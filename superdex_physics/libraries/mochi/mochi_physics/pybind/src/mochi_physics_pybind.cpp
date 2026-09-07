@@ -33,6 +33,11 @@
 using namespace mochi;
 namespace py = pybind11;
 
+namespace mochi {
+void DefineSceneBatchExecutor(py::module_& m);
+void OverrideLeasedSceneDestroy(py::module_& m);
+}
+
 PYBIND11_MODULE(MOCHI_PHYSICS_MODULE_NAME, m) {
   // Build configuration
   m.def(
@@ -331,6 +336,8 @@ Raises:
 
   // Insert generated bindings here
   mochi::DefineAll(m);
+  mochi::DefineSceneBatchExecutor(m);
+  mochi::OverrideLeasedSceneDestroy(m);
 
   // Override release_shape to accept None (equivalent to default-constructed ShapeHandle)
   m.def(
