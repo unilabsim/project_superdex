@@ -75,15 +75,21 @@ class SceneBatchExecutor
     : public std::enable_shared_from_this<SceneBatchExecutor> {
 public:
   SceneBatchExecutor(py::sequence scenes, py::sequence actors,
-                     size_t numWorkers) {
+                     py::sequence links, py::sequence contactSources,
+                     py::sequence contactOthers, py::sequence contactKinds,
+                     py::sequence contactDistances, size_t numWorkers) {
     CheckContext();
     if (numWorkers == 0) {
       throw std::invalid_argument(
           "SceneBatchExecutor requires num_workers >= 1");
     }
-    if (py::len(scenes) == 0 || py::len(scenes) != py::len(actors)) {
+    if (py::len(scenes) == 0 || py::len(scenes) != py::len(actors) ||
+        py::len(scenes) != py::len(links) ||
+        py::len(scenes) != py::len(contactSources) ||
+        py::len(scenes) != py::len(contactOthers)) {
       throw std::invalid_argument(
-          "scenes and actors must be non-empty and have equal length");
+          "scenes, actors, links, contact_sources, and contact_others must be "
+          "non-empty and have equal length");
     }
     numWorkers = std::min(numWorkers, static_cast<size_t>(py::len(scenes)));
     if (GetContext()->GetNumThreads() != 0) {
@@ -95,6 +101,22 @@ public:
     std::unordered_set<Scene *> uniqueScenes;
     std::unordered_set<Actor *> uniqueActors;
     int dofCount = -1;
+    int linkCount = -1;
+    int contactCount = -1;
+    if (py::len(contactKinds) != py::len(contactDistances)) {
+      throw std::invalid_argument(
+          "contact_kinds and contact_distances must have equal length");
+    }
+    for (size_t i = 0; i < static_cast<size_t>(py::len(contactKinds)); ++i) {
+      auto kind = py::cast<int>(contactKinds[i]);
+      auto distance = py::cast<double>(contactDistances[i]);
+      if (kind < 0 || kind > 2 || !std::isfinite(distance) || distance < 0) {
+        throw std::invalid_argument(
+            "contact kinds must be 0..2 and distances finite/non-negative");
+      }
+      _contactKinds.push_back(kind);
+      _contactDistances.push_back(static_cast<real>(distance));
+    }
     for (size_t i = 0; i < static_cast<size_t>(py::len(scenes)); ++i) {
       auto scene = py::cast<Scene *>(scenes[i]);
       auto actor = py::cast<Actor *>(actors[i]);
@@ -120,8 +142,65 @@ public:
       dofCount = thisDofCount;
       _scenes.push_back(scene);
       _actors.push_back(actor);
+
+      auto sceneLinks = py::cast<py::sequence>(links[i]);
+      if (linkCount < 0) {
+        linkCount = static_cast<int>(py::len(sceneLinks));
+      } else if (static_cast<int>(py::len(sceneLinks)) != linkCount) {
+        throw std::invalid_argument("all link actor lists must have equal length");
+      }
+      std::vector<Actor *> nativeLinks;
+      nativeLinks.reserve(static_cast<size_t>(py::len(sceneLinks)));
+      for (size_t linkIndex = 0; linkIndex < static_cast<size_t>(py::len(sceneLinks));
+           ++linkIndex) {
+        auto link = py::cast<Actor *>(sceneLinks[linkIndex]);
+        if (!link || link->GetScene() != scene) {
+          throw std::invalid_argument("link actors must belong to their scene");
+        }
+        nativeLinks.push_back(link);
+      }
+      _links.push_back(std::move(nativeLinks));
+
+      auto sceneSources = py::cast<py::sequence>(contactSources[i]);
+      auto sceneOthers = py::cast<py::sequence>(contactOthers[i]);
+      if (static_cast<int>(py::len(sceneSources)) !=
+              static_cast<int>(_contactKinds.size()) ||
+          py::len(sceneSources) != py::len(sceneOthers)) {
+        throw std::invalid_argument(
+            "each contact source/other list must match contact_kinds");
+      }
+      std::vector<Actor *> nativeSources;
+      std::vector<Actor *> nativeOthers;
+      nativeSources.reserve(_contactKinds.size());
+      nativeOthers.reserve(_contactKinds.size());
+      for (size_t contactIndex = 0; contactIndex < _contactKinds.size();
+           ++contactIndex) {
+        auto source = py::cast<Actor *>(sceneSources[contactIndex]);
+        if (!source || source->GetScene() != scene) {
+          throw std::invalid_argument("contact sources must belong to their scene");
+        }
+        nativeSources.push_back(source);
+        if (sceneOthers[contactIndex].is_none()) {
+          nativeOthers.push_back(nullptr);
+        } else {
+          auto other = py::cast<Actor *>(sceneOthers[contactIndex]);
+          if (!other || other->GetScene() != scene) {
+            throw std::invalid_argument("contact actors must belong to their scene");
+          }
+          nativeOthers.push_back(other);
+        }
+      }
+      if (contactCount < 0) {
+        contactCount = static_cast<int>(nativeSources.size());
+      } else if (static_cast<int>(nativeSources.size()) != contactCount) {
+        throw std::invalid_argument("all contact actor lists must have equal length");
+      }
+      _contactSources.push_back(std::move(nativeSources));
+      _contactOthers.push_back(std::move(nativeOthers));
     }
     _dofCount = dofCount;
+    _linkCount = std::max(0, linkCount);
+    _contactCount = std::max(0, contactCount);
     _dofIndices.resize(static_cast<size_t>(_dofCount));
     for (int i = 0; i < _dofCount; ++i) {
       _dofIndices[static_cast<size_t>(i)] = i;
@@ -159,12 +238,16 @@ public:
   [[nodiscard]] size_t GetNumWorkers() const { return _workers.size(); }
   [[nodiscard]] size_t GetNumScenes() const { return _scenes.size(); }
   [[nodiscard]] int GetNumDofs() const { return _dofCount; }
+  [[nodiscard]] int GetNumLinks() const { return _linkCount; }
+  [[nodiscard]] int GetNumContacts() const { return _contactCount; }
   [[nodiscard]] bool IsClosed() const { return _closed; }
 
   void Step(double timeStepSec,
             py::array_t<real, py::array::c_style> generalizedForces,
             py::array_t<real, py::array::c_style> qposOut,
-            py::array_t<real, py::array::c_style> qvelOut) {
+            py::array_t<real, py::array::c_style> qvelOut,
+            py::array_t<real, py::array::c_style> linkStateOut,
+            py::array_t<real, py::array::c_style> contactOut) {
     CheckContext();
     if (!std::isfinite(timeStepSec) || timeStepSec < 0) {
       throw std::invalid_argument(
@@ -173,6 +256,8 @@ public:
     ValidateArray("generalized_forces", generalizedForces);
     ValidateArray("qpos_out", qposOut);
     ValidateArray("qvel_out", qvelOut);
+    ValidateArray("link_state_out", linkStateOut, 3, _linkCount, 16);
+    ValidateArray("contact_out", contactOut, 3, _contactCount, 3);
 
     std::unique_lock callLock(_callMutex);
     if (_closed) {
@@ -189,12 +274,15 @@ public:
     auto const *forceData = generalizedForces.data();
     auto *qposData = qposOut.mutable_data();
     auto *qvelData = qvelOut.mutable_data();
+    auto *linkStateData = linkStateOut.mutable_data();
+    auto *contactData = contactOut.mutable_data();
     std::exception_ptr failure;
     {
       // Keep all pybind arrays alive with the GIL held. Only the pure C++
       // scheduler barrier may execute without it.
       py::gil_scoped_release release;
-      failure = DispatchAndWait(timeStepSec, forceData, qposData, qvelData);
+      failure = DispatchAndWait(timeStepSec, forceData, qposData, qvelData,
+                                linkStateData, contactData);
     }
     if (failure) {
       std::rethrow_exception(failure);
@@ -226,14 +314,16 @@ public:
 
 private:
   std::exception_ptr DispatchAndWait(double timeStepSec, real const* forceData,
-                                     real* qposData, real* qvelData) {
+                                     real* qposData, real* qvelData,
+                                     real* linkStateData, real* contactData) {
     {
       std::lock_guard lock(_mutex);
       _failure = nullptr;
       _pending = _scenes.size();
       for (size_t i = 0; i < _scenes.size(); ++i) {
         _jobs.emplace_back(
-            [this, i, timeStepSec, forceData, qposData, qvelData]() {
+            [this, i, timeStepSec, forceData, qposData, qvelData, linkStateData,
+             contactData]() {
               auto const offset = i * static_cast<size_t>(_dofCount);
               Error error;
               _actors[i]->SetExternalForcesOnDofs(
@@ -257,6 +347,85 @@ private:
               if (!error.IsOK()) {
                 throw MochiErrorException(error);
               }
+              auto const linkOffset = i * static_cast<size_t>(_linkCount) * 16;
+              std::vector<TransformRT> transforms(static_cast<size_t>(_linkCount));
+              _actors[i]->GetArticulatedLinkTransforms(MakeSpan(transforms), error);
+              if (!error.IsOK()) {
+                throw MochiErrorException(error);
+              }
+              for (int linkIndex = 0; linkIndex < _linkCount; ++linkIndex) {
+                auto const &transform = transforms[static_cast<size_t>(linkIndex)];
+                auto const position = transform.GetTranslation();
+                auto const rotation = transform.GetRotation().ToReal4();
+                auto *out = linkStateData + linkOffset +
+                            static_cast<size_t>(linkIndex) * 16;
+                out[0] = position[0];
+                out[1] = position[1];
+                out[2] = position[2];
+                out[3] = rotation[3];
+                out[4] = rotation[0];
+                out[5] = rotation[1];
+                out[6] = rotation[2];
+                auto const com = _links[i][static_cast<size_t>(linkIndex)]
+                                     ->GetCenterOfMassTransform(error);
+                if (!error.IsOK()) {
+                  throw MochiErrorException(error);
+                }
+                auto const comPosition = com.GetTranslation();
+                auto const linear = _links[i][static_cast<size_t>(linkIndex)]
+                                        ->GetLinearVelocity(error);
+                auto const angular = _links[i][static_cast<size_t>(linkIndex)]
+                                         ->GetAngularVelocity(error);
+                if (!error.IsOK()) {
+                  throw MochiErrorException(error);
+                }
+                out[7] = comPosition[0];
+                out[8] = comPosition[1];
+                out[9] = comPosition[2];
+                out[10] = linear[0];
+                out[11] = linear[1];
+                out[12] = linear[2];
+                out[13] = angular[0];
+                out[14] = angular[1];
+                out[15] = angular[2];
+              }
+              auto const contactOffset = i * static_cast<size_t>(_contactCount) * 3;
+              for (int contactIndex = 0; contactIndex < _contactCount; ++contactIndex) {
+                auto *out = contactData + contactOffset +
+                            static_cast<size_t>(contactIndex) * 3;
+                out[0] = 0;
+                out[1] = 0;
+                out[2] = 0;
+                auto *source = _contactSources[i][static_cast<size_t>(contactIndex)];
+                auto *other = _contactOthers[i][static_cast<size_t>(contactIndex)];
+                if (_contactKinds[static_cast<size_t>(contactIndex)] == 0) {
+                  auto points = source->GetContactPointsWorld(error);
+                  if (!error.IsOK()) {
+                    throw MochiErrorException(error);
+                  }
+                  auto const own = source->GetHandle();
+                  auto const otherHandle = other ? other->GetHandle() : ActorHandle{};
+                  for (auto const &point : points) {
+                    if (point.distance <= _contactDistances[static_cast<size_t>(contactIndex)] &&
+                        (!other ||
+                         ((point.actorA == own && point.actorB == otherHandle) ||
+                          (point.actorA == otherHandle && point.actorB == own)))) {
+                      out[0] = 1;
+                      break;
+                    }
+                  }
+                } else {
+                  auto value = _contactKinds[static_cast<size_t>(contactIndex)] == 1
+                                   ? source->GetContactForceWorld(error)
+                                   : source->GetContactTorqueWorld(error);
+                  if (!error.IsOK()) {
+                    throw MochiErrorException(error);
+                  }
+                  out[0] = value[0];
+                  out[1] = value[1];
+                  out[2] = value[2];
+                }
+              }
             });
       }
     }
@@ -267,12 +436,21 @@ private:
   }
 
   void ValidateArray(char const *name,
-                     py::array_t<real, py::array::c_style> const &array) const {
-    if (array.ndim() != 2 ||
+                     py::array_t<real, py::array::c_style> const &array,
+                     int ndim = 2, int dim1 = -1, int dim2 = -1) const {
+    if (array.ndim() != ndim ||
         array.shape(0) != static_cast<py::ssize_t>(_scenes.size()) ||
-        array.shape(1) != _dofCount) {
-      throw std::invalid_argument(std::string(name) +
-                                  " must have shape [num_scenes, num_dofs]");
+        (ndim == 2 && array.shape(1) != _dofCount) ||
+        (ndim == 3 && (array.shape(1) != dim1 || array.shape(2) != dim2))) {
+      throw std::invalid_argument(
+          std::string(name) + " has unexpected shape (ndim=" +
+          std::to_string(array.ndim()) + ", shape0=" +
+          std::to_string(array.shape(0)) + ", expected ndim=" +
+          std::to_string(ndim) + ", dim1=" + std::to_string(dim1) +
+          ", dim2=" + std::to_string(dim2) + ", links=" +
+          std::to_string(_linkCount) + ", actual1=" +
+          (array.ndim() > 1 ? std::to_string(array.shape(1)) : "-") +
+          ", actual2=" + (array.ndim() > 2 ? std::to_string(array.shape(2)) : "-") + ")");
     }
   }
 
@@ -312,8 +490,15 @@ private:
 
   std::vector<Scene *> _scenes;
   std::vector<Actor *> _actors;
+  std::vector<std::vector<Actor *>> _links;
+  std::vector<std::vector<Actor *>> _contactSources;
+  std::vector<std::vector<Actor *>> _contactOthers;
+  std::vector<int> _contactKinds;
+  std::vector<real> _contactDistances;
   std::vector<int> _dofIndices;
   int _dofCount = 0;
+  int _linkCount = 0;
+  int _contactCount = 0;
   std::vector<std::thread> _workers;
   std::deque<std::function<void()>> _jobs;
   mutable std::mutex _mutex;
@@ -333,9 +518,13 @@ void DefineSceneBatchExecutor(py::module_ &m) {
   py::class_<SceneBatchExecutor, std::shared_ptr<SceneBatchExecutor>>(
       m, "SceneBatchExecutor")
       .def(py::init(
-               [](py::sequence scenes, py::sequence actors, size_t numWorkers) {
+               [](py::sequence scenes, py::sequence actors, py::sequence links,
+                  py::sequence contactSources, py::sequence contactOthers,
+                  py::sequence contactKinds, py::sequence contactDistances,
+                  size_t numWorkers) {
                  auto executor = std::make_shared<SceneBatchExecutor>(
-                     scenes, actors, numWorkers);
+                     scenes, actors, links, contactSources, contactOthers,
+                     contactKinds, contactDistances, numWorkers);
                  RegisterContextDependent(
                      [weak = std::weak_ptr<SceneBatchExecutor>(executor)]() {
                        if (auto active = weak.lock()) {
@@ -344,21 +533,30 @@ void DefineSceneBatchExecutor(py::module_ &m) {
                      });
                  return executor;
                }),
-           py::arg("scenes"), py::arg("actors"), py::arg("num_workers"))
+           py::arg("scenes"), py::arg("actors"), py::arg("links"),
+           py::arg("contact_sources"), py::arg("contact_others"),
+           py::arg("contact_kinds"), py::arg("contact_distances"),
+           py::arg("num_workers"))
       .def_property_readonly("num_workers", &SceneBatchExecutor::GetNumWorkers)
       .def_property_readonly("num_scenes", &SceneBatchExecutor::GetNumScenes)
       .def_property_readonly("num_dofs", &SceneBatchExecutor::GetNumDofs)
+      .def_property_readonly("num_links", &SceneBatchExecutor::GetNumLinks)
+      .def_property_readonly("num_contacts", &SceneBatchExecutor::GetNumContacts)
       .def_property_readonly("closed", &SceneBatchExecutor::IsClosed)
       .def(
           "step",
           [](SceneBatchExecutor& self, double timeStepSec,
              py::array_t<real, py::array::c_style> generalizedForces,
              py::array_t<real, py::array::c_style> qposOut,
-             py::array_t<real, py::array::c_style> qvelOut) {
-            self.Step(timeStepSec, generalizedForces, qposOut, qvelOut);
+             py::array_t<real, py::array::c_style> qvelOut,
+             py::array_t<real, py::array::c_style> linkStateOut,
+             py::array_t<real, py::array::c_style> contactOut) {
+            self.Step(timeStepSec, generalizedForces, qposOut, qvelOut,
+                      linkStateOut, contactOut);
           },
           py::arg("time_step_sec"), py::arg("generalized_forces"),
-          py::arg("qpos_out"), py::arg("qvel_out"))
+          py::arg("qpos_out"), py::arg("qvel_out"), py::arg("link_state_out"),
+          py::arg("contact_out"))
       .def("close", [](SceneBatchExecutor& self) {
         py::gil_scoped_release release;
         self.Close();
