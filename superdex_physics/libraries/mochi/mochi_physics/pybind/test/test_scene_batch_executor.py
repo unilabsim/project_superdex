@@ -37,15 +37,26 @@ def test_scene_batch_executor_steps_and_refreshes_each_scene():
         qvel = np.empty_like(forces)
         link_state = np.empty((len(scenes), len(links[0]), 16), dtype=np.float32)
         contact = np.empty((len(scenes), 0, 3), dtype=np.float32)
-        with mochi.SceneBatchExecutor(scenes, actors, num_workers=2) as executor:
+        diverged = np.empty(len(scenes), dtype=np.uint8)
+        with mochi.SceneBatchExecutor(
+            scenes,
+            actors,
+            links,
+            [[] for _ in scenes],
+            [[] for _ in scenes],
+            [],
+            [],
+            num_workers=2,
+        ) as executor:
             assert executor.num_scenes == 4
             assert executor.num_dofs == dofs
             assert executor.num_links == len(links[0])
             assert executor.num_contacts == 0
-            executor.step(0.002, forces, qpos, qvel, link_state, contact)
+            executor.step(0.002, forces, qpos, qvel, link_state, contact, diverged)
             assert np.isfinite(qpos).all()
             assert np.isfinite(qvel).all()
             assert np.isfinite(link_state).all()
+            assert not diverged.any()
             for scene in scenes:
                 assert abs(scene.get_total_simulation_time() - 0.002) < 1e-8
         assert executor.closed
@@ -67,7 +78,17 @@ def test_scene_batch_executor_shutdown_closes_live_workers():
         )
     )
     mochi.release_shape(shape)
-    executor = mochi.SceneBatchExecutor([scene], [actor], num_workers=1)
+    links = [[scene.get_actor(handle) for handle in actor.get_nested_link_actors()]]
+    executor = mochi.SceneBatchExecutor(
+        [scene],
+        [actor],
+        links,
+        [[]],
+        [[]],
+        [],
+        [],
+        num_workers=1,
+    )
     with pytest.raises(RuntimeError, match="close SceneBatchExecutor"):
         mochi.destroy_scene(scene)
     mochi.shutdown()
