@@ -19,15 +19,16 @@
 #include <mochi_physics/pybind/core/pybind_core.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
-#include <deque>
 #include <exception>
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <stdexcept>
 #include <thread>
 #include <unordered_set>
@@ -74,6 +75,14 @@ bool IsLeasedScene(Scene const *scene) {
 
 class SceneBatchExecutor {
 public:
+  static constexpr uint32_t kReadQpos = 1u << 0;
+  static constexpr uint32_t kReadQvel = 1u << 1;
+  static constexpr uint32_t kReadLinks = 1u << 2;
+  static constexpr uint32_t kReadContacts = 1u << 3;
+  static constexpr uint32_t kReadDiverged = 1u << 4;
+  static constexpr uint32_t kReadAll = kReadQpos | kReadQvel | kReadLinks |
+                                        kReadContacts | kReadDiverged;
+
   SceneBatchExecutor(py::sequence scenes, py::sequence actors,
                      py::sequence links, py::sequence contactSources,
                      py::sequence contactOthers, py::sequence contactKinds,
@@ -244,22 +253,26 @@ public:
 
   void Step(double timeStepSec,
             py::array_t<real, py::array::c_style> generalizedForces,
-            py::array_t<real, py::array::c_style> qposOut,
-            py::array_t<real, py::array::c_style> qvelOut,
-            py::array_t<real, py::array::c_style> linkStateOut,
-            py::array_t<real, py::array::c_style> contactOut,
-            py::array_t<uint8_t, py::array::c_style> divergedOut) {
+            py::object qposOut, py::object qvelOut, py::object linkStateOut,
+            py::object contactOut, py::object divergedOut,
+            uint32_t readbackMask) {
     CheckContext();
     if (!std::isfinite(timeStepSec) || timeStepSec < 0) {
       throw std::invalid_argument(
           "time_step_sec must be finite and non-negative");
     }
     ValidateArray("generalized_forces", generalizedForces);
-    ValidateArray("qpos_out", qposOut);
-    ValidateArray("qvel_out", qvelOut);
-    ValidateArray("link_state_out", linkStateOut, 3, _linkCount, 16);
-    ValidateArray("contact_out", contactOut, 3, _contactCount, 3);
-    ValidateVector("diverged_out", divergedOut);
+    if ((readbackMask & ~kReadAll) != 0) {
+      throw std::invalid_argument("readback_mask contains unknown fields");
+    }
+    auto qpos = RequireArray("qpos_out", qposOut, readbackMask & kReadQpos);
+    auto qvel = RequireArray("qvel_out", qvelOut, readbackMask & kReadQvel);
+    auto links = RequireArray("link_state_out", linkStateOut,
+                              readbackMask & kReadLinks, 3, _linkCount, 16);
+    auto contacts = RequireArray("contact_out", contactOut,
+                                 readbackMask & kReadContacts, 3, _contactCount, 3);
+    auto diverged = RequireVector("diverged_out", divergedOut,
+                                  readbackMask & kReadDiverged);
 
     std::unique_lock callLock(_callMutex);
     if (_closed) {
@@ -274,18 +287,19 @@ public:
     }
 
     auto const *forceData = generalizedForces.data();
-    auto *qposData = qposOut.mutable_data();
-    auto *qvelData = qvelOut.mutable_data();
-    auto *linkStateData = linkStateOut.mutable_data();
-    auto *contactData = contactOut.mutable_data();
-    auto *divergedData = divergedOut.mutable_data();
+    auto *qposData = qpos ? qpos->mutable_data() : nullptr;
+    auto *qvelData = qvel ? qvel->mutable_data() : nullptr;
+    auto *linkStateData = links ? links->mutable_data() : nullptr;
+    auto *contactData = contacts ? contacts->mutable_data() : nullptr;
+    auto *divergedData = diverged ? diverged->mutable_data() : nullptr;
     std::exception_ptr failure;
     {
       // Keep all pybind arrays alive with the GIL held. Only the pure C++
       // scheduler barrier may execute without it.
       py::gil_scoped_release release;
       failure = DispatchAndWait(timeStepSec, forceData, qposData, qvelData,
-                                linkStateData, contactData, divergedData);
+                                linkStateData, contactData, divergedData,
+                                readbackMask);
     }
     if (failure) {
       std::rethrow_exception(failure);
@@ -316,132 +330,150 @@ public:
   }
 
 private:
-  std::exception_ptr DispatchAndWait(double timeStepSec, real const* forceData,
-                                     real* qposData, real* qvelData,
-                                     real* linkStateData, real* contactData,
-                                     uint8_t* divergedData) {
+  std::exception_ptr DispatchAndWait(double timeStepSec, real const *forceData,
+                                     real *qposData, real *qvelData,
+                                     real *linkStateData, real *contactData,
+                                     uint8_t *divergedData,
+                                     uint32_t readbackMask) {
     {
       std::lock_guard lock(_mutex);
       _failure = nullptr;
-      _pending = _scenes.size();
-      for (size_t i = 0; i < _scenes.size(); ++i) {
-        _jobs.emplace_back(
-            [this, i, timeStepSec, forceData, qposData, qvelData, linkStateData,
-             contactData, divergedData]() {
-              auto const offset = i * static_cast<size_t>(_dofCount);
-              Error error;
-              _actors[i]->SetExternalForcesOnDofs(
-                  MakeConstSpan(_dofIndices),
-                  Span<real const>(forceData + offset,
-                                   static_cast<size_t>(_dofCount)),
-                  error);
-              if (!error.IsOK()) {
-                throw MochiErrorException(error);
-              }
-              _scenes[i]->Step(timeStepSec);
-              divergedData[i] = _scenes[i]->GetSolverStats().convergenceStatus ==
-                                        ConvergenceStatus::Diverged
-                                    ? 1
-                                    : 0;
-              _actors[i]->GetArticulatedPose(
-                  Span<real>(qposData + offset, static_cast<size_t>(_dofCount)),
-                  error);
-              if (!error.IsOK()) {
-                throw MochiErrorException(error);
-              }
-              _actors[i]->GetArticulatedJointVelocities(
-                  Span<real>(qvelData + offset, static_cast<size_t>(_dofCount)),
-                  error);
-              if (!error.IsOK()) {
-                throw MochiErrorException(error);
-              }
-              auto const linkOffset = i * static_cast<size_t>(_linkCount) * 16;
-              thread_local std::vector<TransformRT> transforms;
-              transforms.resize(static_cast<size_t>(_linkCount));
-              _actors[i]->GetArticulatedLinkTransforms(MakeSpan(transforms), error);
-              if (!error.IsOK()) {
-                throw MochiErrorException(error);
-              }
-              for (int linkIndex = 0; linkIndex < _linkCount; ++linkIndex) {
-                auto const &transform = transforms[static_cast<size_t>(linkIndex)];
-                auto const position = transform.GetTranslation();
-                auto const rotation = transform.GetRotation().ToReal4();
-                auto *out = linkStateData + linkOffset +
-                            static_cast<size_t>(linkIndex) * 16;
-                out[0] = position[0];
-                out[1] = position[1];
-                out[2] = position[2];
-                out[3] = rotation[3];
-                out[4] = rotation[0];
-                out[5] = rotation[1];
-                out[6] = rotation[2];
-                auto const com = _links[i][static_cast<size_t>(linkIndex)]
-                                     ->GetCenterOfMassTransform(error);
-                if (!error.IsOK()) {
-                  throw MochiErrorException(error);
-                }
-                auto const comPosition = com.GetTranslation();
-                auto const linear = _links[i][static_cast<size_t>(linkIndex)]
-                                        ->GetLinearVelocity(error);
-                auto const angular = _links[i][static_cast<size_t>(linkIndex)]
-                                         ->GetAngularVelocity(error);
-                if (!error.IsOK()) {
-                  throw MochiErrorException(error);
-                }
-                out[7] = comPosition[0];
-                out[8] = comPosition[1];
-                out[9] = comPosition[2];
-                out[10] = linear[0];
-                out[11] = linear[1];
-                out[12] = linear[2];
-                out[13] = angular[0];
-                out[14] = angular[1];
-                out[15] = angular[2];
-              }
-              auto const contactOffset = i * static_cast<size_t>(_contactCount) * 3;
-              for (int contactIndex = 0; contactIndex < _contactCount; ++contactIndex) {
-                auto *out = contactData + contactOffset +
-                            static_cast<size_t>(contactIndex) * 3;
-                out[0] = 0;
-                out[1] = 0;
-                out[2] = 0;
-                auto *source = _contactSources[i][static_cast<size_t>(contactIndex)];
-                auto *other = _contactOthers[i][static_cast<size_t>(contactIndex)];
-                if (_contactKinds[static_cast<size_t>(contactIndex)] == 0) {
-                  auto points = source->GetContactPointsWorld(error);
-                  if (!error.IsOK()) {
-                    throw MochiErrorException(error);
-                  }
-                  auto const own = source->GetHandle();
-                  auto const otherHandle = other ? other->GetHandle() : ActorHandle{};
-                  for (auto const &point : points) {
-                    if (point.distance <= _contactDistances[static_cast<size_t>(contactIndex)] &&
-                        (!other ||
-                         ((point.actorA == own && point.actorB == otherHandle) ||
-                          (point.actorA == otherHandle && point.actorB == own)))) {
-                      out[0] = 1;
-                      break;
-                    }
-                  }
-                } else {
-                  auto value = _contactKinds[static_cast<size_t>(contactIndex)] == 1
-                                   ? source->GetContactForceWorld(error)
-                                   : source->GetContactTorqueWorld(error);
-                  if (!error.IsOK()) {
-                    throw MochiErrorException(error);
-                  }
-                  out[0] = value[0];
-                  out[1] = value[1];
-                  out[2] = value[2];
-                }
-              }
-            });
-      }
+      _nextIndex.store(0, std::memory_order_relaxed);
+      _completedWorkers = 0;
+      _timeStepSec = timeStepSec;
+      _forceData = forceData;
+      _qposData = qposData;
+      _qvelData = qvelData;
+      _linkStateData = linkStateData;
+      _contactData = contactData;
+      _divergedData = divergedData;
+      _readbackMask = readbackMask;
+      ++_dispatchGeneration;
     }
     _workAvailable.notify_all();
     std::unique_lock lock(_mutex);
-    _allDone.wait(lock, [this]() { return _pending == 0; });
+    _allDone.wait(lock, [this]() {
+      return _completedWorkers == _workers.size();
+    });
     return _failure;
+  }
+
+  void RunScene(size_t i) {
+    auto const offset = i * static_cast<size_t>(_dofCount);
+    Error error;
+    _actors[i]->SetExternalForcesOnDofs(
+        MakeConstSpan(_dofIndices),
+        Span<real const>(_forceData + offset, static_cast<size_t>(_dofCount)),
+        error);
+    if (!error.IsOK()) {
+      throw MochiErrorException(error);
+    }
+    _scenes[i]->Step(_timeStepSec);
+    if (_readbackMask & kReadDiverged) {
+      _divergedData[i] = _scenes[i]->GetSolverStats().convergenceStatus ==
+                                 ConvergenceStatus::Diverged
+                             ? 1
+                             : 0;
+    }
+    if (_readbackMask & kReadQpos) {
+      _actors[i]->GetArticulatedPose(
+          Span<real>(_qposData + offset, static_cast<size_t>(_dofCount)), error);
+      if (!error.IsOK()) {
+        throw MochiErrorException(error);
+      }
+    }
+    if (_readbackMask & kReadQvel) {
+      _actors[i]->GetArticulatedJointVelocities(
+          Span<real>(_qvelData + offset, static_cast<size_t>(_dofCount)), error);
+      if (!error.IsOK()) {
+        throw MochiErrorException(error);
+      }
+    }
+    if (_readbackMask & kReadLinks) {
+      auto const linkOffset = i * static_cast<size_t>(_linkCount) * 16;
+      thread_local std::vector<TransformRT> transforms;
+      transforms.resize(static_cast<size_t>(_linkCount));
+      _actors[i]->GetArticulatedLinkTransforms(MakeSpan(transforms), error);
+      if (!error.IsOK()) {
+        throw MochiErrorException(error);
+      }
+      for (int linkIndex = 0; linkIndex < _linkCount; ++linkIndex) {
+        auto const &transform = transforms[static_cast<size_t>(linkIndex)];
+        auto const position = transform.GetTranslation();
+        auto const rotation = transform.GetRotation().ToReal4();
+        auto *out = _linkStateData + linkOffset +
+                    static_cast<size_t>(linkIndex) * 16;
+        out[0] = position[0];
+        out[1] = position[1];
+        out[2] = position[2];
+        out[3] = rotation[3];
+        out[4] = rotation[0];
+        out[5] = rotation[1];
+        out[6] = rotation[2];
+        auto const com = _links[i][static_cast<size_t>(linkIndex)]
+                             ->GetCenterOfMassTransform(error);
+        if (!error.IsOK()) {
+          throw MochiErrorException(error);
+        }
+        auto const comPosition = com.GetTranslation();
+        auto const linear = _links[i][static_cast<size_t>(linkIndex)]
+                                ->GetLinearVelocity(error);
+        auto const angular = _links[i][static_cast<size_t>(linkIndex)]
+                                 ->GetAngularVelocity(error);
+        if (!error.IsOK()) {
+          throw MochiErrorException(error);
+        }
+        out[7] = comPosition[0];
+        out[8] = comPosition[1];
+        out[9] = comPosition[2];
+        out[10] = linear[0];
+        out[11] = linear[1];
+        out[12] = linear[2];
+        out[13] = angular[0];
+        out[14] = angular[1];
+        out[15] = angular[2];
+      }
+    }
+    if (_readbackMask & kReadContacts) {
+      auto const contactOffset = i * static_cast<size_t>(_contactCount) * 3;
+      for (int contactIndex = 0; contactIndex < _contactCount; ++contactIndex) {
+        auto *out = _contactData + contactOffset +
+                    static_cast<size_t>(contactIndex) * 3;
+        out[0] = 0;
+        out[1] = 0;
+        out[2] = 0;
+        auto *source = _contactSources[i][static_cast<size_t>(contactIndex)];
+        auto *other = _contactOthers[i][static_cast<size_t>(contactIndex)];
+        if (_contactKinds[static_cast<size_t>(contactIndex)] == 0) {
+          auto points = source->GetContactPointsWorld(error);
+          if (!error.IsOK()) {
+            throw MochiErrorException(error);
+          }
+          auto const own = source->GetHandle();
+          auto const otherHandle = other ? other->GetHandle() : ActorHandle{};
+          for (auto const &point : points) {
+            if (point.distance <=
+                    _contactDistances[static_cast<size_t>(contactIndex)] &&
+                (!other ||
+                 ((point.actorA == own && point.actorB == otherHandle) ||
+                  (point.actorA == otherHandle && point.actorB == own)))) {
+              out[0] = 1;
+              break;
+            }
+          }
+        } else {
+          auto value = _contactKinds[static_cast<size_t>(contactIndex)] == 1
+                           ? source->GetContactForceWorld(error)
+                           : source->GetContactTorqueWorld(error);
+          if (!error.IsOK()) {
+            throw MochiErrorException(error);
+          }
+          out[0] = value[0];
+          out[1] = value[1];
+          out[2] = value[2];
+        }
+      }
+    }
   }
 
   void ValidateArray(char const *name,
@@ -472,33 +504,76 @@ private:
     }
   }
 
+  std::optional<py::array_t<real, py::array::c_style>> RequireArray(
+      char const *name, py::object const &object, bool requested, int ndim = 2,
+      int dim1 = -1, int dim2 = -1) const {
+    if (!requested) {
+      if (!object.is_none()) {
+        throw std::invalid_argument(std::string(name) +
+                                    " must be None when readback is disabled");
+      }
+      return std::nullopt;
+    }
+    if (object.is_none()) {
+      throw std::invalid_argument(std::string(name) +
+                                  " is required by readback_mask");
+    }
+    auto array = object.cast<py::array_t<real, py::array::c_style>>();
+    ValidateArray(name, array, ndim, dim1, dim2);
+    return array;
+  }
+
+  std::optional<py::array_t<uint8_t, py::array::c_style>> RequireVector(
+      char const *name, py::object const &object, bool requested) const {
+    if (!requested) {
+      if (!object.is_none()) {
+        throw std::invalid_argument(std::string(name) +
+                                    " must be None when readback is disabled");
+      }
+      return std::nullopt;
+    }
+    if (object.is_none()) {
+      throw std::invalid_argument(std::string(name) +
+                                  " is required by readback_mask");
+    }
+    auto array = object.cast<py::array_t<uint8_t, py::array::c_style>>();
+    ValidateVector(name, array);
+    return array;
+  }
+
   void WorkerMain() {
     auto *context = GetContext();
     context->BindThisThread();
+    size_t seenGeneration = 0;
     while (true) {
-      std::function<void()> job;
       {
         std::unique_lock lock(_mutex);
-        _workAvailable.wait(lock,
-                            [this]() { return _stopping || !_jobs.empty(); });
-        if (_stopping && _jobs.empty()) {
+        _workAvailable.wait(lock, [this, seenGeneration]() {
+          return _stopping || _dispatchGeneration != seenGeneration;
+        });
+        if (_stopping) {
           break;
         }
-        job = std::move(_jobs.front());
-        _jobs.pop_front();
+        seenGeneration = _dispatchGeneration;
       }
-      try {
-        job();
-      } catch (...) {
-        std::lock_guard lock(_mutex);
-        if (!_failure) {
-          _failure = std::current_exception();
+      while (true) {
+        auto const index = _nextIndex.fetch_add(1, std::memory_order_relaxed);
+        if (index >= _scenes.size()) {
+          break;
+        }
+        try {
+          RunScene(index);
+        } catch (...) {
+          std::lock_guard lock(_mutex);
+          if (!_failure) {
+            _failure = std::current_exception();
+          }
         }
       }
       {
         std::lock_guard lock(_mutex);
-        --_pending;
-        if (_pending == 0) {
+        ++_completedWorkers;
+        if (_completedWorkers == _workers.size()) {
           _allDone.notify_one();
         }
       }
@@ -518,13 +593,22 @@ private:
   int _linkCount = 0;
   int _contactCount = 0;
   std::vector<std::thread> _workers;
-  std::deque<std::function<void()>> _jobs;
+  std::atomic<size_t> _nextIndex{0};
+  double _timeStepSec = 0;
+  real const *_forceData = nullptr;
+  real *_qposData = nullptr;
+  real *_qvelData = nullptr;
+  real *_linkStateData = nullptr;
+  real *_contactData = nullptr;
+  uint8_t *_divergedData = nullptr;
+  uint32_t _readbackMask = kReadAll;
   mutable std::mutex _mutex;
   std::mutex _callMutex;
   std::condition_variable _workAvailable;
   std::condition_variable _allDone;
   std::exception_ptr _failure;
-  size_t _pending = 0;
+  size_t _completedWorkers = 0;
+  size_t _dispatchGeneration = 0;
   bool _stopping = false;
   bool _closed = false;
   bool _leasesRegistered = false;
@@ -565,17 +649,16 @@ void DefineSceneBatchExecutor(py::module_ &m) {
           "step",
           [](SceneBatchExecutor& self, double timeStepSec,
              py::array_t<real, py::array::c_style> generalizedForces,
-             py::array_t<real, py::array::c_style> qposOut,
-             py::array_t<real, py::array::c_style> qvelOut,
-             py::array_t<real, py::array::c_style> linkStateOut,
-             py::array_t<real, py::array::c_style> contactOut,
-             py::array_t<uint8_t, py::array::c_style> divergedOut) {
+             py::object qposOut, py::object qvelOut, py::object linkStateOut,
+             py::object contactOut, py::object divergedOut,
+             uint32_t readbackMask) {
             self.Step(timeStepSec, generalizedForces, qposOut, qvelOut,
-                      linkStateOut, contactOut, divergedOut);
+                      linkStateOut, contactOut, divergedOut, readbackMask);
           },
           py::arg("time_step_sec"), py::arg("generalized_forces"),
           py::arg("qpos_out"), py::arg("qvel_out"), py::arg("link_state_out"),
-          py::arg("contact_out"), py::arg("diverged_out"))
+          py::arg("contact_out"), py::arg("diverged_out"),
+          py::arg("readback_mask"))
       .def("close", [](SceneBatchExecutor& self) {
         py::gil_scoped_release release;
         self.Close();
