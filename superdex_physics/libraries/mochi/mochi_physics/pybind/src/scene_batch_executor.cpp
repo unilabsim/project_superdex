@@ -120,10 +120,6 @@ public:
       dofCount = thisDofCount;
       _scenes.push_back(scene);
       _actors.push_back(actor);
-      // The pool never owns physics objects, but it keeps the Python wrappers
-      // alive while active.
-      _pythonOwners.emplace_back(py::reinterpret_borrow<py::object>(scenes[i]));
-      _pythonOwners.emplace_back(py::reinterpret_borrow<py::object>(actors[i]));
     }
     _dofCount = dofCount;
     _dofIndices.resize(static_cast<size_t>(_dofCount));
@@ -193,6 +189,44 @@ public:
     auto const *forceData = generalizedForces.data();
     auto *qposData = qposOut.mutable_data();
     auto *qvelData = qvelOut.mutable_data();
+    std::exception_ptr failure;
+    {
+      // Keep all pybind arrays alive with the GIL held. Only the pure C++
+      // scheduler barrier may execute without it.
+      py::gil_scoped_release release;
+      failure = DispatchAndWait(timeStepSec, forceData, qposData, qvelData);
+    }
+    if (failure) {
+      std::rethrow_exception(failure);
+    }
+  }
+
+  void Close() {
+    std::unique_lock callLock(_callMutex);
+    if (_closed) {
+      return;
+    }
+    {
+      std::lock_guard lock(_mutex);
+      _stopping = true;
+    }
+    _workAvailable.notify_all();
+    for (auto &worker : _workers) {
+      if (worker.joinable()) {
+        worker.join();
+      }
+    }
+    _workers.clear();
+    if (_leasesRegistered) {
+      ReleaseLeasedScenes(_scenes);
+      _leasesRegistered = false;
+    }
+    _closed = true;
+  }
+
+private:
+  std::exception_ptr DispatchAndWait(double timeStepSec, real const* forceData,
+                                     real* qposData, real* qvelData) {
     {
       std::lock_guard lock(_mutex);
       _failure = nullptr;
@@ -227,43 +261,11 @@ public:
       }
     }
     _workAvailable.notify_all();
-
-    std::exception_ptr failure;
-    {
-      std::unique_lock lock(_mutex);
-      _allDone.wait(lock, [this]() { return _pending == 0; });
-      failure = _failure;
-    }
-    if (failure) {
-      std::rethrow_exception(failure);
-    }
+    std::unique_lock lock(_mutex);
+    _allDone.wait(lock, [this]() { return _pending == 0; });
+    return _failure;
   }
 
-  void Close() {
-    std::unique_lock callLock(_callMutex);
-    if (_closed) {
-      return;
-    }
-    {
-      std::lock_guard lock(_mutex);
-      _stopping = true;
-    }
-    _workAvailable.notify_all();
-    for (auto &worker : _workers) {
-      if (worker.joinable()) {
-        worker.join();
-      }
-    }
-    _workers.clear();
-    _pythonOwners.clear();
-    if (_leasesRegistered) {
-      ReleaseLeasedScenes(_scenes);
-      _leasesRegistered = false;
-    }
-    _closed = true;
-  }
-
-private:
   void ValidateArray(char const *name,
                      py::array_t<real, py::array::c_style> const &array) const {
     if (array.ndim() != 2 ||
@@ -310,7 +312,6 @@ private:
 
   std::vector<Scene *> _scenes;
   std::vector<Actor *> _actors;
-  std::vector<py::object> _pythonOwners;
   std::vector<int> _dofIndices;
   int _dofCount = 0;
   std::vector<std::thread> _workers;
@@ -348,15 +349,28 @@ void DefineSceneBatchExecutor(py::module_ &m) {
       .def_property_readonly("num_scenes", &SceneBatchExecutor::GetNumScenes)
       .def_property_readonly("num_dofs", &SceneBatchExecutor::GetNumDofs)
       .def_property_readonly("closed", &SceneBatchExecutor::IsClosed)
-      .def("step", &SceneBatchExecutor::Step, py::arg("time_step_sec"),
-           py::arg("generalized_forces"), py::arg("qpos_out"),
-           py::arg("qvel_out"), py::call_guard<py::gil_scoped_release>())
-      .def("close", &SceneBatchExecutor::Close)
+      .def(
+          "step",
+          [](SceneBatchExecutor& self, double timeStepSec,
+             py::array_t<real, py::array::c_style> generalizedForces,
+             py::array_t<real, py::array::c_style> qposOut,
+             py::array_t<real, py::array::c_style> qvelOut) {
+            self.Step(timeStepSec, generalizedForces, qposOut, qvelOut);
+          },
+          py::arg("time_step_sec"), py::arg("generalized_forces"),
+          py::arg("qpos_out"), py::arg("qvel_out"))
+      .def("close", [](SceneBatchExecutor& self) {
+        py::gil_scoped_release release;
+        self.Close();
+      })
       .def(
           "__enter__",
           [](SceneBatchExecutor &self) -> SceneBatchExecutor & { return self; })
-      .def("__exit__", [](SceneBatchExecutor &self, py::object, py::object,
-                          py::object) { self.Close(); });
+      .def("__exit__", [](SceneBatchExecutor& self, py::object, py::object,
+                          py::object) {
+        py::gil_scoped_release release;
+        self.Close();
+      });
 }
 
 void OverrideLeasedSceneDestroy(py::module_ &m) {
@@ -372,6 +386,34 @@ void OverrideLeasedSceneDestroy(py::module_ &m) {
         GetContext()->DestroyScene(scene);
       },
       py::arg("scene"));
+}
+
+void OverrideLeasedSceneCallbacks(py::module_& m) {
+  auto sceneClass = m.attr("Scene");
+  auto registerCallback = [](Scene& scene, std::string_view debugName,
+                             std::function<void(StepInfo const&)> callback, int priority,
+                             bool preStep) {
+    if (IsLeasedScene(&scene)) {
+      throw std::runtime_error(
+          "SceneBatchExecutor scenes do not support Python step callbacks");
+    }
+    return preStep ? scene.RegisterPreStepCallback(debugName, std::move(callback), priority)
+                   : scene.RegisterPostStepCallback(debugName, std::move(callback), priority);
+  };
+  py::delattr(sceneClass, "register_pre_step_callback");
+  py::delattr(sceneClass, "register_post_step_callback");
+  sceneClass.attr("register_pre_step_callback") = py::cpp_function(
+      [registerCallback](Scene& scene, std::string_view debugName,
+                         std::function<void(StepInfo const&)> callback, int priority) {
+        return registerCallback(scene, debugName, std::move(callback), priority, true);
+      },
+      py::is_method(sceneClass));
+  sceneClass.attr("register_post_step_callback") = py::cpp_function(
+      [registerCallback](Scene& scene, std::string_view debugName,
+                         std::function<void(StepInfo const&)> callback, int priority) {
+        return registerCallback(scene, debugName, std::move(callback), priority, false);
+      },
+      py::is_method(sceneClass));
 }
 
 } // namespace mochi
