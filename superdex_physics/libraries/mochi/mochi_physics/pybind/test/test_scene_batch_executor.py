@@ -93,7 +93,7 @@ def test_scene_batch_executor_shutdown_closes_live_workers():
         mochi.destroy_scene(scene)
     mochi.shutdown()
     assert executor.closed
-        mochi.initialize(num_worker_threads=0)
+    mochi.initialize(num_worker_threads=0)
 
 
 def test_scene_batch_executor_selective_readback_skips_optional_buffers():
