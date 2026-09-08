@@ -52,7 +52,7 @@ def test_scene_batch_executor_steps_and_refreshes_each_scene():
             assert executor.num_dofs == dofs
             assert executor.num_links == len(links[0])
             assert executor.num_contacts == 0
-            executor.step(0.002, forces, qpos, qvel, link_state, contact, diverged)
+            executor.step(0.002, forces, qpos, qvel, link_state, contact, diverged, 31)
             assert np.isfinite(qpos).all()
             assert np.isfinite(qvel).all()
             assert np.isfinite(link_state).all()
@@ -93,4 +93,30 @@ def test_scene_batch_executor_shutdown_closes_live_workers():
         mochi.destroy_scene(scene)
     mochi.shutdown()
     assert executor.closed
-    mochi.initialize(num_worker_threads=0)
+        mochi.initialize(num_worker_threads=0)
+
+
+def test_scene_batch_executor_selective_readback_skips_optional_buffers():
+    scene = mochi.create_scene("selective-readback")
+    shape = mochi.create_tet_mesh_shape(
+        np.array([0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1], dtype=np.float32),
+        np.array([0, 1, 2, 3], dtype=np.int32),
+    )
+    actor = scene.create_articulated_actor(
+        mochi.ArticulatedActorParams(
+            joints=[mochi.ArticulatedJointParams(type=mochi.ArticulatedJointType.FREE)],
+            links=[mochi.ArticulatedLinkParams(name="base", shape=shape)],
+        )
+    )
+    mochi.release_shape(shape)
+    try:
+        links = [[scene.get_actor(handle) for handle in actor.get_nested_link_actors()]]
+        forces = np.zeros((1, actor.get_num_dofs()), dtype=np.float32)
+        qpos = np.empty_like(forces)
+        with mochi.SceneBatchExecutor([scene], [actor], links, [[]], [[]], [], [], 1) as executor:
+            executor.step(0.002, forces, qpos, None, None, None, None, 1)
+            assert np.isfinite(qpos).all()
+            with pytest.raises(ValueError, match="readback_mask"):
+                executor.step(0.002, forces, qpos, None, None, None, None, 2)
+    finally:
+        mochi.destroy_scene(scene)
