@@ -22,6 +22,7 @@
 #include <cmath>
 #include <condition_variable>
 #include <cstddef>
+#include <cstdint>
 #include <deque>
 #include <exception>
 #include <functional>
@@ -71,8 +72,7 @@ bool IsLeasedScene(Scene const *scene) {
   return LeasedScenes().contains(const_cast<Scene *>(scene));
 }
 
-class SceneBatchExecutor
-    : public std::enable_shared_from_this<SceneBatchExecutor> {
+class SceneBatchExecutor {
 public:
   SceneBatchExecutor(py::sequence scenes, py::sequence actors,
                      py::sequence links, py::sequence contactSources,
@@ -247,7 +247,8 @@ public:
             py::array_t<real, py::array::c_style> qposOut,
             py::array_t<real, py::array::c_style> qvelOut,
             py::array_t<real, py::array::c_style> linkStateOut,
-            py::array_t<real, py::array::c_style> contactOut) {
+            py::array_t<real, py::array::c_style> contactOut,
+            py::array_t<uint8_t, py::array::c_style> divergedOut) {
     CheckContext();
     if (!std::isfinite(timeStepSec) || timeStepSec < 0) {
       throw std::invalid_argument(
@@ -258,6 +259,7 @@ public:
     ValidateArray("qvel_out", qvelOut);
     ValidateArray("link_state_out", linkStateOut, 3, _linkCount, 16);
     ValidateArray("contact_out", contactOut, 3, _contactCount, 3);
+    ValidateVector("diverged_out", divergedOut);
 
     std::unique_lock callLock(_callMutex);
     if (_closed) {
@@ -276,13 +278,14 @@ public:
     auto *qvelData = qvelOut.mutable_data();
     auto *linkStateData = linkStateOut.mutable_data();
     auto *contactData = contactOut.mutable_data();
+    auto *divergedData = divergedOut.mutable_data();
     std::exception_ptr failure;
     {
       // Keep all pybind arrays alive with the GIL held. Only the pure C++
       // scheduler barrier may execute without it.
       py::gil_scoped_release release;
       failure = DispatchAndWait(timeStepSec, forceData, qposData, qvelData,
-                                linkStateData, contactData);
+                                linkStateData, contactData, divergedData);
     }
     if (failure) {
       std::rethrow_exception(failure);
@@ -315,7 +318,8 @@ public:
 private:
   std::exception_ptr DispatchAndWait(double timeStepSec, real const* forceData,
                                      real* qposData, real* qvelData,
-                                     real* linkStateData, real* contactData) {
+                                     real* linkStateData, real* contactData,
+                                     uint8_t* divergedData) {
     {
       std::lock_guard lock(_mutex);
       _failure = nullptr;
@@ -323,7 +327,7 @@ private:
       for (size_t i = 0; i < _scenes.size(); ++i) {
         _jobs.emplace_back(
             [this, i, timeStepSec, forceData, qposData, qvelData, linkStateData,
-             contactData]() {
+             contactData, divergedData]() {
               auto const offset = i * static_cast<size_t>(_dofCount);
               Error error;
               _actors[i]->SetExternalForcesOnDofs(
@@ -335,6 +339,10 @@ private:
                 throw MochiErrorException(error);
               }
               _scenes[i]->Step(timeStepSec);
+              divergedData[i] = _scenes[i]->GetSolverStats().convergenceStatus ==
+                                        ConvergenceStatus::Diverged
+                                    ? 1
+                                    : 0;
               _actors[i]->GetArticulatedPose(
                   Span<real>(qposData + offset, static_cast<size_t>(_dofCount)),
                   error);
@@ -348,7 +356,8 @@ private:
                 throw MochiErrorException(error);
               }
               auto const linkOffset = i * static_cast<size_t>(_linkCount) * 16;
-              std::vector<TransformRT> transforms(static_cast<size_t>(_linkCount));
+              thread_local std::vector<TransformRT> transforms;
+              transforms.resize(static_cast<size_t>(_linkCount));
               _actors[i]->GetArticulatedLinkTransforms(MakeSpan(transforms), error);
               if (!error.IsOK()) {
                 throw MochiErrorException(error);
@@ -454,6 +463,15 @@ private:
     }
   }
 
+  void ValidateVector(char const *name,
+                      py::array_t<uint8_t, py::array::c_style> const &array) const {
+    if (array.ndim() != 1 ||
+        array.shape(0) != static_cast<py::ssize_t>(_scenes.size())) {
+      throw std::invalid_argument(std::string(name) +
+                                  " must have shape [num_scenes]");
+    }
+  }
+
   void WorkerMain() {
     auto *context = GetContext();
     context->BindThisThread();
@@ -550,13 +568,14 @@ void DefineSceneBatchExecutor(py::module_ &m) {
              py::array_t<real, py::array::c_style> qposOut,
              py::array_t<real, py::array::c_style> qvelOut,
              py::array_t<real, py::array::c_style> linkStateOut,
-             py::array_t<real, py::array::c_style> contactOut) {
+             py::array_t<real, py::array::c_style> contactOut,
+             py::array_t<uint8_t, py::array::c_style> divergedOut) {
             self.Step(timeStepSec, generalizedForces, qposOut, qvelOut,
-                      linkStateOut, contactOut);
+                      linkStateOut, contactOut, divergedOut);
           },
           py::arg("time_step_sec"), py::arg("generalized_forces"),
           py::arg("qpos_out"), py::arg("qvel_out"), py::arg("link_state_out"),
-          py::arg("contact_out"))
+          py::arg("contact_out"), py::arg("diverged_out"))
       .def("close", [](SceneBatchExecutor& self) {
         py::gil_scoped_release release;
         self.Close();
