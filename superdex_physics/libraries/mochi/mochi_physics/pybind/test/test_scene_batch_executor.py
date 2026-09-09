@@ -120,3 +120,42 @@ def test_scene_batch_executor_selective_readback_skips_optional_buffers():
                 executor.step(0.002, forces, qpos, None, None, None, None, 2)
     finally:
         mochi.destroy_scene(scene)
+
+
+def test_scene_batch_executor_control_step_matches_two_serial_steps():
+    scenes = [mochi.create_scene(f"control-{i}") for i in range(2)]
+    actors = []
+    try:
+        for scene in scenes:
+            shape = mochi.create_tet_mesh_shape(
+                np.array([0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1], dtype=np.float32),
+                np.array([0, 1, 2, 3], dtype=np.int32),
+            )
+            actors.append(scene.create_articulated_actor(
+                mochi.ArticulatedActorParams(
+                    joints=[mochi.ArticulatedJointParams(type=mochi.ArticulatedJointType.FREE)],
+                    links=[mochi.ArticulatedLinkParams(name="base", shape=shape)],
+                )
+            ))
+            mochi.release_shape(shape)
+        links = [[scene.get_actor(h) for h in actor.get_nested_link_actors()]
+                 for scene, actor in zip(scenes, actors, strict=True)]
+        dofs = actors[0].get_num_dofs()
+        controls = np.zeros((2, dofs), dtype=np.float32)
+        indices = np.arange(dofs, dtype=np.int32)
+        zeros = np.zeros(dofs, dtype=np.float32)
+        gears = np.ones(dofs, dtype=np.float32)
+        ranges = np.full((dofs, 2), [-1e6, 1e6], dtype=np.float32)
+        qpos = np.empty_like(controls)
+        qvel = np.empty_like(controls)
+        link_state = np.empty((2, len(links[0]), 16), dtype=np.float32)
+        contact = np.empty((2, 0, 3), dtype=np.float32)
+        diverged = np.empty(2, dtype=np.uint8)
+        with mochi.SceneBatchExecutor(scenes, actors, links, [[] for _ in scenes], [[] for _ in scenes], [], [], 2) as executor:
+            executor.step_control(0.002, controls, indices, indices, zeros, zeros, gears, ranges, 2,
+                                  qpos, qvel, link_state, contact, diverged, 31)
+            assert np.isfinite(qpos).all()
+            assert not diverged.any()
+    finally:
+        for scene in scenes:
+            mochi.destroy_scene(scene)
