@@ -306,6 +306,80 @@ public:
     }
   }
 
+  void StepControl(double timeStepSec, py::array_t<real, py::array::c_style> controls,
+                   py::array_t<int, py::array::c_style> qposIndices,
+                   py::array_t<int, py::array::c_style> qvelIndices,
+                   py::array_t<real, py::array::c_style> kp,
+                   py::array_t<real, py::array::c_style> kd,
+                   py::array_t<real, py::array::c_style> gear,
+                   py::array_t<real, py::array::c_style> forceRanges,
+                   int numSteps, py::object qposOut, py::object qvelOut,
+                   py::object linkStateOut, py::object contactOut,
+                   py::object divergedOut, uint32_t readbackMask) {
+    CheckContext();
+    if (numSteps < 1 || !std::isfinite(timeStepSec) || timeStepSec < 0) {
+      throw std::invalid_argument("step_control requires positive num_steps and finite dt");
+    }
+    if (controls.ndim() != 2 || controls.shape(0) != static_cast<py::ssize_t>(_scenes.size())) {
+      throw std::invalid_argument("controls must have shape [num_scenes, num_actuators]");
+    }
+    auto const actuatorCount = static_cast<size_t>(controls.shape(1));
+    auto validateVector = [actuatorCount](char const *name, auto const &array) {
+      if (array.ndim() != 1 || array.shape(0) != static_cast<py::ssize_t>(actuatorCount)) {
+        throw std::invalid_argument(std::string(name) + " must have shape [num_actuators]");
+      }
+    };
+    validateVector("qpos_indices", qposIndices);
+    validateVector("qvel_indices", qvelIndices);
+    validateVector("kp", kp);
+    validateVector("kd", kd);
+    validateVector("gear", gear);
+    if (forceRanges.ndim() != 2 || forceRanges.shape(0) != static_cast<py::ssize_t>(actuatorCount) ||
+        forceRanges.shape(1) != 2) {
+      throw std::invalid_argument("force_ranges must have shape [num_actuators, 2]");
+    }
+    for (size_t i = 0; i < actuatorCount; ++i) {
+      auto const q = qposIndices.at(i), v = qvelIndices.at(i);
+      if (q < 0 || q >= _dofCount || v < 0 || v >= _dofCount ||
+          !std::isfinite(kp.at(i)) || !std::isfinite(kd.at(i)) ||
+          !std::isfinite(gear.at(i)) || !std::isfinite(forceRanges.at(i, 0)) ||
+          !std::isfinite(forceRanges.at(i, 1)) || forceRanges.at(i, 0) > forceRanges.at(i, 1)) {
+        throw std::invalid_argument("invalid actuator control metadata");
+      }
+    }
+    if (readbackMask & ~kReadAll) throw std::invalid_argument("readback_mask contains unknown fields");
+    auto qpos = RequireArray("qpos_out", qposOut, readbackMask & kReadQpos);
+    auto qvel = RequireArray("qvel_out", qvelOut, readbackMask & kReadQvel);
+    auto links = RequireArray("link_state_out", linkStateOut, readbackMask & kReadLinks, 3, _linkCount, 16);
+    auto contacts = RequireArray("contact_out", contactOut, readbackMask & kReadContacts, 3, _contactCount, 3);
+    auto diverged = RequireVector("diverged_out", divergedOut, readbackMask & kReadDiverged);
+    std::unique_lock callLock(_callMutex);
+    if (_closed) throw std::runtime_error("SceneBatchExecutor is closed");
+    auto const *controlData = controls.data();
+    auto *qposData = qpos ? qpos->mutable_data() : nullptr;
+    auto *qvelData = qvel ? qvel->mutable_data() : nullptr;
+    auto *linkData = links ? links->mutable_data() : nullptr;
+    auto *contactData = contacts ? contacts->mutable_data() : nullptr;
+    auto *divergedData = diverged ? diverged->mutable_data() : nullptr;
+    {
+      py::gil_scoped_release release;
+      {
+        std::lock_guard lock(_mutex);
+        _controlMode = true;
+        _controlSteps = numSteps;
+        _controlData = controlData;
+        _controlQposIndices = qposIndices.data(); _controlQvelIndices = qvelIndices.data();
+        _controlKp = kp.data(); _controlKd = kd.data(); _controlGear = gear.data();
+        _controlForceRanges = forceRanges.data(); _controlActuatorCount = actuatorCount;
+      }
+      auto failure = DispatchAndWait(timeStepSec, nullptr, qposData, qvelData, linkData,
+                                     contactData, divergedData, readbackMask);
+      if (failure) std::rethrow_exception(failure);
+      std::lock_guard lock(_mutex);
+      _controlMode = false;
+    }
+  }
+
   void Close() {
     std::unique_lock callLock(_callMutex);
     if (_closed) {
@@ -361,14 +435,35 @@ private:
   void RunScene(size_t i) {
     auto const offset = i * static_cast<size_t>(_dofCount);
     Error error;
-    _actors[i]->SetExternalForcesOnDofs(
-        MakeConstSpan(_dofIndices),
-        Span<real const>(_forceData + offset, static_cast<size_t>(_dofCount)),
-        error);
-    if (!error.IsOK()) {
-      throw MochiErrorException(error);
+    thread_local std::vector<real> pose;
+    thread_local std::vector<real> velocity;
+    thread_local std::vector<real> forces;
+    pose.resize(static_cast<size_t>(_dofCount));
+    velocity.resize(static_cast<size_t>(_dofCount));
+    forces.resize(static_cast<size_t>(_dofCount));
+    for (int controlStep = 0; controlStep < (_controlMode ? _controlSteps : 1); ++controlStep) {
+      if (_controlMode) {
+        _actors[i]->GetArticulatedPose(Span<real>(pose), error);
+        if (!error.IsOK()) throw MochiErrorException(error);
+        _actors[i]->GetArticulatedJointVelocities(Span<real>(velocity), error);
+        if (!error.IsOK()) throw MochiErrorException(error);
+        std::fill(forces.begin(), forces.end(), 0);
+        auto const *ctrl = _controlData + i * _controlActuatorCount;
+        for (size_t a = 0; a < _controlActuatorCount; ++a) {
+          auto value = _controlKp[a] > 0
+                           ? _controlKp[a] * (ctrl[a] - pose[_controlQposIndices[a]] * _controlGear[a])
+                               - _controlKd[a] * velocity[_controlQvelIndices[a]] * _controlGear[a]
+                           : ctrl[a];
+          value = std::clamp(value, _controlForceRanges[2 * a], _controlForceRanges[2 * a + 1]);
+          forces[static_cast<size_t>(_controlQvelIndices[a])] += value * _controlGear[a];
+        }
+      }
+      auto const *forceData = _controlMode ? forces.data() : _forceData + offset;
+      _actors[i]->SetExternalForcesOnDofs(MakeConstSpan(_dofIndices),
+          Span<real const>(forceData, static_cast<size_t>(_dofCount)), error);
+      if (!error.IsOK()) throw MochiErrorException(error);
+      _scenes[i]->Step(_timeStepSec);
     }
-    _scenes[i]->Step(_timeStepSec);
     if (_readbackMask & kReadDiverged) {
       _divergedData[i] = _scenes[i]->GetSolverStats().convergenceStatus ==
                                  ConvergenceStatus::Diverged
@@ -602,6 +697,16 @@ private:
   real *_contactData = nullptr;
   uint8_t *_divergedData = nullptr;
   uint32_t _readbackMask = kReadAll;
+  bool _controlMode = false;
+  int _controlSteps = 1;
+  size_t _controlActuatorCount = 0;
+  real const *_controlData = nullptr;
+  int const *_controlQposIndices = nullptr;
+  int const *_controlQvelIndices = nullptr;
+  real const *_controlKp = nullptr;
+  real const *_controlKd = nullptr;
+  real const *_controlGear = nullptr;
+  real const *_controlForceRanges = nullptr;
   mutable std::mutex _mutex;
   std::mutex _callMutex;
   std::condition_variable _workAvailable;
@@ -645,6 +750,29 @@ void DefineSceneBatchExecutor(py::module_ &m) {
       .def_property_readonly("num_links", &SceneBatchExecutor::GetNumLinks)
       .def_property_readonly("num_contacts", &SceneBatchExecutor::GetNumContacts)
       .def_property_readonly("closed", &SceneBatchExecutor::IsClosed)
+      .def("step_control",
+           [](SceneBatchExecutor& self, double dt,
+              py::array_t<real, py::array::c_style> controls,
+              py::array_t<int, py::array::c_style> qpos_indices,
+              py::array_t<int, py::array::c_style> qvel_indices,
+              py::array_t<real, py::array::c_style> kp,
+              py::array_t<real, py::array::c_style> kd,
+              py::array_t<real, py::array::c_style> gear,
+              py::array_t<real, py::array::c_style> force_ranges,
+              int num_steps, py::object qpos_out, py::object qvel_out,
+              py::object link_state_out, py::object contact_out,
+              py::object diverged_out, uint32_t readback_mask) {
+             self.StepControl(dt, controls, qpos_indices, qvel_indices, kp, kd,
+                              gear, force_ranges, num_steps, qpos_out, qvel_out,
+                              link_state_out, contact_out, diverged_out,
+                              readback_mask);
+           },
+           py::arg("time_step_sec"), py::arg("controls"),
+           py::arg("qpos_indices"), py::arg("qvel_indices"), py::arg("kp"),
+           py::arg("kd"), py::arg("gear"), py::arg("force_ranges"),
+           py::arg("num_steps"), py::arg("qpos_out"), py::arg("qvel_out"),
+           py::arg("link_state_out"), py::arg("contact_out"),
+           py::arg("diverged_out"), py::arg("readback_mask"))
       .def(
           "step",
           [](SceneBatchExecutor& self, double timeStepSec,
