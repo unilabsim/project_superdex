@@ -35,43 +35,12 @@
 #include <utility>
 #include <vector>
 
+#include "scene_batch_executor_state.h"
+
 namespace mochi {
 namespace {
 
 namespace py = pybind11;
-
-std::mutex &LeasedScenesMutex() {
-  static std::mutex mutex;
-  return mutex;
-}
-
-std::unordered_set<Scene *> &LeasedScenes() {
-  static std::unordered_set<Scene *> scenes;
-  return scenes;
-}
-
-void RegisterLeasedScenes(std::vector<Scene *> const &scenes) {
-  std::lock_guard lock(LeasedScenesMutex());
-  for (auto *scene : scenes) {
-    if (LeasedScenes().contains(scene)) {
-      throw std::runtime_error(
-          "a scene is already owned by a SceneBatchExecutor");
-    }
-  }
-  LeasedScenes().insert(scenes.begin(), scenes.end());
-}
-
-void ReleaseLeasedScenes(std::vector<Scene *> const &scenes) {
-  std::lock_guard lock(LeasedScenesMutex());
-  for (auto *scene : scenes) {
-    LeasedScenes().erase(scene);
-  }
-}
-
-bool IsLeasedScene(Scene const *scene) {
-  std::lock_guard lock(LeasedScenesMutex());
-  return LeasedScenes().contains(const_cast<Scene *>(scene));
-}
 
 class SceneBatchExecutor {
 public:
@@ -216,7 +185,7 @@ public:
     }
 
     _workers.reserve(numWorkers);
-    RegisterLeasedScenes(_scenes);
+    detail::RegisterLeasedScenes(_scenes);
     _leasesRegistered = true;
     try {
       for (size_t i = 0; i < numWorkers; ++i) {
@@ -233,7 +202,7 @@ public:
           worker.join();
         }
       }
-      ReleaseLeasedScenes(_scenes);
+      detail::ReleaseLeasedScenes(_scenes);
       _leasesRegistered = false;
       throw;
     }
@@ -397,7 +366,7 @@ public:
     }
     _workers.clear();
     if (_leasesRegistered) {
-      ReleaseLeasedScenes(_scenes);
+      detail::ReleaseLeasedScenes(_scenes);
       _leasesRegistered = false;
     }
     _closed = true;
@@ -604,8 +573,9 @@ private:
       int dim1 = -1, int dim2 = -1) const {
     if (!requested) {
       if (!object.is_none()) {
-        throw std::invalid_argument(std::string(name) +
-                                    " must be None when readback is disabled");
+        throw std::invalid_argument(
+            std::string(name) + " must be None when readback_mask does not "
+                                "request it");
       }
       return std::nullopt;
     }
@@ -807,7 +777,7 @@ void OverrideLeasedSceneDestroy(py::module_ &m) {
       "destroy_scene",
       [](Scene *scene) {
         CheckContext();
-        if (scene && IsLeasedScene(scene)) {
+        if (scene && detail::IsLeasedScene(scene)) {
           throw std::runtime_error(
               "close SceneBatchExecutor before destroying one of its scenes");
         }
@@ -816,12 +786,50 @@ void OverrideLeasedSceneDestroy(py::module_ &m) {
       py::arg("scene"));
 }
 
+void OverrideLeasedActorDestroy(py::module_ &m) {
+  using SceneClass =
+      py::class_<Scene, std::unique_ptr<Scene, py::nodelete>>;
+  auto sceneClass = py::cast<SceneClass>(m.attr("Scene"));
+  py::delattr(sceneClass, "destroy_actor");
+  sceneClass.def(
+      "destroy_actor",
+      [](Scene &self, Actor *actor) {
+        CheckContext();
+        if (actor && detail::IsLeasedScene(actor->GetScene())) {
+          throw std::runtime_error(
+              "close SceneBatchExecutor before destroying one of its actors");
+        }
+        self.DestroyActor(actor);
+      },
+      py::arg("actor"),
+      "Destroy an actor and remove it from the scene.\n\n"
+      "Raises:\n"
+      "    RuntimeError: If the actor belongs to a leased SceneBatchExecutor "
+      "scene. Close the executor first.");
+  sceneClass.def(
+      "destroy_actor",
+      [](Scene &self, ActorHandle actor) {
+        CheckContext();
+        auto *nativeActor = self.GetActor(actor);
+        if (nativeActor && detail::IsLeasedScene(nativeActor->GetScene())) {
+          throw std::runtime_error(
+              "close SceneBatchExecutor before destroying one of its actors");
+        }
+        self.DestroyActor(actor);
+      },
+      py::arg("actor"),
+      "Destroy an actor and remove it from the scene.\n\n"
+      "Raises:\n"
+      "    RuntimeError: If the actor belongs to a leased SceneBatchExecutor "
+      "scene. Close the executor first.");
+}
+
 void OverrideLeasedSceneCallbacks(py::module_& m) {
   auto sceneClass = m.attr("Scene");
   auto registerCallback = [](Scene& scene, std::string_view debugName,
                              std::function<void(StepInfo const&)> callback, int priority,
                              bool preStep) {
-    if (IsLeasedScene(&scene)) {
+    if (detail::IsLeasedScene(&scene)) {
       throw std::runtime_error(
           "SceneBatchExecutor scenes do not support Python step callbacks");
     }

@@ -35,7 +35,9 @@ namespace py = pybind11;
 
 namespace mochi {
 void DefineSceneBatchExecutor(py::module_& m);
+void DefineSceneBatchExecutorV2(py::module_& m);
 void OverrideLeasedSceneDestroy(py::module_& m);
+void OverrideLeasedActorDestroy(py::module_& m);
 void OverrideLeasedSceneCallbacks(py::module_& m);
 }
 
@@ -338,7 +340,9 @@ Raises:
   // Insert generated bindings here
   mochi::DefineAll(m);
   mochi::DefineSceneBatchExecutor(m);
+  mochi::DefineSceneBatchExecutorV2(m);
   mochi::OverrideLeasedSceneDestroy(m);
+  mochi::OverrideLeasedActorDestroy(m);
   mochi::OverrideLeasedSceneCallbacks(m);
 
   // Override release_shape to accept None (equivalent to default-constructed ShapeHandle)
