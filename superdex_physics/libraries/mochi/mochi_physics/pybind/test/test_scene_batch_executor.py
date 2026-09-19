@@ -228,7 +228,8 @@ def test_scene_batch_executor_v2_steps_two_actors_in_one_scene():
             num_workers=1,
         ) as executor:
             assert executor.abi_version == 2
-            assert mochi.SCENE_BATCH_EXECUTOR_ABI_VERSION == 2
+            assert mochi.SCENE_BATCH_EXECUTOR_ABI_VERSION == 3
+            assert not hasattr(executor, "write_boundary_conditions")
             assert executor.num_scenes == 1
             assert executor.num_actors == 3
             dofs = first.get_num_dofs()
@@ -345,6 +346,162 @@ def test_scene_batch_executor_v2_selective_write_state_updates_only_masked_chann
     finally:
         for scene in scenes:
             mochi.destroy_scene(scene)
+
+
+def test_scene_batch_executor_v3_boundary_writes_are_selective_and_hold_target():
+    scenes = [mochi.create_scene(f"v3-boundary-{i}") for i in range(2)]
+    actors = [
+        [
+            _create_free_articulated_actor(scene, "first", [0, 0, 0]),
+            _create_free_articulated_actor(scene, "second", [0, 0, 0]),
+        ]
+        for scene in scenes
+    ]
+    try:
+        links = [
+            [
+                [scene.get_actor(handle) for handle in actor.get_nested_link_actors()]
+                for actor in scene_actors
+            ]
+            for scene, scene_actors in zip(scenes, actors, strict=True)
+        ]
+        dofs = actors[0][0].get_num_dofs()
+        total_dofs = dofs * 2
+
+        targets = np.zeros((2, total_dofs), dtype=np.float32)
+        targets[0, 2] = 0.4
+        targets[1, dofs + 2] = -0.4
+        mask = np.zeros_like(targets, dtype=np.uint8)
+        mask[0, 0] = 1
+        mask[1, dofs] = 1
+
+        with mochi.SceneBatchExecutorV3(
+            scenes,
+            actors,
+            links,
+            [dofs, dofs],
+            [[] for _ in scenes],
+            [[] for _ in scenes],
+            [],
+            [],
+            num_workers=2,
+        ) as executor:
+            assert executor.abi_version == 3
+            assert mochi.SCENE_BATCH_EXECUTOR_ABI_VERSION == 3
+            assert executor.num_scenes == 2
+            assert executor.num_actors == 2
+            assert executor.actor_dof_counts == [dofs, dofs]
+            executor.write_state(targets, None, mask, None)
+            executor.write_boundary_conditions(targets, mask)
+
+            np.testing.assert_array_equal(
+                np.asarray(actors[0][0].get_boundary_condition_dof_indices()),
+                np.arange(dofs, dtype=np.int32),
+            )
+            np.testing.assert_allclose(
+                np.asarray(actors[0][0].get_boundary_condition_dof_values_world()),
+                targets[0, :dofs],
+                atol=0,
+            )
+            assert len(actors[0][1].get_boundary_condition_dof_indices()) == 0
+            assert len(actors[1][0].get_boundary_condition_dof_indices()) == 0
+            np.testing.assert_allclose(
+                np.asarray(actors[1][1].get_boundary_condition_dof_values_world()),
+                targets[1, dofs:],
+                atol=0,
+            )
+
+            invalid = targets.copy()
+            invalid[0, 0] = np.nan
+            with pytest.raises(ValueError, match="finite"):
+                executor.write_boundary_conditions(invalid, mask)
+            with pytest.raises(ValueError, match="total_dofs"):
+                executor.write_boundary_conditions(invalid[:, :1], mask)
+            np.testing.assert_allclose(
+                np.asarray(actors[0][0].get_boundary_condition_dof_values_world()),
+                targets[0, :dofs],
+                atol=0,
+            )
+            assert not executor.closed
+
+            updated_targets = targets.copy()
+            updated_targets[0, 0] = 0.8
+            updated_targets[0, 1] = 0.2
+            executor.write_boundary_conditions(updated_targets, mask)
+            np.testing.assert_allclose(
+                np.asarray(actors[0][0].get_boundary_condition_dof_values_world()),
+                updated_targets[0, :dofs],
+                atol=0,
+            )
+            assert len(actors[0][0].get_boundary_condition_dof_indices()) == dofs
+            np.testing.assert_allclose(
+                np.asarray(actors[1][1].get_boundary_condition_dof_values_world()),
+                targets[1, dofs:],
+                atol=0,
+            )
+
+            forces = np.zeros_like(targets)
+            forces[0, 0] = 2.0
+            forces[1, dofs] = -2.0
+            qpos = np.empty_like(targets)
+            executor.step(0.002, forces, qpos, None, None, None, None, 1)
+            np.testing.assert_allclose(
+                qpos[0, :dofs], updated_targets[0, :dofs], atol=1e-6
+            )
+            np.testing.assert_allclose(qpos[1, dofs:], targets[1, dofs:], atol=1e-6)
+            assert not executor.closed
+    finally:
+        for scene in scenes:
+            mochi.destroy_scene(scene)
+
+
+def test_scene_batch_executor_v3_native_write_failure_closes_executor():
+    scenes = [mochi.create_scene(f"v3-failure-{i}") for i in range(2)]
+    actors = [
+        [_create_free_articulated_actor(scene, "actor", [0, 0, 0])]
+        for scene in scenes
+    ]
+    executor = None
+    try:
+        solver = scenes[1].get_solver_params()
+        solver.integration_method = mochi.IntegrationMethod.BACKWARD_EULER
+        scenes[1].set_solver_params(solver)
+        mochi.diffsim.make_scene_differentiable(scenes[1])
+
+        links = [
+            [
+                [scene.get_actor(handle) for handle in actor.get_nested_link_actors()]
+                for actor in scene_actors
+            ]
+            for scene, scene_actors in zip(scenes, actors, strict=True)
+        ]
+        dofs = actors[0][0].get_num_dofs()
+        targets = np.zeros((2, dofs), dtype=np.float32)
+        targets[1, 2] = 0.4
+        mask = np.ones_like(targets, dtype=np.uint8)
+
+        with mochi.SceneBatchExecutorV3(
+            scenes,
+            actors,
+            links,
+            [dofs],
+            [[] for _ in scenes],
+            [[] for _ in scenes],
+            [],
+            [],
+            num_workers=2,
+        ) as active_executor:
+            executor = active_executor
+            with pytest.raises(RuntimeError, match="differentiable scenes"):
+                executor.write_boundary_conditions(targets, mask)
+            assert executor.closed
+            with pytest.raises(RuntimeError, match="closed"):
+                executor.write_boundary_conditions(targets, mask)
+    finally:
+        for scene in scenes:
+            mochi.destroy_scene(scene)
+        if executor is not None:
+            assert executor.closed
 
 
 def test_scene_batch_executor_v2_rejects_invalid_layout_control_and_write_inputs():

@@ -526,6 +526,61 @@ public:
     }
   }
 
+  void WriteBoundaryConditions(py::object values, py::object mask) {
+    CheckContext();
+    auto write = RequireWritePayload("boundary_condition_values", values, mask);
+    if (!write.has_value()) {
+      return;
+    }
+
+    std::unique_lock callLock(_callMutex);
+    if (_closed) {
+      throw std::runtime_error("SceneBatchExecutorV3 is closed");
+    }
+    CheckLiveActors();
+    try {
+      auto const *valueData = write->values.data();
+      auto const *maskData = write->mask.data();
+      for (size_t sceneIndex = 0; sceneIndex < _scenes.size(); ++sceneIndex) {
+        for (int actorIndex = 0; actorIndex < _actorCount; ++actorIndex) {
+          size_t const actor = static_cast<size_t>(actorIndex);
+          int const dofCount = _actorDofCounts[actor];
+          int const dofOffset = _actorDofOffsets[actor];
+          size_t const sceneOffset =
+              sceneIndex * static_cast<size_t>(_dofCount) +
+              static_cast<size_t>(dofOffset);
+          bool selected = false;
+          for (int dof = 0; dof < dofCount; ++dof) {
+            selected = selected ||
+                       maskData[sceneOffset + static_cast<size_t>(dof)] != 0;
+          }
+          if (!selected) {
+            continue;
+          }
+
+          // Boundary-condition APIs append entries. Replacing the complete
+          // clearable set keeps repeated selected writes bounded and prevents a
+          // new target from competing with an older one.
+          auto *actorPtr = _actors[sceneIndex][actor];
+          actorPtr->ClearBoundaryConditions();
+          Error error;
+          actorPtr->AddBoundaryConditionDofsWorld(
+              Span<int const>(_dofIndices.data() + dofOffset,
+                              static_cast<size_t>(dofCount)),
+              Span<real const>(valueData + sceneOffset,
+                               static_cast<size_t>(dofCount)),
+              error);
+          if (!error.IsOK()) {
+            throw MochiErrorException(error);
+          }
+        }
+      }
+    } catch (...) {
+      CloseLocked();
+      throw;
+    }
+  }
+
   void Close() {
     std::unique_lock callLock(_callMutex);
     CloseLocked();
@@ -1084,10 +1139,17 @@ private:
   bool _leasesRegistered = false;
 };
 
+class SceneBatchExecutorV3 : public SceneBatchExecutorV2 {
+public:
+  using SceneBatchExecutorV2::SceneBatchExecutorV2;
+
+  static constexpr int kAbiVersion = 3;
+};
+
 } // namespace
 
 void DefineSceneBatchExecutorV2(py::module_ &m) {
-  m.attr("SCENE_BATCH_EXECUTOR_ABI_VERSION") = py::int_(2);
+  m.attr("SCENE_BATCH_EXECUTOR_ABI_VERSION") = py::int_(3);
   py::class_<SceneBatchExecutorV2, std::shared_ptr<SceneBatchExecutorV2>>(
       m, "SceneBatchExecutorV2")
       .def(py::init(
@@ -1194,6 +1256,45 @@ void DefineSceneBatchExecutorV2(py::module_ &m) {
         py::gil_scoped_release release;
         self.Close();
       });
+
+  py::class_<SceneBatchExecutorV3, SceneBatchExecutorV2,
+             std::shared_ptr<SceneBatchExecutorV3>>(m, "SceneBatchExecutorV3")
+      .def(py::init(
+               [](py::sequence scenes, py::sequence actors,
+                  py::sequence links, py::sequence actuatorCounts,
+                  py::sequence contactSources, py::sequence contactOthers,
+                  py::sequence contactKinds, py::sequence contactDistances,
+                  size_t numWorkers) {
+                 auto executor = std::make_shared<SceneBatchExecutorV3>(
+                     scenes, actors, links, actuatorCounts, contactSources,
+                     contactOthers, contactKinds, contactDistances,
+                     numWorkers);
+                 RegisterContextDependent(
+                     [weak = std::weak_ptr<SceneBatchExecutorV3>(executor)]() {
+                       if (auto active = weak.lock()) {
+                         active->Close();
+                       }
+                     });
+                 return executor;
+               }),
+           py::arg("scenes"), py::arg("actors"), py::arg("links"),
+           py::arg("actuator_counts"), py::arg("contact_sources"),
+           py::arg("contact_others"), py::arg("contact_kinds"),
+           py::arg("contact_distances"), py::arg("num_workers"))
+      .def_property_readonly("abi_version",
+                             [](SceneBatchExecutorV3 const &) {
+                               return SceneBatchExecutorV3::kAbiVersion;
+                             })
+      // ABI 2 methods and properties are inherited through the registered
+      // SceneBatchExecutorV2 base. Only the constructor, ABI identity, and ABI 3
+      // transaction are V3-specific.
+      .def("write_boundary_conditions",
+           &SceneBatchExecutorV3::WriteBoundaryConditions,
+           py::arg("values"), py::arg("write_mask"))
+      .def("__enter__",
+           [](SceneBatchExecutorV3 &self) -> SceneBatchExecutorV3 & {
+             return self;
+           });
 }
 
 } // namespace mochi
