@@ -25,6 +25,7 @@ namespace mochi {
 
 void ValidatePointCloudColliderParams(
     experimental::PointCloudColliderParams const& params,
+    ContactParams const& contactParams,
     Error& error) {
   MOCHI_ERROR_IF_NOT(params.radius > 0_r, error, "Point-cloud collider radius must be positive.");
   MOCHI_ERROR_IF_NOT(
@@ -33,6 +34,12 @@ void ValidatePointCloudColliderParams(
       "Point-cloud self-contact exclusion ratio must be > 1.");
   MOCHI_ERROR_IF_NOT(
       params.spatialHashLoadFactor > 0_r, error, "Hash table load factor must be positive.");
+  real const contactRange =
+      params.radius + contactParams.GetPenaltyThresholdDist(/*addPadding*/ true);
+  MOCHI_ERROR_IF_NOT(
+      IsFinite(contactRange) && contactRange > 0_r,
+      error,
+      "Point-cloud collider radius plus contact threshold must be finite and positive.");
 }
 
 SpatialHashTable CreateSpatialHashTable(
@@ -41,6 +48,10 @@ SpatialHashTable CreateSpatialHashTable(
     real contactThreshold) {
   int const numColliderPoints = colliderDiscretization.GetNumColliderPoints();
   MOCHI_ASSERT(numColliderPoints > 0, "Collider discretization must have at least one point");
+  real const cellSize = params.radius + contactThreshold;
+  MOCHI_ASSERT(
+      IsFinite(cellSize) && cellSize > 0_r,
+      "Point-cloud spatial hash cell size must be finite and positive.");
   auto const minNumBinsDouble = static_cast<double>(
       Ceil(static_cast<real>(numColliderPoints) / params.spatialHashLoadFactor));
   MOCHI_ASSERT(
@@ -48,7 +59,7 @@ SpatialHashTable CreateSpatialHashTable(
           minNumBinsDouble <= static_cast<double>(std::numeric_limits<int>::max()),
       "Point-cloud spatial hash load factor produced an invalid bin count.");
   auto const minNumBins = static_cast<int>(minNumBinsDouble);
-  return {params.radius + contactThreshold, numColliderPoints, minNumBins};
+  return {cellSize, numColliderPoints, minNumBins};
 }
 
 void UpdateSpatialHashTable(
@@ -119,6 +130,10 @@ DynamicArray<DynamicArray<int>> ComputePointsToColliderPoints(
   DynamicArray<DynamicArray<int>> pointsToColliderPoints(numCollidingPoints);
 
   real const contactRange = pointCloudColliderParams.radius + contactThreshold;
+  [[maybe_unused]] real const cellSize = colliderHashTable.GetCellSize();
+  MOCHI_ASSERT_VERBOSE(
+      cellSize >= contactRange || NearEqualRel(cellSize, contactRange),
+      "Point-cloud spatial hash cell size must cover the contact range.");
   real const contactRangeSquared = Sqr(contactRange);
   real const selfContactExclusionRangeSquared =
       Sqr(pointCloudColliderParams.radius * pointCloudColliderParams.selfContactExclusionRatio +

@@ -67,7 +67,9 @@ class HybridVectorEnv(VectorWrapper):
         within a worker. Currently this is simply a `SyncVectorEnv`, but future versions
         of the wrapper could use a different implementation."""
 
-        pass
+        def get_wrapper_attr(self, name: str) -> Any:
+            """Resolve methods requested by the outer AsyncVectorEnv worker."""
+            return getattr(self, name)
 
     class _OuterVectorEnv(AsyncVectorEnv):
         """Outer vectorization wrapper handling the parallel execution of environments
@@ -223,6 +225,20 @@ class HybridVectorEnv(VectorWrapper):
         )
         super().__init__(env)
 
+        # The outer AsyncVectorEnv is intentionally created with AutoresetMode.DISABLED
+        # because the inner SyncVectorEnvs perform autoreset in the requested mode.
+        # Publish that inner mode so the wrapper's advertised metadata matches actual
+        # behavior rather than the outer DISABLED value.
+        requested_autoreset_mode = (
+            autoreset_mode
+            if isinstance(autoreset_mode, AutoresetMode)
+            else AutoresetMode(autoreset_mode)
+        )
+        self.metadata = {
+            **self.env.metadata,
+            "autoreset_mode": requested_autoreset_mode,
+        }
+
         # Determine flattened and single observation/action spaces.
         # This hides the nesting from users, allowing them to work with single batch
         # dimension tensors. Note we assumes all environments have identical Box spaces
@@ -274,9 +290,16 @@ class HybridVectorEnv(VectorWrapper):
         if options is not None and "reset_mask" in options:
             raise ValueError("Reset mask is not supported for this vectorization.")
 
-        # Distribute seeds across workers if a full seed sequence is provided
-        # Each worker gets a subset of seeds for its environments
+        # Distribute seeds across workers. A scalar seed is first expanded into
+        # globally-unique per-env seeds: passing the scalar straight to the outer
+        # AsyncVectorEnv would offset it per worker (seed + worker) and each inner
+        # SyncVectorEnv would offset again per env (+ inner), so adjacent workers would
+        # receive overlapping streams. Expanding once here and handing each worker
+        # explicit per-env seeds avoids the double offset. A full sequence is chunked per
+        # worker; None is left as-is so each env draws independent entropy.
         processed_seed = seed
+        if isinstance(seed, int):
+            seed = [seed + index for index in range(self.num_envs)]
         if isinstance(seed, Sequence):
             if len(seed) != self.num_envs:
                 raise ValueError(
@@ -296,6 +319,13 @@ class HybridVectorEnv(VectorWrapper):
         return BatchedResetResult(
             observation=observations.reshape(-1, *observations.shape[2:]),
             info=info,
+        )
+
+    def call(self, name: str, *args: Any, **kwargs: Any) -> tuple[Any, ...]:
+        """Call a method or read an attribute from every underlying environment."""
+        worker_results = self.env.call("call", name, *args, **kwargs)
+        return tuple(
+            result for worker_result in worker_results for result in worker_result
         )
 
     @override_from(VectorWrapper)

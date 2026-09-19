@@ -110,7 +110,7 @@ TEST(MeshCliClientTest, ConcurrentInvocationsReceiveStdinEof) {
   auto const markerDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
   if (!WaitForMarker(coordinationDirectory.Path() / "first_started", markerDeadline)) {
     CancelInFlightMeshCli();
-    first.get();
+    first.wait();
     FAIL() << "The first concurrency helper did not start";
   }
 

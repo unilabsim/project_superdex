@@ -680,6 +680,17 @@ TEST(ModelUtils, Validate_Mesh_Skinning) {
   TestValidateSkinningData(model, *model.mesh->skinning, kInvalidSkinningIndices);
 }
 
+TEST(ModelUtils, ValidateSkinningSourceCount) {
+  SkinningData skinning;
+  skinning.weightsPerNode = 2;
+  skinning.indices = {0, 1};
+  skinning.weights = {0.5_r, 0.5_r};
+
+  model::ValidateSkinning(skinning, /*numNodes=*/1, /*numSkinningSources=*/2, test::ExpectOK{});
+  model::ValidateSkinning(skinning, /*numNodes=*/1, /*numSkinningSources=*/1, test::ExpectNotOK{});
+  model::ValidateSkinning(skinning, /*numNodes=*/1, /*numSkinningSources=*/0, test::ExpectNotOK{});
+}
+
 TEST(ModelUtils, AutoCorrect_Mesh_Skinning) {
   // Load model with a mesh + skinning
   ModelData model = model::LoadFromBytes(kTriMeshCubeJson, test::ExpectOK{});
@@ -1207,39 +1218,44 @@ TEST(ModelUtils, FlipWindingOrder_TetMesh) {
   }
 }
 
-static void
-TestBakeTransformMesh(ModelData const& model, Real3 const& scale, TransformRT const& rt) {
-  EXPECT_TRUE(model.mesh.has_value());
+static void TestBakeTransformMesh(
+    ModelData const& model,
+    std::optional<MeshData> ModelData::* meshMember,
+    Real3 const& scale,
+    TransformRT const& rt) {
+  auto const& mesh = model.*meshMember;
+  ASSERT_TRUE(mesh.has_value());
   ModelData model2 = model;
   model::BakeTransform(model2, scale, rt, test::ExpectOK{});
+  auto const& transformedMesh = model2.*meshMember;
+  ASSERT_TRUE(transformedMesh.has_value());
 
   // These should be unchanged
-  EXPECT_EQ(model.mesh->nodesPerElement, model2.mesh->nodesPerElement);
-  EXPECT_EQ(model.mesh->skinning, model2.mesh->skinning);
+  EXPECT_EQ(mesh->nodesPerElement, transformedMesh->nodesPerElement);
+  EXPECT_EQ(mesh->skinning, transformedMesh->skinning);
 
   // Check coordinates
-  auto const& nodes = Unflatten<Real3 const>(MakeConstSpan(model.mesh->coordinates));
-  auto const& nodes2 = Unflatten<Real3 const>(MakeConstSpan(model2.mesh->coordinates));
-  EXPECT_EQ(nodes.size(), nodes2.size());
+  auto const& nodes = Unflatten<Real3 const>(MakeConstSpan(mesh->coordinates));
+  auto const& transformedNodes =
+      Unflatten<Real3 const>(MakeConstSpan(transformedMesh->coordinates));
+  EXPECT_EQ(nodes.size(), transformedNodes.size());
   for (int i = 0; i < isize(nodes); ++i) {
-    EXPECT_NEAR_EQ(rt.TransformPoint(scale * nodes[i]), nodes2[i]);
+    EXPECT_NEAR_EQ(rt.TransformPoint(scale * nodes[i]), transformedNodes[i]);
   }
 
   // FlipWindingOrder should have been called automatically if the scale performed mirroring on
   // an odd numer of axes. This happens when converting between left handed and right handed
   // coordinate systems.
-  int numMirroredAxes = //
+  int const numMirroredAxes = //
       static_cast<int>(scale[0] < 0_r) + //
       static_cast<int>(scale[1] < 0_r) + //
       static_cast<int>(scale[2] < 0_r);
-  bool expectReverseWinding = (numMirroredAxes == 1) || (numMirroredAxes == 3);
+  bool const expectReverseWinding = (numMirroredAxes == 1) || (numMirroredAxes == 3);
   if (expectReverseWinding) {
-    EXPECT_NE(model.mesh->connectivity, model2.mesh->connectivity);
+    EXPECT_NE(mesh->connectivity, transformedMesh->connectivity);
     model::FlipWindingOrder(model2, test::ExpectOK{});
-    EXPECT_EQ(model.mesh->connectivity, model2.mesh->connectivity);
-  } else {
-    EXPECT_EQ(model.mesh->connectivity, model2.mesh->connectivity);
   }
+  EXPECT_EQ(mesh->connectivity, transformedMesh->connectivity);
 }
 
 static void TestBakeTransformBox(Box const& original, Real3 const& scale, TransformRT const& rt) {
@@ -1332,9 +1348,7 @@ TEST(ModelUtils, BakeTransform_Box) {
 }
 
 TEST(ModelUtils, BakeTransform) {
-  ModelData models[2]{
-      model::LoadFromBytes(kTriMeshCubeJson, test::ExpectOK{}),
-      model::LoadFromBytes(kTriMeshCubeJson, test::ExpectOK{})};
+  ModelData const model = model::LoadFromBytes(kTriMeshCubeJson, test::ExpectOK{});
 
   Real3 constexpr kScaleValues[] = {
       Real3{1_r, 1_r, 1_r},
@@ -1360,12 +1374,10 @@ TEST(ModelUtils, BakeTransform) {
       Quaternion::FromAxisAngle(Real3{0_r, 0_r, 1_r}, 0.5_r * kPI),
   };
 
-  for (auto const& model : models) {
-    for (auto const& scale : kScaleValues) {
-      for (auto const& trans : kTranslationValues) {
-        for (auto const& rot : kRotationValues) {
-          TestBakeTransformMesh(model, scale, TransformRT(rot, trans));
-        }
+  for (auto const& scale : kScaleValues) {
+    for (auto const& trans : kTranslationValues) {
+      for (auto const& rot : kRotationValues) {
+        TestBakeTransformMesh(model, &ModelData::mesh, scale, TransformRT(rot, trans));
       }
     }
   }
@@ -2188,33 +2200,29 @@ TEST(ModelUtils, Validate_MaterialData) {
   }
 }
 
-static ModelData GetTetMeshModelWithVisualMesh(int weightsPerNode) {
-  // Load a valid model with a tetrahedral mesh
-  ModelData tetMeshModel = model::LoadFromBytes(kTetMeshCubeJson, test::ExpectOK{});
-  EXPECT_TRUE(tetMeshModel.mesh.has_value());
+static ModelData GetTetMeshModelWithAuxiliaryMesh(
+    int weightsPerNode,
+    std::optional<MeshData> ModelData::* meshMember) {
+  ModelData model = model::LoadFromBytes(kTetMeshCubeJson, test::ExpectOK{});
+  EXPECT_TRUE(model.mesh.has_value());
 
-  // Load a valid model with a triangular mesh
-  ModelData triMeshModel = model::LoadFromBytes(kTriMeshCubeJson, test::ExpectOK{});
+  ModelData const triMeshModel = model::LoadFromBytes(kTriMeshCubeJson, test::ExpectOK{});
   EXPECT_TRUE(triMeshModel.mesh.has_value());
-  auto const& triMesh = *triMeshModel.mesh;
+  MeshData mesh = *triMeshModel.mesh;
+  EXPECT_LE(mesh.GetNumNodes(), model.mesh->GetNumNodes());
 
-  // Normally a visual mesh would be higher resolution than the surface of the simulation mesh, but
-  // not in this case.
-  EXPECT_EQ(isize(tetMeshModel.mesh->coordinates), isize(triMesh.coordinates));
-
-  // Build a visual mesh. For simplicity, each visual node is weighted to one simulation node.
-  MeshData visualMesh = triMesh;
-  visualMesh.skinning = SkinningData{};
-  visualMesh.skinning->weightsPerNode = weightsPerNode;
-  visualMesh.skinning->indices.resize(weightsPerNode * triMesh.GetNumNodes());
-  visualMesh.skinning->weights.resize(weightsPerNode * triMesh.GetNumNodes());
-  for (int i = 0; i < triMesh.GetNumNodes(); ++i) {
-    visualMesh.skinning->indices[weightsPerNode * i] = i;
-    visualMesh.skinning->weights[weightsPerNode * i] = 1_r;
+  // For simplicity, each auxiliary node is weighted to one simulation node.
+  mesh.skinning.emplace();
+  mesh.skinning->weightsPerNode = weightsPerNode;
+  mesh.skinning->indices.resize(weightsPerNode * mesh.GetNumNodes());
+  mesh.skinning->weights.resize(weightsPerNode * mesh.GetNumNodes());
+  for (int i = 0; i < mesh.GetNumNodes(); ++i) {
+    mesh.skinning->indices[weightsPerNode * i] = i;
+    mesh.skinning->weights[weightsPerNode * i] = 1_r;
   }
 
-  tetMeshModel.visualMesh = std::move(visualMesh);
-  return tetMeshModel;
+  model.*meshMember = std::move(mesh);
+  return model;
 }
 
 static ModelData GetPolylineModelWithVisualMesh(bool includeSkinning) {
@@ -2244,20 +2252,29 @@ static ModelData GetPolylineModelWithVisualMesh(bool includeSkinning) {
   return model;
 }
 
-TEST(ModelUtils, SaveLoad_VisualMesh) {
-  // Tetrahedral meshes with valid visual meshes
-  for (int weightsPerNode = 1; weightsPerNode <= 4; ++weightsPerNode) {
-    ModelData model = GetTetMeshModelWithVisualMesh(weightsPerNode);
-    model::Validate(model, test::ExpectOK{});
-    TestSerializationRoundTrip(model);
-  }
+TEST(ModelUtils, SaveLoad_AuxiliaryMeshes) {
+  auto const testMesh = [](std::string_view name, auto meshMember) {
+    SCOPED_TRACE(name);
+    for (int weightsPerNode = 1; weightsPerNode <= 4; ++weightsPerNode) {
+      ModelData model = GetTetMeshModelWithAuxiliaryMesh(weightsPerNode, meshMember);
+      model::Validate(model, test::ExpectOK{});
+      TestSerializationRoundTrip(model);
+    }
+  };
+  testMesh("VisualMesh", &ModelData::visualMesh);
+  testMesh("ContactSkin", &ModelData::contactSkinMesh);
+}
 
-  // It is less common for a model with a triangle mesh to have a visual mesh, but it is legal.
-  // We can use the same triangle mesh for both because they have the same number of nodes
-  for (int weightsPerNode = 1; weightsPerNode <= 4; ++weightsPerNode) {
-    ModelData model = GetTetMeshModelWithVisualMesh(weightsPerNode);
+TEST(ModelUtils, SaveLoad_VisualMeshOnTriangleMesh) {
+  // A triangle primary mesh may carry a visual mesh with or without skinning.
+  for (bool visualMeshHasSkinning : {true, false}) {
+    ModelData model =
+        GetTetMeshModelWithAuxiliaryMesh(/*weightsPerNode*/ 4, &ModelData::visualMesh);
     model.mesh = model.visualMesh;
     model.mesh->skinning = std::nullopt;
+    if (!visualMeshHasSkinning) {
+      model.visualMesh->skinning = std::nullopt;
+    }
     model::Validate(model, test::ExpectOK{});
     TestSerializationRoundTrip(model);
   }
@@ -2270,82 +2287,162 @@ TEST(ModelUtils, SaveLoad_VisualMesh) {
   }
 }
 
-TEST(ModelUtils, AutoCorrect_VisualMesh) {
-  // AutoCorrect should normalize the skinning weights
+TEST(ModelUtils, AutoCorrect_AuxiliaryMeshes) {
   int constexpr kWeightsPerNode = 3;
-  ModelData model = GetTetMeshModelWithVisualMesh(kWeightsPerNode);
-  auto& skinning = *model.visualMesh->skinning;
-  for (int i = 0; i < model.visualMesh->GetNumNodes(); ++i) {
-    // All the weight on one node
-    skinning.weights[kWeightsPerNode * i + 0] = 0_r;
-    skinning.weights[kWeightsPerNode * i + 1] = 2.34_r;
-    skinning.weights[kWeightsPerNode * i + 2] = 0_r;
-    model::AutoCorrect(model, test::ExpectOK{});
-    EXPECT_NEAR_EQ(0_r, skinning.weights[kWeightsPerNode * i + 0]);
-    EXPECT_NEAR_EQ(1_r, skinning.weights[kWeightsPerNode * i + 1]);
-    EXPECT_NEAR_EQ(0_r, skinning.weights[kWeightsPerNode * i + 2]);
+  auto const testMesh = [](std::string_view name, auto meshMember) {
+    SCOPED_TRACE(name);
+    ModelData model = GetTetMeshModelWithAuxiliaryMesh(kWeightsPerNode, meshMember);
+    auto& mesh = *(model.*meshMember);
+    auto& skinning = *mesh.skinning;
 
-    // Weight split between multiple nodes
-    skinning.weights[kWeightsPerNode * i + 0] = 0.5_r;
-    skinning.weights[kWeightsPerNode * i + 1] = 0_r;
-    skinning.weights[kWeightsPerNode * i + 2] = 1.5_r;
+    for (int i = 0; i < mesh.GetNumNodes(); ++i) {
+      // All the weight on one node.
+      skinning.weights[kWeightsPerNode * i + 0] = 0_r;
+      skinning.weights[kWeightsPerNode * i + 1] = 2.34_r;
+      skinning.weights[kWeightsPerNode * i + 2] = 0_r;
+      model::AutoCorrect(model, test::ExpectOK{});
+      EXPECT_NEAR_EQ(0_r, skinning.weights[kWeightsPerNode * i + 0]);
+      EXPECT_NEAR_EQ(1_r, skinning.weights[kWeightsPerNode * i + 1]);
+      EXPECT_NEAR_EQ(0_r, skinning.weights[kWeightsPerNode * i + 2]);
+
+      // Weight split between multiple nodes.
+      skinning.weights[kWeightsPerNode * i + 0] = 0.5_r;
+      skinning.weights[kWeightsPerNode * i + 1] = 0_r;
+      skinning.weights[kWeightsPerNode * i + 2] = 1.5_r;
+      model::AutoCorrect(model, test::ExpectOK{});
+      EXPECT_NEAR_EQ(0.25_r, skinning.weights[kWeightsPerNode * i + 0]);
+      EXPECT_NEAR_EQ(0_r, skinning.weights[kWeightsPerNode * i + 1]);
+      EXPECT_NEAR_EQ(0.75_r, skinning.weights[kWeightsPerNode * i + 2]);
+    }
+
+    // An auxiliary mesh with no triangles is removed.
+    mesh.connectivity.clear();
     model::AutoCorrect(model, test::ExpectOK{});
-    EXPECT_NEAR_EQ(0.25_r, skinning.weights[kWeightsPerNode * i + 0]);
-    EXPECT_NEAR_EQ(0_r, skinning.weights[kWeightsPerNode * i + 1]);
-    EXPECT_NEAR_EQ(0.75_r, skinning.weights[kWeightsPerNode * i + 2]);
-  }
-  // If the visual mesh has no triangles, then AutoCorrect should remove it.
-  EXPECT_TRUE(model.visualMesh.has_value());
-  model.visualMesh->connectivity.clear();
-  model::AutoCorrect(model, test::ExpectOK{});
-  EXPECT_FALSE(model.visualMesh.has_value());
+    EXPECT_FALSE((model.*meshMember).has_value());
+  };
+  testMesh("VisualMesh", &ModelData::visualMesh);
+  testMesh("ContactSkin", &ModelData::contactSkinMesh);
 }
 
-TEST(ModelUtils, Validate_VisualMesh) {
-  int constexpr kWeightsPerNode = 4;
-  ModelData srcModel = GetTetMeshModelWithVisualMesh(kWeightsPerNode);
-  model::Validate(srcModel, test::ExpectOK{}); // Starts valid
+TEST(ModelUtils, Validate_AuxiliaryMeshes) {
+  auto const testMesh = [](std::string_view name, auto meshMember) {
+    SCOPED_TRACE(name);
+    ModelData const srcModel = GetTetMeshModelWithAuxiliaryMesh(/*weightsPerNode*/ 4, meshMember);
+    model::Validate(srcModel, test::ExpectOK{});
 
-  // Visual mesh must be a valid triangle mesh.
-  {
-    ModelData model = srcModel; // copy
-    EXPECT_EQ(3, model.visualMesh->nodesPerElement);
-    model.visualMesh->nodesPerElement = 4;
-    model::Validate(model, test::ExpectNotOK{});
-    model.visualMesh->nodesPerElement = 3;
-    model::Validate(model, test::ExpectOK{}); // Valid again
-    TestValidateMeshCoordinates(model, *model.visualMesh);
-    TestValidateMeshConnectivity(model, *model.visualMesh);
-  }
+    {
+      ModelData model = srcModel;
+      auto& mesh = *(model.*meshMember);
+      EXPECT_EQ(3, mesh.nodesPerElement);
+      mesh.nodesPerElement = 4;
+      model::Validate(model, test::ExpectNotOK{});
+      mesh.nodesPerElement = 3;
+      model::Validate(model, test::ExpectOK{});
+      TestValidateMeshCoordinates(model, mesh);
+      TestValidateMeshConnectivity(model, mesh);
+    }
 
-  // It is technically legal for a model to have a visual mesh without skinning data, however, it
-  // won't be deformable.
+    {
+      ModelData model = srcModel;
+      auto& mesh = *(model.*meshMember);
+      int const invalidSkinningIndices[] = {-1, model.mesh->GetNumNodes()};
+      TestValidateSkinningData(model, *mesh.skinning, invalidSkinningIndices);
+    }
+  };
+  testMesh("VisualMesh", &ModelData::visualMesh);
+  testMesh("ContactSkin", &ModelData::contactSkinMesh);
+}
+
+TEST(ModelUtils, Validate_VisualMeshSkinning) {
   {
-    ModelData model = srcModel; // copy
+    ModelData model =
+        GetTetMeshModelWithAuxiliaryMesh(/*weightsPerNode*/ 4, &ModelData::visualMesh);
     model.visualMesh->skinning = std::nullopt;
     model::Validate(model, test::ExpectOK{});
   }
-
-  // Visual mesh skinning data must be valid. Indices must be in the half open range [0, numNodes)
   {
-    ModelData model = srcModel; // copy
-    int const kInvalidSkinningIndices[] = {-1, model.mesh->GetNumNodes()};
-    TestValidateSkinningData(model, *model.visualMesh->skinning, kInvalidSkinningIndices);
-  }
-
-  // Polyline visual meshes do not require skinning.
-  {
-    ModelData model = GetPolylineModelWithVisualMesh(/*includeSkinning=*/false);
+    ModelData model = model::LoadFromBytes(kPolylineMeshJson, test::ExpectOK{});
+    ModelData const triMeshModel = model::LoadFromBytes(kTriMeshCubeJson, test::ExpectOK{});
+    model.visualMesh = triMeshModel.mesh;
+    model.visualMesh->skinning = std::nullopt;
     model::Validate(model, test::ExpectOK{});
   }
-
-  // Supplied polyline skinning must remain valid. Its indices reference elements, so an open
-  // polyline with N nodes accepts [0, N - 2].
   {
     ModelData model = GetPolylineModelWithVisualMesh(/*includeSkinning=*/true);
-    int const kInvalidSkinningIndices[] = {-1, model.mesh->GetNumNodes() - 1};
-    TestValidateSkinningData(model, *model.visualMesh->skinning, kInvalidSkinningIndices);
+    int const invalidSkinningIndices[] = {-1, model.mesh->GetNumNodes() - 1};
+    TestValidateSkinningData(model, *model.visualMesh->skinning, invalidSkinningIndices);
   }
+}
+
+TEST(ModelUtils, Validate_ContactSkin) {
+  ModelData const srcModel =
+      GetTetMeshModelWithAuxiliaryMesh(/*weightsPerNode*/ 4, &ModelData::contactSkinMesh);
+
+  {
+    ModelData model = srcModel;
+    model.mesh = std::nullopt;
+    model.constrainedNodes = std::nullopt;
+    model.sphere = Sphere{Real3{}, 1_r};
+    model::Validate(model, test::ExpectNotOK{});
+  }
+  {
+    ModelData model = srcModel;
+    model.contactSkinMesh->skinning = std::nullopt;
+    model::Validate(model, test::ExpectOK{});
+  }
+}
+
+static MeshData MakeSingleTriangleContactSkin(int skinningIndex) {
+  MeshData contactSkin;
+  contactSkin.nodesPerElement = 3;
+  contactSkin.coordinates = DynamicArray<real>{0_r, 0_r, 0_r, 0_r, 1_r, 0_r, 0_r, 0_r, 1_r};
+  contactSkin.connectivity = DynamicArray<int>{0, 1, 2};
+  contactSkin.skinning.emplace();
+  contactSkin.skinning->weightsPerNode = 1;
+  contactSkin.skinning->indices = DynamicArray<int>(3, skinningIndex);
+  contactSkin.skinning->weights = DynamicArray<real>(3, 1_r);
+  return contactSkin;
+}
+
+TEST(ModelUtils, Validate_ContactSkinPolylineSkinningIndicesReferenceElements) {
+  ModelData model = model::LoadFromBytes(kPolylineMeshJson, test::ExpectOK{});
+  model.contactSkinMesh = MakeSingleTriangleContactSkin(model.mesh->GetNumElements() - 1);
+  model::Validate(model, test::ExpectOK{});
+  model.contactSkinMesh->skinning->indices[0] = model.mesh->GetNumElements();
+  model::Validate(model, test::ExpectNotOK{});
+
+  model.mesh->coordinates =
+      DynamicArray<real>{0_r, 0_r, 0_r, 1_r, 0_r, 0_r, 1_r, 1_r, 0_r, 0_r, 1_r, 0_r};
+  model.mesh->connectivity = DynamicArray<int>{0, 1, 1, 2, 2, 3, 3, 0};
+  model.elementFrameAxes = std::nullopt;
+  model.contactSkinMesh = MakeSingleTriangleContactSkin(model.mesh->GetNumElements() - 1);
+  model::Validate(model, test::ExpectOK{});
+  model.contactSkinMesh->skinning->indices[0] = model.mesh->GetNumElements();
+  model::Validate(model, test::ExpectNotOK{});
+}
+
+TEST(ModelUtils, SaveLoad_VisualMeshAndContactSkin) {
+  ModelData model = GetTetMeshModelWithAuxiliaryMesh(/*weightsPerNode*/ 4, &ModelData::visualMesh);
+  model.contactSkinMesh = *model.visualMesh;
+  model.contactSkinMesh->coordinates[0] += 0.125_r;
+
+  ASSERT_NE(*model.visualMesh, *model.contactSkinMesh);
+  model::Validate(model, test::ExpectOK{});
+  TestSerializationRoundTrip(model);
+}
+
+TEST(ModelUtils, BakeTransformAndFlipWinding_AuxiliaryMeshes) {
+  auto const testMesh = [](std::string_view name, auto meshMember) {
+    SCOPED_TRACE(name);
+    ModelData const model = GetTetMeshModelWithAuxiliaryMesh(/*weightsPerNode*/ 1, meshMember);
+    TestBakeTransformMesh(
+        model,
+        meshMember,
+        Real3{-2_r, 3_r, 4_r},
+        TransformRT{Quaternion::Identity(), Real3{1_r, 2_r, 3_r}});
+  };
+  testMesh("VisualMesh", &ModelData::visualMesh);
+  testMesh("ContactSkin", &ModelData::contactSkinMesh);
 }
 
 // Build a ModelData whose simulation mesh is a unit-cube tetrahedralization (8 nodes, 5 tets).

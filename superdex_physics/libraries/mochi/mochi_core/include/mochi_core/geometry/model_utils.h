@@ -146,6 +146,20 @@ void SaveToFile(ModelDataView const& data, std::string_view path, FileFormat for
 void Validate(ModelDataView const& data, Error& error);
 
 /**
+ * @brief Check skinning data for errors.
+ *
+ * @param[in] data Non-owning view of the skinning data to check.
+ * @param[in] numNodes Number of nodes being skinned.
+ * @param[in] numSkinningSources Number of available skinning sources.
+ * @param[in,out] error Error status. Check @ref Error::IsOK for success.
+ */
+void ValidateSkinning(
+    SkinningDataView const& data,
+    int numNodes,
+    int numSkinningSources,
+    Error& error);
+
+/**
  * @brief Validate that a polyline has well-defined element tangents.
  *
  * @details Checks two geometric preconditions required to compute element tangents and a
@@ -342,8 +356,9 @@ void FlipWindingOrder(MeshData& data, Error& error);
  * @brief Flip mesh winding order by swapping the connectivity indices within each element.
  *
  * @overload
- * @details Operates on both the simulation mesh (@ref ModelData::mesh) and the visual mesh
- * (@ref ModelData::visualMesh) when present. Implicit shapes and SDF data are not modified.
+ * @details Operates on the simulation mesh (@ref ModelData::mesh), visual mesh
+ * (@ref ModelData::visualMesh), and contact skin (@ref ModelData::contactSkinMesh) when present.
+ * Implicit shapes and SDF data are not modified.
  *
  * @param[in,out] data @ref ModelData to modify.
  * @param[in,out] error Error status. Check @ref Error::IsOK for success.

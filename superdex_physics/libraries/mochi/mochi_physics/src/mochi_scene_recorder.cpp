@@ -247,7 +247,8 @@ void SceneRecorder::AddCreateActorEvents() {
         _writer->AddDataSet("refPositions", refPos, MakeSpan(posDims), _error);
       }
 
-      if (auto const* surfMesh = _registry.try_get<CSurfaceMesh>(e)) {
+      auto const* surfMesh = _registry.try_get<CSurfaceMesh>(e);
+      if (surfMesh && !_registry.all_of<TagRodActor>(e)) {
         auto const* mesh = surfMesh->mesh.get();
         _writer->AddAttribute("numSurfNodes", mesh->GetNumNodes(), _error);
         _writer->AddAttribute("numSurfEdges", mesh->GetNumEdges(), _error);
@@ -269,9 +270,7 @@ void SceneRecorder::AddCreateActorEvents() {
         MOCHI_ASSERT(refPos.size() % 3 == 0);
         size_t const posDims[2] = {refPos.size() / 3, 3};
         _writer->AddDataSet("surfRefPositions", refPos, MakeSpan(posDims), _error);
-      }
-
-      if (auto const* polylineMesh = _registry.try_get<CPolylineMesh>(e)) {
+      } else if (auto const* polylineMesh = _registry.try_get<CPolylineMesh>(e)) {
         int const numNodes = isize(polylineMesh->nodes);
 
         // For rod actors, all nodes are "surface" nodes

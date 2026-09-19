@@ -81,6 +81,10 @@ BENCHMARK_TEMPLATE(ApplyActivation, float, ELUActivation<float>, krylov::Directi
     ->Name("AI/ApplyActivation/ELU")
     ->ArgNames({"rows", "cols"})
     ->Args({60, 2048});
+BENCHMARK_TEMPLATE(ApplyActivation, float, SiLUActivation<float>, krylov::Direction::ColMajor)
+    ->Name("AI/ApplyActivation/SiLU")
+    ->ArgNames({"rows", "cols"})
+    ->Args({60, 2048});
 
 BENCHMARK_TEMPLATE(ApplyActivationWithDerivative, float, IdentityActivation<float>, krylov::Direction::ColMajor)
     ->Name("AI/ApplyActivationWithDerivative/Identity")
@@ -92,6 +96,10 @@ BENCHMARK_TEMPLATE(ApplyActivationWithDerivative, float, ReLUActivation<float>, 
     ->Args({60, 2048});
 BENCHMARK_TEMPLATE(ApplyActivationWithDerivative, float, ELUActivation<float>, krylov::Direction::ColMajor)
     ->Name("AI/ApplyActivationWithDerivative/ELU")
+    ->ArgNames({"rows", "cols"})
+    ->Args({60, 2048});
+BENCHMARK_TEMPLATE(ApplyActivationWithDerivative, float, SiLUActivation<float>, krylov::Direction::ColMajor)
+    ->Name("AI/ApplyActivationWithDerivative/SiLU")
     ->ArgNames({"rows", "cols"})
     ->Args({60, 2048});
 // clang-format on
@@ -187,6 +195,12 @@ BENCHMARK_TEMPLATE(MlpForward, float, ELUActivation<float>)
     ->ArgsProduct({{6}, {60}, {13}, {3}, {2048}, {1, 2, 4, 8, 16, 32}})
     ->Unit(benchmark::kMillisecond)
     ->UseRealTime();
+BENCHMARK_TEMPLATE(MlpForward, float, SiLUActivation<float>)
+    ->Name("AI/MlpForward/SiLU")
+    ->ArgNames({"layers", "hiddenDim", "inputDim", "outputDim", "batchSize", "threads"})
+    ->Args({6, 60, 13, 3, 2048, 1})
+    ->Unit(benchmark::kMillisecond)
+    ->UseRealTime();
 
 BENCHMARK_TEMPLATE(MlpForwardAndJacobian, float, IdentityActivation<float>)
     ->Name("AI/MlpForwardAndJacobian/Identity")
@@ -204,6 +218,12 @@ BENCHMARK_TEMPLATE(MlpForwardAndJacobian, float, ELUActivation<float>)
     ->Name("AI/MlpForwardAndJacobian/ELU")
     ->ArgNames({"layers", "hiddenDim", "inputDim", "outputDim", "batchSize", "threads"})
     ->ArgsProduct({{6}, {60}, {13}, {3}, {2048}, {1, 2, 4, 8, 16, 32}})
+    ->Unit(benchmark::kMillisecond)
+    ->UseRealTime();
+BENCHMARK_TEMPLATE(MlpForwardAndJacobian, float, SiLUActivation<float>)
+    ->Name("AI/MlpForwardAndJacobian/SiLU")
+    ->ArgNames({"layers", "hiddenDim", "inputDim", "outputDim", "batchSize", "threads"})
+    ->Args({6, 60, 13, 3, 2048, 1})
     ->Unit(benchmark::kMillisecond)
     ->UseRealTime();
 

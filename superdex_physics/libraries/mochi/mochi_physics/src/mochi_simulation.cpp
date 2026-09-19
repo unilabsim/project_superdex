@@ -99,13 +99,13 @@ void mochi::GetIslandNewtonParams(
   outNewtonParams.lParams.normType = simParams.linearSolver.normType;
   if (simParams.linearSolver.maxIter == kAutoLinearSolverMaxIter) {
     // TODO: Tune the criteria to select the maximum number of iterations.
-    outNewtonParams.lParams.maxIter = Min(numDofs, kDefaultLinearSolverMaxIter);
+    outNewtonParams.lParams.maxIter = Clamp(numDofs, 1, kDefaultLinearSolverMaxIter);
   } else {
     outNewtonParams.lParams.maxIter = simParams.linearSolver.maxIter;
   }
   MOCHI_ASSERT(
-      outNewtonParams.lParams.maxIter >= 0,
-      "Maximum number of linear solver iterations must not be negative.");
+      outNewtonParams.lParams.maxIter > 0,
+      "Maximum number of iterations for iterative linear solvers must be positive.");
   outNewtonParams.lParams.absTol = simParams.linearSolver.absTol;
   outNewtonParams.lParams.relTol = simParams.linearSolver.relTol;
   outNewtonParams.lParams.relDivTol = simParams.linearSolver.relDivTol;

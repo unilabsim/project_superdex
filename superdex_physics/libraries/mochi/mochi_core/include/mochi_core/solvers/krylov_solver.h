@@ -51,7 +51,7 @@ struct KrylovSolverParams {
   // increase before the solver concludes that the method is diverging. Only used for iterative
   // solvers.
   double relDivTol = static_cast<double>(LinearSolverParams{}.relDivTol);
-  // Maximum number of iterations. Only used for iterative solvers.
+  // Maximum number of iterations for iterative solvers. Must be positive.
   int maxIter = kDefaultLinearSolverMaxIter; // LinearSolverParams defaults to "Auto".
   // Krylov subspace size triggering a restarting (used in GMRes)
   int restartSize = LinearSolverParams{}.restartSize;

@@ -14,11 +14,11 @@
 
 """Robot environments.
 
-Environments here are found and registered automatically by
-:mod:`superdex.lab.gym.utils.env_discovery` (call ``register_all_envs()``); this package
-intentionally has no import-time side effects. Import concrete classes from their own
-modules rather than from this package, which re-exports nothing.
+Environments here are registered explicitly with Gymnasium by
+:mod:`superdex.lab.gym.registration`; this package intentionally has no import-time side
+effects. Import concrete classes from their own modules rather than from this package,
+which re-exports nothing.
 
 Which env modules are present depends on the build, so this package can legitimately be
-an empty discovery root.
+empty.
 """

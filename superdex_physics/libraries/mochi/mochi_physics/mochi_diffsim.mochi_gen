@@ -51,10 +51,10 @@ struct diffsim::BackPropagationSolverParams [no_reflection] {
 struct diffsim::BackPropagationSceneStats [no_reflection] {
 
   // @brief Total wall-clock time spent in the last back-propagation step.
-  double totalDurationSec [units(s)];
+  double totalDurationSec [units("s")];
 
   // @brief Wall-clock time spent in the adjoint solve of the last back-propagation step.
-  double solveDurationSec [units(s)];
+  double solveDurationSec [units("s")];
 
   // @brief Maximum number of outer-solver iterations across all islands in the last
   // back-propagation step.

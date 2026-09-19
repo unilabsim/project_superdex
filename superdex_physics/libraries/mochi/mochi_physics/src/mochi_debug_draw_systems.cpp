@@ -884,39 +884,27 @@ static void RegisterDebugDrawSystem_ContactSamples(DebugDrawInternal& debugDraw)
   debugDraw.RegisterSystem<CContactSamples<TimeStep::Current>>(system);
 }
 
-// Traverses the contact sample bounding sphere hierarchy from the root and emits one colored
-// sphere per node relevant to [targetDepth]. Nodes sitting exactly at [targetDepth] are drawn in
-// light orange. Branches that bottom out before reaching [targetDepth] (leaf nodes at a shallower
-// depth) are drawn in light blue, so the union of drawn spheres always covers the full sample set.
-static void DrawBshLevel(BvhTree<Sphere> const& bvh, int targetDepth, DebugDrawCollector& out) {
+// Traverses the contact sample SphereTree from the root and emits one colored sphere per
+// node relevant to [targetDepth]. Non-leaf nodes sitting exactly at [targetDepth] are drawn in
+// light orange. Leaf nodes at or above [targetDepth] (i.e. branches that bottom out at or before
+// reaching [targetDepth]) are drawn in light blue, so the union of drawn spheres always covers the
+// full sample set.
+static void DrawBshLevel(SphereOctTree const& tree, int targetDepth, DebugDrawCollector& out) {
   Color constexpr kAtDepthColor = MakeColor(0xFFB26680); // light orange
-  Color constexpr kEarlyLeafColor = MakeColor(0x66B2FF80); // light blue
-
-  if (bvh.GetNodeCount() == 0) {
-    return;
-  }
-
-  // Explicit (nodeIndex, depth) stack to avoid recursion.
-  DynamicArray<std::pair<int, int>> stack;
-  stack.emplace_back(BvhTree<Sphere>::kRootNode, 0);
-  while (!stack.empty()) {
-    auto const [nodeIndex, depth] = stack.back();
-    stack.pop_back();
-    auto const& node = bvh.GetNode(nodeIndex);
-    if (depth == targetDepth) {
-      out.AddSphere(DebugDrawSphere{node.bv.GetCenter(), node.bv.GetRadius(), kAtDepthColor});
-    } else if (node.isLeafNode) {
-      // Cannot refine further; draw the early leaf to keep coverage complete.
-      out.AddSphere(DebugDrawSphere{node.bv.GetCenter(), node.bv.GetRadius(), kEarlyLeafColor});
-    } else {
-      stack.emplace_back(node.leftChildIndex, depth + 1);
-      stack.emplace_back(node.rightChildIndex, depth + 1);
+  Color constexpr kLeafColor = MakeColor(0x66B2FF80); // light blue
+  tree.ForEachNodeSphere([&](Sphere const& s, int depth, bool isLeaf) {
+    auto const& center = s.GetCenter();
+    auto const radius = Max(s.GetRadius(), 0.0005_r); // Avoid zero radius (invisible).
+    if (isLeaf && depth <= targetDepth) {
+      out.AddSphere(DebugDrawSphere{center, radius, kLeafColor});
+    } else if (depth == targetDepth) {
+      out.AddSphere(DebugDrawSphere{center, radius, kAtDepthColor});
     }
-  }
+  });
 }
 
 static void RegisterDebugDrawSystem_ContactSamplesBsh(DebugDrawInternal& debugDraw) {
-  constexpr int kMaxDepth = 9;
+  constexpr int kMaxDepth = 8;
   for (int depth = 0; depth <= kMaxDepth; ++depth) {
     DebugDrawSystem system;
     system.name = Format("Actor Contact Samples BSH (level %.2d)", depth);
@@ -926,7 +914,7 @@ static void RegisterDebugDrawSystem_ContactSamplesBsh(DebugDrawInternal& debugDr
         [depth](entt::registry const& reg, entt::entity e, DebugDrawCollector& out) {
           auto const& samples = reg.get<CContactSamples<TimeStep::Current>>(e);
           if (samples.bsh.has_value()) {
-            DrawBshLevel(samples.bsh->GetBvh(), depth, out);
+            DrawBshLevel(*samples.bsh, depth, out);
           }
         };
     debugDraw.RegisterSystem<CContactSamples<TimeStep::Current>>(system);
@@ -1701,10 +1689,6 @@ static void RegisterDebugDrawSystem_LinearTransmission(DebugDrawInternal& debugD
       CArticulatedReducedPose<TimeStep::Current>>(
       system, ecs::Excluded<TagExcludedFromDebugDraw>{});
 }
-
-// This suppresses a warning about no prior declaration of the function.
-// There is no header for this cpp, but that's OK.
-void RegisterDebugDrawSystems(DebugDrawInternal& debugDraw);
 
 // Called once by mochi::Scene to register all the DebugDrawSystems.
 void RegisterDebugDrawSystems(DebugDrawInternal& debugDraw) {

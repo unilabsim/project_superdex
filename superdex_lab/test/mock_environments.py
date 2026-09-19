@@ -41,8 +41,10 @@ class BasicMockEnv(Env):
         self._max_steps = max_steps
         self._step_count = 0
         self._reset_count = 0
+        self._last_seed = None
 
     def reset(self, *, seed=None, options=None):
+        self._last_seed = seed
         if seed is not None:
             np.random.seed(seed)
         self._step_count = 0
@@ -50,6 +52,13 @@ class BasicMockEnv(Env):
         observation = np.random.random(4).astype(np.float32)
         info = {"env_id": self._env_id, "reset_count": self._reset_count}
         return observation, info
+
+    def get_env_id(self) -> int:
+        return self._env_id
+
+    def get_last_seed(self):
+        """Return the seed this env was last reset with (None if unseeded)."""
+        return self._last_seed
 
     def step(self, action):
         self._step_count += 1

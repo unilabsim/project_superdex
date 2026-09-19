@@ -605,6 +605,11 @@ TEST(Matrix, VectorNormalized) {
   EXPECT_NEAR_EQ(n.Norm(), 1_r);
   EXPECT_NEAR_EQ(n[0], 0.6_r);
   EXPECT_NEAR_EQ(n[2], 0.8_r);
+
+  auto dynamic = ColumnVector<real>::Zero(3);
+  auto const* data = dynamic.Data();
+  auto normalized = std::move(dynamic).Normalize();
+  EXPECT_EQ(data, normalized.Data());
 }
 
 TEST(Matrix, CrossProduct) {

@@ -34,6 +34,7 @@
 #include "mochi_soft_rom_systems.h"
 #include "mochi_soft_skinned.h"
 
+#include <mochi_core/geometry/batch_sphere.h>
 #include <mochi_core/geometry/geometry_utils.h>
 #include <mochi_core/geometry/grid_sdf.h>
 #include <mochi_core/memory/filo_allocator.h>
@@ -795,8 +796,8 @@ template <TimeStep kTimeStep, bool kAllowFarSdfQuery>
   // introduced in the future.
   if (contactSamples.bsh && IsFinite(farSdfDistance)) {
     MOCHI_ASSERT(
-        outPositionsToQuery.size() == contactSamples.bsh->NumSamplePoints(),
-        "Inconsistent number of sample points. Is the BVH tree up-to-date with the number of active sample points?");
+        outPositionsToQuery.size() == contactSamples.bsh->GetNumSamples(),
+        "Inconsistent number of sample points. Is the SphereTree tree up-to-date with the number of active sample points?");
 
     AnyBoundingVolume colliderBvForCulling;
     bool shouldCull = true;
@@ -854,7 +855,12 @@ template <TimeStep kTimeStep, bool kAllowFarSdfQuery>
     // Perform culling.
     if (shouldCull) {
       culledIndicesBuffer.reserve(outPositionsToQuery.size());
-      contactSamples.bsh->FindIntersectingSamples(colliderBvForCulling, culledIndicesBuffer);
+
+      std::visit(
+          [&](auto const& bv) {
+            contactSamples.bsh->FindIntersectingSamples(bv, culledIndicesBuffer);
+          },
+          colliderBvForCulling);
 
       // Store culled positions and make 'outPositionsToQuery' point to them.
       culledPositionsBuffer.reserve(culledIndicesBuffer.size());
@@ -2420,9 +2426,11 @@ void mochi::UpdateCollisionSamplePositionsImpl(
     });
   });
 
-  if (outSamples.bsh) {
-    outSamples.bsh->Refit();
-  }
+  MOCHI_ASSERT(
+      !outSamples.bsh.has_value(),
+      "SphereOctTree does not currently support refitting. You could rebuild the tree from scratch, "
+      "or add a Refit method, but the best solution probably involves a different data structure "
+      "(e.g. an AABB tree).");
 }
 
 #define MOCHI_SPECIALIZE_UPDATE_COLLISION_SAMPLES_IMPL(activeFaces, discretization, numFields)     \
@@ -3056,7 +3064,7 @@ static void AppendBlockIndices(DynamicArray<int>& outBlockIndices, Span<int cons
   } else {
     int outIdx = isize(outBlockIndices);
     int prevIdx = -1;
-    outBlockIndices.resize(outBlockIndices.size() + fullIndices.size()); // worst case
+    outBlockIndices.resize_noinit(outBlockIndices.size() + fullIndices.size()); // worst case
     for (int i : fullIndices) {
       int bi = i / kBlockSize;
       if (bi != prevIdx) {
@@ -3317,6 +3325,13 @@ static void AssembleAllSyncContactPairs(
   for (auto& cp : allPairs) {
     Interval<int> pointsRemaining{0, isize(cp.collision->collisionResult.sampleIndices)};
     while (pointsRemaining.Size() > 0) {
+      if (isize(taskWork) == kMaxTasks) {
+        // Floating-point rounding can leave work after kMaxTasks. Do not grow taskWork:
+        // DynamicArray::GrowCapacity allocates a new FILO block, then tries to free the previous
+        // block. FiloAllocator only permits freeing the most recently allocated block.
+        taskWork.back().pairWork.emplace_back(&cp, pointsRemaining);
+        break;
+      }
       if (taskWork.empty() || taskWork.back().cost >= targetCostPerTask) {
         taskWork.push_back({});
       }
@@ -3733,22 +3748,14 @@ void mochi::AssembleAsyncSkinnedContact(
 
 Aabb mochi::ExpandConservativeBoundsWithContactPadding(
     Aabb bounds,
-    ecs::PartialRegistry<
-        CContactParams const,
-        CRequiresFarSdfEvaluation const,
-        CPointCloudColliderParams const> reg,
+    ecs::PartialRegistry<CContactParams const, CRequiresFarSdfEvaluation const> reg,
     entt::entity e) {
   auto const* contactParams = reg.try_get<CContactParams const>(e);
   real farSdfDistance = GetFarSdfEvaluationDistance<true>(reg, e);
 
-  // Pad with: (1) contact params (for colliders), (2) point-cloud collider radius (for
-  // point-cloud colliders such as shell/rods), and (3) far-SDF distance (for collidees).
+  // Point-cloud collider radii are already included in the actors' local bounding volumes.
   if (contactParams) {
     bounds = ExpandColliderBoundsForContact(bounds, *contactParams);
-  }
-
-  if (auto const* pcParams = reg.try_get<CPointCloudColliderParams const>(e)) {
-    bounds = ExpandShape(bounds, pcParams->radius);
   }
 
   return ExpandShape(bounds, farSdfDistance);

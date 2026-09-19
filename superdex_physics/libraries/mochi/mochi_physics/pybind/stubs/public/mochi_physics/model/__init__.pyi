@@ -411,9 +411,10 @@ def flip_winding_order(data: mochi_physics.ModelData) -> None:
     """Flip mesh winding order by swapping the connectivity indices within each
     element.
 
-    Operates on both the simulation mesh (:attr:`~superdex.physics.ModelData.mesh`)
-    and the visual mesh (:attr:`~superdex.physics.ModelData.visual_mesh`) when
-    present. Implicit shapes and SDF data are not modified.
+    Operates on the simulation mesh (:attr:`~superdex.physics.ModelData.mesh`),
+    visual mesh (:attr:`~superdex.physics.ModelData.visual_mesh`), and contact skin
+    (:attr:`~superdex.physics.ModelData.contact_skin_mesh`) when present. Implicit
+    shapes and SDF data are not modified.
 
     Args:
         data (ModelData): :class:`~superdex.physics.ModelData` to modify.

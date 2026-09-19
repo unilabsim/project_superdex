@@ -129,6 +129,122 @@ static RowMatrix<real, 5, 5> U{
     1.61721508012528_r, -0.6183469424008423_r, 0.0_r, 0.0_r, 0.0_r, 0.0_r,
     1.271867547672921_r};
 
+[[nodiscard]] static Graph<int, int> MakeClosedDistanceTwoGraph(int numVertices) {
+  std::vector<std::vector<int>> rows(numVertices);
+  for (int row = 0; row < numVertices; ++row) {
+    for (int offset = -2; offset <= 2; ++offset) {
+      int const col = (row + offset + numVertices) % numVertices;
+      rows[row].push_back(col);
+    }
+  }
+  return MakeSparsityGraph(std::move(rows), numVertices);
+}
+
+template <typename Preconditioner, typename MatrixType>
+void CheckNaturalOrderSolve(
+    Preconditioner const& preconditioner,
+    MatrixType const& matrix,
+    int seed) {
+  int const size = matrix.Rows();
+  Matrix<real> expected(size, 3), rhs(size, 3), result(size, 3);
+  expected.SetRandom(seed);
+  rhs = matrix * expected;
+  preconditioner(rhs, result);
+  auto const tolerance = 1024_r * size * std::numeric_limits<real>::epsilon();
+  EXPECT_TRUE(test::NearEqualMatrices(result, expected, tolerance));
+}
+
+template <int kBlockSize>
+void CheckNaturalOrderCompletionConstructAndUpdate() {
+  int constexpr kBlocks = 8;
+  int constexpr kSize = kBlockSize * kBlocks;
+  auto dense = RowMatrix<real, kSize, kSize>::Zero();
+  for (int i = 0; i < kSize; ++i) {
+    dense(i, i) = 8_r + real(i) * 0.01_r;
+  }
+  for (int block = 0; block < kBlocks; ++block) {
+    for (int distance = 1; distance <= 2; ++distance) {
+      int const neighbor = (block + distance) % kBlocks;
+      for (int i = 0; i < kBlockSize; ++i) {
+        for (int j = 0; j < kBlockSize; ++j) {
+          real const value = -0.01_r * real(1 + i + kBlockSize * j);
+          dense(block * kBlockSize + i, neighbor * kBlockSize + j) = value;
+          dense(neighbor * kBlockSize + j, block * kBlockSize + i) = value;
+        }
+      }
+    }
+  }
+
+  auto sparse = ToBlockSparseMatrix<kBlockSize>(dense, /*pruneZeros*/ true);
+  using Prec = IncompleteCholeskyPrec<decltype(sparse)>;
+  Prec prec(sparse, NaturalOrderCompletion{}, /*alphaShift*/ 0_r);
+  EXPECT_EQ(PreconditionerType::IC0, prec.GetType());
+  CheckNaturalOrderSolve(prec, dense, 123);
+  auto const baselineDense = dense;
+  auto baselinePrec = prec;
+
+  for (int i = 0; i < kSize; ++i) {
+    dense(i, i) += 0.5_r;
+    sparse.SetValue(i, i, dense(i, i));
+  }
+  prec.Update(sparse);
+  CheckNaturalOrderSolve(baselinePrec, baselineDense, 124);
+  CheckNaturalOrderSolve(prec, dense, 124);
+
+  dense(0, kBlockSize + 1) = -0.1_r;
+  dense(kBlockSize + 1, 0) = -0.1_r;
+  sparse.SetValue(0, kBlockSize + 1, dense(0, kBlockSize + 1));
+  sparse.SetValue(kBlockSize + 1, 0, dense(kBlockSize + 1, 0));
+  prec.Update(sparse);
+  CheckNaturalOrderSolve(prec, dense, 125);
+
+  real constexpr kAlphaShift = 0.1_r;
+  Prec shiftedPrec(sparse, NaturalOrderCompletion{}, kAlphaShift);
+  auto checkShifted = [&](int seed) {
+    auto shiftedDense = dense;
+    real const shift = kAlphaShift * Trace(dense) / dense.Rows();
+    for (int i = 0; i < kSize; ++i) {
+      shiftedDense(i, i) += shift;
+    }
+    CheckNaturalOrderSolve(shiftedPrec, shiftedDense, seed);
+  };
+  checkShifted(126);
+  for (int update = 0; update < 2; ++update) {
+    dense(update, update) += 0.25_r;
+    sparse.SetValue(update, update, dense(update, update));
+    shiftedPrec.Update(sparse);
+    checkShifted(127 + update);
+  }
+}
+
+TEST(IncompleteCholeskyPrec, NaturalOrderCompletionConstructAndUpdate) {
+  EXPECT_EQ(0, krylov::details::CompleteCholeskyPatternNaturalOrder(Graph<int, int>{}).size());
+  int constexpr kPatternBlocks = 256;
+  auto completed = krylov::details::CompleteCholeskyPatternNaturalOrder(
+      MakeClosedDistanceTwoGraph(kPatternBlocks));
+  EXPECT_EQ(9 * kPatternBlocks - 20, completed.NumTargets());
+
+  CheckNaturalOrderCompletionConstructAndUpdate<1>();
+  CheckNaturalOrderCompletionConstructAndUpdate<2>();
+  CheckNaturalOrderCompletionConstructAndUpdate<3>();
+  CheckNaturalOrderCompletionConstructAndUpdate<4>();
+  CheckNaturalOrderCompletionConstructAndUpdate<5>();
+
+  int constexpr kChordalBlockSize = 2;
+  auto chordal = A;
+  auto chordalSparse = ToBlockSparseMatrix<kChordalBlockSize>(chordal, /*pruneZeros*/ true);
+  using ChordalPrec = IncompleteCholeskyPrec<decltype(chordalSparse)>;
+  ChordalPrec chordalPrec(chordalSparse, NaturalOrderCompletion{}, /*alphaShift*/ 0_r);
+  CheckNaturalOrderSolve(chordalPrec, chordal, 127);
+
+  chordal(0, kChordalBlockSize + 1) = -0.08_r;
+  chordal(kChordalBlockSize + 1, 0) = -0.08_r;
+  chordalSparse.SetValue(0, kChordalBlockSize + 1, chordal(0, kChordalBlockSize + 1));
+  chordalSparse.SetValue(kChordalBlockSize + 1, 0, chordal(kChordalBlockSize + 1, 0));
+  chordalPrec.Update(chordalSparse);
+  CheckNaturalOrderSolve(chordalPrec, chordal, 128);
+}
+
 template <int kBlockSize>
 using BlockPrec = mochi::krylov::IncompleteCholeskyPrec<BlockSparseMatrix<real, kBlockSize>>;
 

@@ -18,28 +18,28 @@
 
 // clang-format off
 
-#include <pybind11/pybind11.h>
+#include <limits>
+#include <nanobind/nanobind.h>
 #include "../pybind_include.h"
 
 using namespace mochi;
-namespace py = pybind11;
-using namespace pybind11::literals;
+namespace nb = nanobind;
 
 namespace mochi {
   // Forward declarations for the definitions below.
-  void DeclareMochiPhysics_MochiPhysicsContext(py::module_& m, PybindRegistry& registry);
-  void DefineMochiPhysics_MochiPhysicsContext(py::module_& m, PybindRegistry& registry);
+  void DeclareMochiPhysics_MochiPhysicsContext(nb::module_& m, PybindRegistry& registry);
+  void DefineMochiPhysics_MochiPhysicsContext(nb::module_& m, PybindRegistry& registry);
 } // namespace mochi
 
-void mochi::DeclareMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+void mochi::DeclareMochiPhysics_MochiPhysicsContext([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
 }
 
-void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
     m.def("set_is_single_threaded", [](bool is_single_threaded) {
       CheckContext();
       GetContext()->SetIsSingleThreaded(is_single_threaded);
     }
-      , py::arg("is_single_threaded")
+      , nb::arg("is_single_threaded")
       , "Enable or disable single-threaded mode.\n\nIn single-threaded mode, each new task will be executed on the calling thread,\neven if other threads are available. This may hurt performance, but it is useful\nfor debugging and batch simulation.\n\nEnabling single-threaded mode does not, however, terminate tasks that are\nalready running asynchronously. Such tasks will run to completion. For example,\nif you have an ``mochi::AsyncScene``, it will continue to step asynchronously,\nbut each step will do its work on that one thread.\n\nArgs:\n    is_single_threaded (bool): True to enable single-threaded mode. False to\n        disable.\n\nNote:\n    Call on any thread.\n\nWarning:\n    This documentation references the following C++ API, which is not available\n    in Python: ``mochi::AsyncScene``.\n\nSee Also:\n    :func:`~superdex.physics.is_single_threaded`"
     );
 
@@ -63,8 +63,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       CheckContext();
       GetContext()->EnableLogChannel(channel, enable);
     }
-      , py::arg("channel")
-      , py::arg("enable")
+      , nb::arg("channel")
+      , nb::arg("enable")
       , "Enable or disable log messages on the specified channel.\n\nWhen a channel is disabled, messages on that channel are discarded before\nreaching the logging callback (see :func:`~superdex.physics.set_log_callback`).\n\nArgs:\n    channel (LogChannel | int): The log channel to enable or disable.\n    enable (bool): True to enable the channel, false to disable it.\n\nNote:\n    By default, all channels are enabled except for :class:`VERBOSE\n    <superdex.physics.LogChannel>`.\n\nNote:\n    Call on any thread.\n\nSee Also:\n    :func:`~superdex.physics.is_log_channel_enabled`,\n    :func:`~superdex.physics.set_log_callback`"
     );
 
@@ -73,7 +73,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       auto result = GetContext()->IsLogChannelEnabled(channel);
       return result;
     }
-      , py::arg("channel")
+      , nb::arg("channel")
       , "Return true if messages on the specified log channel are enabled.\n\nArgs:\n    channel (LogChannel | int): The log channel to query.\n\nReturns:\n    True if the channel is enabled, false otherwise.\n\nNote:\n    Call on any thread.\n\nSee Also:\n    :func:`~superdex.physics.enable_log_channel`"
     );
 
@@ -81,7 +81,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       CheckContext();
       GetContext()->SetLogCallback(callback);
     }
-      , py::arg("callback")
+      , nb::arg("callback").none()
       , "Optionally provide a callback function to redirect SuperDex Physics logging. The\ndefault function outputs to stdout and to the debugger (if attached).\n\nArgs:\n    callback (Callable[[LogChannel, str, str, int], None]): Function to handle\n        logging, or None to restore the default logging function.\n\nNote:\n    Call on any thread.\n\nWarning:\n    This documentation references the following C++ API, which is not available\n    in Python: ``mochi::Context::GetLogCallback``.\n\nWarning:\n    Your callback function may be called on any thread.\n\nSee Also:\n    ``mochi::Context::GetLogCallback``"
     );
 
@@ -94,7 +94,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("file_path")
+      , nb::arg("file_path")
       , "Load a shape from a file of supported format.\n\nSupported formats: JSON (.mochi.json), HDF5 (.mochi.h5), OBJ (.obj), OFF (.off),\nPLY (.ply), and STL (.stl).\n\nArgs:\n    file_path (str): File path to load (case sensitive on some filesystems).\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    Call on any thread.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`,\n    :func:`~superdex.physics.load_shape_from_bytes`"
     );
 
@@ -107,8 +107,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("file_path")
-      , py::arg("bake_scale")
+      , nb::arg("file_path")
+      , nb::arg("bake_scale")
       , "Load a shape from a file of supported format, and bake in some scale.\n\nSupported formats: JSON (.mochi.json), HDF5 (.mochi.h5), OBJ (.obj), OFF (.off),\nPLY (.ply), and STL (.stl).\n\nArgs:\n    file_path (str): File path to load (case sensitive on some filesystems).\n    bake_scale (Real3Like): Scale to bake into the shape or (1, 1, 1) for no\n        change. Negative scale results in mirroring.\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    Some shape data cannot bake arbitrary non-uniform scale. Unsupported scale\n    values are rejected.\n\nNote:\n    Precomputed grid SDF data is preserved only when ``bake_scale`` is uniform\n    by absolute value. Non-uniform scale by absolute value discards the\n    precomputed SDF. If an SDF collider later requires SDF data, SuperDex\n    Physics regenerates it from the transformed mesh at runtime, which may be\n    expensive.\n\nNote:\n    If the loaded model has\n    :attr:`~superdex.physics.ModelData.element_frame_axes`, ``bake_scale``\n    transforms those axes as normal directions using the inverse-transpose of\n    the scale transform, then normalize them.\n\nNote:\n    Call on any thread.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`,\n    :func:`~superdex.physics.load_shape_from_bytes`"
     );
 
@@ -121,8 +121,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("file_path")
-      , py::arg("bake_transform")
+      , nb::arg("file_path")
+      , nb::arg("bake_transform")
       , "Load a shape from a file of supported format, and bake in rotation and\ntranslation.\n\nSupported formats: JSON (.mochi.json), HDF5 (.mochi.h5), OBJ (.obj), OFF (.off),\nPLY (.ply), and STL (.stl).\n\nArgs:\n    file_path (str): File path to load (case sensitive on some filesystems).\n    bake_transform (TransformRT): Transform to bake into the shape, or the\n        identity transform for no change.\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    If the loaded model has\n    :attr:`~superdex.physics.ModelData.element_frame_axes`, ``bake_transform``\n    transforms those axes as normal directions using the inverse-transpose of\n    the rotation transform, then normalize them.\n\nNote:\n    Call on any thread.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`,\n    :func:`~superdex.physics.load_shape_from_bytes`"
     );
 
@@ -135,9 +135,9 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("file_path")
-      , py::arg("bake_scale")
-      , py::arg("bake_transform")
+      , nb::arg("file_path")
+      , nb::arg("bake_scale")
+      , nb::arg("bake_transform")
       , "Load a shape from a file of supported format, and bake in some scale, rotation,\nand translation.\n\nSupported formats: JSON (.mochi.json), HDF5 (.mochi.h5), OBJ (.obj), OFF (.off),\nPLY (.ply), and STL (.stl).\n\nArgs:\n    file_path (str): File path to load (case sensitive on some filesystems).\n    bake_scale (Real3Like): Scale to bake into the shape or (1, 1, 1) for no\n        change. Negative scale results in mirroring.\n    bake_transform (TransformRT): Transform to bake into the shape, or the\n        identity transform for no change.\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    Some shape data cannot bake arbitrary non-uniform scale. Unsupported scale\n    values are rejected.\n\nNote:\n    Precomputed grid SDF data is preserved only when ``bake_scale`` is uniform\n    by absolute value. Non-uniform scale by absolute value discards the\n    precomputed SDF. If an SDF collider later requires SDF data, SuperDex\n    Physics regenerates it from the transformed mesh at runtime, which may be\n    expensive.\n\nNote:\n    If the loaded model has\n    :attr:`~superdex.physics.ModelData.element_frame_axes`, ``bake_scale`` and\n    ``bake_transform`` transform those axes as normal directions using the\n    inverse-transpose of the scale-rotation transform, then normalize them.\n\nNote:\n    Call on any thread.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`,\n    :func:`~superdex.physics.load_shape_from_bytes`"
     );
 
@@ -150,7 +150,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("file_data")
+      , nb::arg("file_data")
       , "Load a shape from a file of supported format, where the file has already been\nloaded into memory.\n\nSupported formats: JSON (.mochi.json) and HDF5 (.mochi.h5), auto-detected from\nheader bytes. To load a surface mesh format (OBJ, PLY, OFF, STL) from memory,\nuse the overload that takes an explicit :class:`~superdex.physics.MeshFileType`.\n\nArgs:\n    file_data (ArrayLikeChar): File contents as an in-memory byte array.\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    Call on any thread.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`,\n    :func:`~superdex.physics.load_shape_from_file`"
     );
 
@@ -163,8 +163,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("file_data")
-      , py::arg("bake_scale")
+      , nb::arg("file_data")
+      , nb::arg("bake_scale")
       , "Load a shape from a file of supported format, where the file has already been\nloaded into memory, and baking in some scale.\n\nSupported formats: JSON (.mochi.json) and HDF5 (.mochi.h5), auto-detected from\nheader bytes. To load a surface mesh format (OBJ, PLY, OFF, STL) from memory,\nuse the overload that takes an explicit :class:`~superdex.physics.MeshFileType`.\n\nArgs:\n    file_data (ArrayLikeChar): File contents as an in-memory byte array.\n    bake_scale (Real3Like): Scale to bake into the shape or (1, 1, 1) for no\n        change. Negative scale results in mirroring.\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    Some shape data cannot bake arbitrary non-uniform scale. Unsupported scale\n    values are rejected.\n\nNote:\n    Precomputed grid SDF data is preserved only when ``bake_scale`` is uniform\n    by absolute value. Non-uniform scale by absolute value discards the\n    precomputed SDF. If an SDF collider later requires SDF data, SuperDex\n    Physics regenerates it from the transformed mesh at runtime, which may be\n    expensive.\n\nNote:\n    If the loaded model has\n    :attr:`~superdex.physics.ModelData.element_frame_axes`, ``bake_scale``\n    transforms those axes as normal directions using the inverse-transpose of\n    the scale transform, then normalize them.\n\nNote:\n    Call on any thread.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`,\n    :func:`~superdex.physics.load_shape_from_file`"
     );
 
@@ -177,8 +177,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("file_data")
-      , py::arg("bake_transform")
+      , nb::arg("file_data")
+      , nb::arg("bake_transform")
       , "Load a shape from a file of supported format, where the file has already been\nloaded into memory, and baking in rotation and translation.\n\nSupported formats: JSON (.mochi.json) and HDF5 (.mochi.h5), auto-detected from\nheader bytes. To load a surface mesh format (OBJ, PLY, OFF, STL) from memory,\nuse the overload that takes an explicit :class:`~superdex.physics.MeshFileType`.\n\nArgs:\n    file_data (ArrayLikeChar): File contents as an in-memory byte array.\n    bake_transform (TransformRT): Transform to bake into the shape, or the\n        identity transform for no change.\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    If the loaded model has\n    :attr:`~superdex.physics.ModelData.element_frame_axes`, ``bake_transform``\n    transforms those axes as normal directions using the inverse-transpose of\n    the rotation transform, then normalize them.\n\nNote:\n    Call on any thread.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`,\n    :func:`~superdex.physics.load_shape_from_file`"
     );
 
@@ -191,9 +191,9 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("file_data")
-      , py::arg("bake_scale")
-      , py::arg("bake_transform")
+      , nb::arg("file_data")
+      , nb::arg("bake_scale")
+      , nb::arg("bake_transform")
       , "Load a shape from a file of supported format, where the file has already been\nloaded into memory, and baking in some scale, rotation, and translation.\n\nSupported formats: JSON (.mochi.json) and HDF5 (.mochi.h5), auto-detected from\nheader bytes. To load a surface mesh format (OBJ, PLY, OFF, STL) from memory,\nuse the overload that takes an explicit :class:`~superdex.physics.MeshFileType`.\n\nArgs:\n    file_data (ArrayLikeChar): File contents as an in-memory byte array.\n    bake_scale (Real3Like): Scale to bake into the shape or (1, 1, 1) for no\n        change. Negative scale results in mirroring.\n    bake_transform (TransformRT): Transform to bake into the shape, or the\n        identity transform for no change.\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    Some shape data cannot bake arbitrary non-uniform scale. Unsupported scale\n    values are rejected.\n\nNote:\n    Precomputed grid SDF data is preserved only when ``bake_scale`` is uniform\n    by absolute value. Non-uniform scale by absolute value discards the\n    precomputed SDF. If an SDF collider later requires SDF data, SuperDex\n    Physics regenerates it from the transformed mesh at runtime, which may be\n    expensive.\n\nNote:\n    If the loaded model has\n    :attr:`~superdex.physics.ModelData.element_frame_axes`, ``bake_scale`` and\n    ``bake_transform`` transform those axes as normal directions using the\n    inverse-transpose of the scale-rotation transform, then normalize them.\n\nNote:\n    Call on any thread.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`,\n    :func:`~superdex.physics.load_shape_from_file`"
     );
 
@@ -206,8 +206,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("file_data")
-      , py::arg("format")
+      , nb::arg("file_data")
+      , nb::arg("format")
       , "Load a shape from a file of supported format, where the file has already been\nloaded into memory, with an explicit mesh format hint.\n\nArgs:\n    file_data (ArrayLikeChar): File contents as an in-memory byte array.\n    format (MeshFileType | int): Mesh file format hint. When :class:`LEGACY\n        <superdex.physics.MeshFileType>`, auto-detects between HDF5 and JSON via\n        header bytes. When a surface mesh format (:class:`PLY\n        <superdex.physics.MeshFileType>`, :class:`OFF\n        <superdex.physics.MeshFileType>`, :class:`STL\n        <superdex.physics.MeshFileType>`, :class:`OBJ\n        <superdex.physics.MeshFileType>`), dispatches directly to that reader.\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    Call on any thread.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`,\n    :func:`~superdex.physics.load_shape_from_file`"
     );
 
@@ -220,9 +220,9 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("file_data")
-      , py::arg("format")
-      , py::arg("bake_scale")
+      , nb::arg("file_data")
+      , nb::arg("format")
+      , nb::arg("bake_scale")
       , "Load a shape from a file of supported format, where the file has already been\nloaded into memory, with an explicit mesh format hint, and baking in some scale.\n\nArgs:\n    file_data (ArrayLikeChar): File contents as an in-memory byte array.\n    format (MeshFileType | int): Mesh file format hint. When :class:`LEGACY\n        <superdex.physics.MeshFileType>`, auto-detects between HDF5 and JSON via\n        header bytes. When a surface mesh format (:class:`PLY\n        <superdex.physics.MeshFileType>`, :class:`OFF\n        <superdex.physics.MeshFileType>`, :class:`STL\n        <superdex.physics.MeshFileType>`, :class:`OBJ\n        <superdex.physics.MeshFileType>`), dispatches directly to that reader.\n    bake_scale (Real3Like): Scale to bake into the shape or (1, 1, 1) for no\n        change. Negative scale results in mirroring.\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    Some shape data cannot bake arbitrary non-uniform scale. Unsupported scale\n    values are rejected.\n\nNote:\n    Precomputed grid SDF data is preserved only when ``bake_scale`` is uniform\n    by absolute value. Non-uniform scale by absolute value discards the\n    precomputed SDF. If an SDF collider later requires SDF data, SuperDex\n    Physics regenerates it from the transformed mesh at runtime, which may be\n    expensive.\n\nNote:\n    If the loaded model has\n    :attr:`~superdex.physics.ModelData.element_frame_axes`, ``bake_scale``\n    transforms those axes as normal directions using the inverse-transpose of\n    the scale transform, then normalize them.\n\nNote:\n    Call on any thread.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`,\n    :func:`~superdex.physics.load_shape_from_file`"
     );
 
@@ -235,9 +235,9 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("file_data")
-      , py::arg("format")
-      , py::arg("bake_transform")
+      , nb::arg("file_data")
+      , nb::arg("format")
+      , nb::arg("bake_transform")
       , "Load a shape from a file of supported format, where the file has already been\nloaded into memory, with an explicit mesh format hint, and baking in rotation\nand translation.\n\nArgs:\n    file_data (ArrayLikeChar): File contents as an in-memory byte array.\n    format (MeshFileType | int): Mesh file format hint. When :class:`LEGACY\n        <superdex.physics.MeshFileType>`, auto-detects between HDF5 and JSON via\n        header bytes. When a surface mesh format (:class:`PLY\n        <superdex.physics.MeshFileType>`, :class:`OFF\n        <superdex.physics.MeshFileType>`, :class:`STL\n        <superdex.physics.MeshFileType>`, :class:`OBJ\n        <superdex.physics.MeshFileType>`), dispatches directly to that reader.\n    bake_transform (TransformRT): Transform to bake into the shape, or the\n        identity transform for no change.\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    If the loaded model has\n    :attr:`~superdex.physics.ModelData.element_frame_axes`, ``bake_transform``\n    transforms those axes as normal directions using the inverse-transpose of\n    the rotation transform, then normalize them.\n\nNote:\n    Call on any thread.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`,\n    :func:`~superdex.physics.load_shape_from_file`"
     );
 
@@ -250,10 +250,10 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("file_data")
-      , py::arg("format")
-      , py::arg("bake_scale")
-      , py::arg("bake_transform")
+      , nb::arg("file_data")
+      , nb::arg("format")
+      , nb::arg("bake_scale")
+      , nb::arg("bake_transform")
       , "Load a shape from a file of supported format, where the file has already been\nloaded into memory, with an explicit mesh format hint, and baking in some scale,\nrotation, and translation.\n\nArgs:\n    file_data (ArrayLikeChar): File contents as an in-memory byte array.\n    format (MeshFileType | int): Mesh file format hint. When :class:`LEGACY\n        <superdex.physics.MeshFileType>`, auto-detects between HDF5 and JSON via\n        header bytes. When a surface mesh format (:class:`PLY\n        <superdex.physics.MeshFileType>`, :class:`OFF\n        <superdex.physics.MeshFileType>`, :class:`STL\n        <superdex.physics.MeshFileType>`, :class:`OBJ\n        <superdex.physics.MeshFileType>`), dispatches directly to that reader.\n    bake_scale (Real3Like): Scale to bake into the shape or (1, 1, 1) for no\n        change. Negative scale results in mirroring.\n    bake_transform (TransformRT): Transform to bake into the shape, or the\n        identity transform for no change.\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    Some shape data cannot bake arbitrary non-uniform scale. Unsupported scale\n    values are rejected.\n\nNote:\n    Precomputed grid SDF data is preserved only when ``bake_scale`` is uniform\n    by absolute value. Non-uniform scale by absolute value discards the\n    precomputed SDF. If an SDF collider later requires SDF data, SuperDex\n    Physics regenerates it from the transformed mesh at runtime, which may be\n    expensive.\n\nNote:\n    If the loaded model has\n    :attr:`~superdex.physics.ModelData.element_frame_axes`, ``bake_scale`` and\n    ``bake_transform`` transform those axes as normal directions using the\n    inverse-transpose of the scale-rotation transform, then normalize them.\n\nNote:\n    Call on any thread.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`,\n    :func:`~superdex.physics.load_shape_from_file`"
     );
 
@@ -266,15 +266,15 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("mesh")
+      , nb::arg("mesh")
       , "Create a shape using in-memory mesh data, so that it can be used to create\nactors.\n\nArgs:\n    mesh (MeshData): The mesh data, which SuperDex Physics copies.\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    Call on any thread.\n\nNote:\n    Can be a tetrahedral mesh, a triangular mesh, or a polyline mesh, depending\n    on the value of :attr:`~superdex.physics.MeshData.nodes_per_element`.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`"
     );
-    m.def("create_mesh_shape", [](py::object nodes_per_element, py::object coordinates, py::object connectivity, py::object skinning) {
-      mochi::MeshData params;
-      params.nodesPerElement = py::cast<int>(nodes_per_element);
-      params.coordinates = py::cast<mochi::DynamicArray<mochi::real>>(coordinates);
-      params.connectivity = py::cast<mochi::DynamicArray<int>>(connectivity);
-      params.skinning = py::cast<std::optional<mochi::SkinningData>>(skinning);
+    m.def("create_mesh_shape", [](nb::object nodes_per_element, nb::object coordinates, nb::object connectivity, nb::object skinning) {
+      mochi::MeshData params{};
+      params.nodesPerElement = nb::cast<int>(nodes_per_element);
+      params.coordinates = nb::cast<mochi::DynamicArray<mochi::real>>(coordinates);
+      params.connectivity = nb::cast<mochi::DynamicArray<int>>(connectivity);
+      params.skinning = nb::cast<std::optional<mochi::SkinningData>>(skinning);
       CheckContext();
       mochi::Error error;
       auto result = GetContext()->CreateMeshShape(params, error);
@@ -283,11 +283,11 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("nodes_per_element") = mochi::MeshData{}.nodesPerElement
-      , py::arg("coordinates") = mochi::MeshData{}.coordinates
-      , py::arg("connectivity") = mochi::MeshData{}.connectivity
-      , py::arg("skinning") = mochi::MeshData{}.skinning
+      , nb::kw_only()
+      , nb::arg("nodes_per_element") = mochi::MeshData{}.nodesPerElement
+      , nb::arg("coordinates").sig("...") = mochi::MeshData{}.coordinates
+      , nb::arg("connectivity").sig("...") = mochi::MeshData{}.connectivity
+      , nb::arg("skinning").sig("...") = mochi::MeshData{}.skinning
       , "Create a shape using in-memory mesh data, so that it can be used to create\nactors.\n\nArgs:\n    mesh (MeshData): The mesh data, which SuperDex Physics copies.\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    Call on any thread.\n\nNote:\n    Can be a tetrahedral mesh, a triangular mesh, or a polyline mesh, depending\n    on the value of :attr:`~superdex.physics.MeshData.nodes_per_element`.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`");
 
     m.def("create_mesh_shape", [](mochi::MeshDataView const& mesh) {
@@ -299,7 +299,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("mesh")
+      , nb::arg("mesh")
       , "Create a shape using in-memory mesh data, so that it can be used to create\nactors.\n\nArgs:\n    mesh (MeshDataView): A non-owning view of the mesh data, which SuperDex\n        Physics copies.\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    Call on any thread.\n\nNote:\n    Can be a tetrahedral mesh, a triangular mesh, or a polyline mesh, depending\n    on the value of :attr:`~superdex.physics.MeshDataView.nodes_per_element`.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`"
     );
 
@@ -312,21 +312,22 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("model")
+      , nb::arg("model")
       , "Create a shape using in-memory model data, so that it can be used to create\nactors.\n\nArgs:\n    model (ModelData): The model data, which SuperDex Physics copies.\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    Call on any thread.\n\nNote:\n    Can be a mesh or an implicit shape, depending on the contents.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`"
     );
-    m.def("create_model_shape", [](py::object mesh, py::object visual_mesh, py::object blending, py::object constrained_nodes, py::object element_frame_axes, py::object box, py::object plane, py::object sphere, py::object sdf, py::object material) {
-      mochi::ModelData params;
-      params.mesh = py::cast<std::optional<mochi::MeshData>>(mesh);
-      params.visualMesh = py::cast<std::optional<mochi::MeshData>>(visual_mesh);
-      params.blending = py::cast<std::optional<mochi::DynamicArray<mochi::BlendingData>>>(blending);
-      params.constrainedNodes = py::cast<std::optional<mochi::DynamicArray<int>>>(constrained_nodes);
-      params.elementFrameAxes = py::cast<std::optional<mochi::DynamicArray<mochi::real>>>(element_frame_axes);
-      params.box = py::cast<std::optional<mochi::Box>>(box);
-      params.plane = py::cast<std::optional<mochi::Plane>>(plane);
-      params.sphere = py::cast<std::optional<mochi::Sphere>>(sphere);
-      params.sdf = py::cast<std::optional<mochi::GridSdfData>>(sdf);
-      params.material = py::cast<std::optional<mochi::PerElementSoftMaterialData>>(material);
+    m.def("create_model_shape", [](nb::object mesh, nb::object visual_mesh, nb::object contact_skin_mesh, nb::object blending, nb::object constrained_nodes, nb::object element_frame_axes, nb::object box, nb::object plane, nb::object sphere, nb::object sdf, nb::object material) {
+      mochi::ModelData params{};
+      params.mesh = nb::cast<std::optional<mochi::MeshData>>(mesh);
+      params.visualMesh = nb::cast<std::optional<mochi::MeshData>>(visual_mesh);
+      params.contactSkinMesh = nb::cast<std::optional<mochi::MeshData>>(contact_skin_mesh);
+      params.blending = nb::cast<std::optional<mochi::DynamicArray<mochi::BlendingData>>>(blending);
+      params.constrainedNodes = nb::cast<std::optional<mochi::DynamicArray<int>>>(constrained_nodes);
+      params.elementFrameAxes = nb::cast<std::optional<mochi::DynamicArray<mochi::real>>>(element_frame_axes);
+      params.box = nb::cast<std::optional<mochi::Box>>(box);
+      params.plane = nb::cast<std::optional<mochi::Plane>>(plane);
+      params.sphere = nb::cast<std::optional<mochi::Sphere>>(sphere);
+      params.sdf = nb::cast<std::optional<mochi::GridSdfData>>(sdf);
+      params.material = nb::cast<std::optional<mochi::PerElementSoftMaterialData>>(material);
       CheckContext();
       mochi::Error error;
       auto result = GetContext()->CreateModelShape(params, error);
@@ -335,17 +336,18 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("mesh") = mochi::ModelData{}.mesh
-      , py::arg("visual_mesh") = mochi::ModelData{}.visualMesh
-      , py::arg("blending") = mochi::ModelData{}.blending
-      , py::arg("constrained_nodes") = mochi::ModelData{}.constrainedNodes
-      , py::arg("element_frame_axes") = mochi::ModelData{}.elementFrameAxes
-      , py::arg("box") = mochi::ModelData{}.box
-      , py::arg("plane") = mochi::ModelData{}.plane
-      , py::arg("sphere") = mochi::ModelData{}.sphere
-      , py::arg("sdf") = mochi::ModelData{}.sdf
-      , py::arg("material") = mochi::ModelData{}.material
+      , nb::kw_only()
+      , nb::arg("mesh").sig("...") = mochi::ModelData{}.mesh
+      , nb::arg("visual_mesh").sig("...") = mochi::ModelData{}.visualMesh
+      , nb::arg("contact_skin_mesh").sig("...") = mochi::ModelData{}.contactSkinMesh
+      , nb::arg("blending").sig("...") = mochi::ModelData{}.blending
+      , nb::arg("constrained_nodes").sig("...") = mochi::ModelData{}.constrainedNodes
+      , nb::arg("element_frame_axes").sig("...") = mochi::ModelData{}.elementFrameAxes
+      , nb::arg("box").sig("...") = mochi::ModelData{}.box
+      , nb::arg("plane").sig("...") = mochi::ModelData{}.plane
+      , nb::arg("sphere").sig("...") = mochi::ModelData{}.sphere
+      , nb::arg("sdf").sig("...") = mochi::ModelData{}.sdf
+      , nb::arg("material").sig("...") = mochi::ModelData{}.material
       , "Create a shape using in-memory model data, so that it can be used to create\nactors.\n\nArgs:\n    model (ModelData): The model data, which SuperDex Physics copies.\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    Call on any thread.\n\nNote:\n    Can be a mesh or an implicit shape, depending on the contents.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`");
 
     m.def("create_model_shape", [](mochi::ModelDataView const& model) {
@@ -357,7 +359,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("model")
+      , nb::arg("model")
       , "Create a shape using in-memory model data, so that it can be used to create\nactors.\n\nArgs:\n    model (ModelDataView): A non-owning view of the model data, which SuperDex\n        Physics copies.\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    Call on any thread.\n\nNote:\n    Can be a mesh or an implicit shape, depending on the contents.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`"
     );
 
@@ -370,8 +372,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("coordinates")
-      , py::arg("connectivity")
+      , nb::arg("coordinates")
+      , nb::arg("connectivity")
       , "Create a tetrahedral mesh shape using in-memory data.\n\nArgs:\n    coordinates (ArrayLikeReal): Node positions [m] (3 values per node)\n    connectivity (ArrayLikeInt): Node indices (4 values per tetrahedron).\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    Call on any thread.\n\nNote:\n    \"Vertex\" is another word for \"node\" in this context.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`"
     );
 
@@ -384,8 +386,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("coordinates")
-      , py::arg("connectivity")
+      , nb::arg("coordinates")
+      , nb::arg("connectivity")
       , "Create a triangle mesh shape using in-memory data.\n\nArgs:\n    coordinates (ArrayLikeReal): Node positions [m] (3 values per node).\n    connectivity (ArrayLikeInt): Node indices (3 values per triangle).\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    Call on any thread.\n\nNote:\n    \"Vertex\" is another word for \"node\" in this context.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`"
     );
 
@@ -398,8 +400,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("center")
-      , py::arg("radius")
+      , nb::arg("center")
+      , nb::arg("radius")
       , "Create an implicit sphere shape.\n\nArgs:\n    center (Real3Like): Center of the sphere [m], in the shape's local frame.\n    radius (float): Radius of the sphere [m]\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create rigid\n    actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    Call on any thread.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`"
     );
 
@@ -412,8 +414,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("normal")
-      , py::arg("distance")
+      , nb::arg("normal")
+      , nb::arg("distance")
       , "Create an implicit plane with infinite extents.\n\nArgs:\n    normal (Real3Like): Normal vector of the plane, in the shape's local frame.\n        Need not be unit length; it is normalized internally.\n    distance (float): Signed offset [m] from the origin to the plane, measured\n        along the (normalized) ``normal``. The plane equation is\n        dot(normalize(normal), x) = distance.\n\nReturns:\n    A :class:`~superdex.physics.ShapeHandle` that can be used to create rigid\n    actors.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The shape remains in memory while referenced by any handle or actor. In the\n    C API, you must release the shape explicitly by calling\n    :func:`~superdex.physics.release_shape`. In C++ and Python, this is\n    optional, since :class:`~superdex.physics.ShapeHandle` cleanup is automatic.\n\nNote:\n    Call on any thread.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.release_shape`"
     );
 
@@ -426,7 +428,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("shape")
+      , nb::arg("shape")
       , "Get a view of the shape's main mesh data.\n\nFor tetrahedral mesh shapes, returns the volume mesh (4 nodes per element). For\ntriangular mesh shapes, returns the surface mesh (3 nodes per element). For\npolyline shapes, returns the polyline mesh (2 nodes per element). For shapes\nwithout a main mesh, including implicit shapes such as spheres and planes,\nreturns an empty view.\n\nArgs:\n    shape (ShapeHandle): Handle to a valid shape.\n\nReturns:\n    A non-owning view of the shape's main mesh data, or an empty view if the\n    shape has no mesh.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Can be called on any thread.\n\nNote:\n    The returned view will be invalid after the shape handle has been released.\n\nSee Also:\n    :class:`~superdex.physics.MeshDataView`,\n    :func:`~superdex.physics.get_shape_surface_mesh`,\n    :func:`~superdex.physics.get_shape_visual_mesh`,\n    :meth:`~superdex.physics.Actor.get_mesh`"
     );
 
@@ -439,8 +441,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("shape")
-      , "Get a view of the shape's surface mesh data.\n\nReturns a triangle mesh (3 nodes per element) representing the shape's surface.\nThe coordinate array contains exactly the surface nodes referenced by the\nreturned connectivity; nodes present in the underlying main mesh but not\nreferenced by any surface triangle are omitted. Connectivity values are indices\ninto this returned coordinate array. For shapes without a surface mesh, returns\nan empty view.\n\nArgs:\n    shape (ShapeHandle): Handle to a valid shape.\n\nReturns:\n    A non-owning view of the shape's surface mesh data, or an empty view if the\n    shape has no surface mesh.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    For triangular mesh shapes, this may differ from\n    :func:`~superdex.physics.get_shape_mesh` if the main mesh contains\n    unreferenced nodes. For tetrahedral mesh shapes, this is the boundary\n    surface of the volume mesh, with non-boundary volume nodes omitted.\n\nNote:\n    Can be called on any thread.\n\nNote:\n    The returned view will be invalid after the shape handle has been released.\n\nSee Also:\n    :class:`~superdex.physics.MeshDataView`,\n    :func:`~superdex.physics.get_shape_mesh`,\n    :func:`~superdex.physics.get_shape_visual_mesh`,\n    :meth:`~superdex.physics.Actor.get_surface_mesh`"
+      , nb::arg("shape")
+      , "Get a view of the shape's surface mesh data.\n\nReturns a triangle mesh (3 nodes per element) representing the shape's surface.\nThe coordinate array contains exactly the surface nodes referenced by the\nreturned connectivity; nodes present in the underlying main mesh but not\nreferenced by any surface triangle are omitted. Connectivity values are indices\ninto this returned coordinate array. For polyline shapes with an authored\ncontact skin, returns that skin. For shapes without a surface mesh, returns an\nempty view.\n\nArgs:\n    shape (ShapeHandle): Handle to a valid shape.\n\nReturns:\n    A non-owning view of the shape's surface mesh data, or an empty view if the\n    shape has no surface mesh.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    For triangular mesh shapes, this may differ from\n    :func:`~superdex.physics.get_shape_mesh` if the main mesh contains\n    unreferenced nodes. For tetrahedral mesh shapes, this is the boundary\n    surface of the volume mesh, with non-boundary volume nodes omitted.\n\nNote:\n    Can be called on any thread.\n\nNote:\n    The returned view will be invalid after the shape handle has been released.\n\nSee Also:\n    :class:`~superdex.physics.MeshDataView`,\n    :func:`~superdex.physics.get_shape_mesh`,\n    :func:`~superdex.physics.get_shape_visual_mesh`,\n    :meth:`~superdex.physics.Actor.get_surface_mesh`"
     );
 
     m.def("get_shape_visual_mesh", [](mochi::ShapeHandle shape) {
@@ -452,7 +454,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("shape")
+      , nb::arg("shape")
       , "Get a view of the shape's visual mesh data, including skinning data if\navailable.\n\nReturns a triangle mesh (3 nodes per element) intended for visual rendering.\nCoordinates and connectivity are returned in visual-mesh node-index space,\nincluding any visual mesh nodes not referenced by the visual connectivity. The\nmesh may include linear skinning data for deformation. For shapes without a\nvisual mesh, returns an empty view.\n\nArgs:\n    shape (ShapeHandle): Handle to a valid shape.\n\nReturns:\n    A non-owning view of the shape's visual mesh data, or an empty view if the\n    shape has no visual mesh.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Can be called on any thread.\n\nNote:\n    The returned view will be invalid after the shape handle has been released.\n\nNote:\n    When linear visual-mesh skinning data is present, skinning indices refer to\n    the node ordering returned by :func:`~superdex.physics.get_shape_mesh`, not\n    to the compact surface-node ordering returned by\n    :func:`~superdex.physics.get_shape_surface_mesh`. Rod visual mesh embeddings\n    are nonlinear and are not exposed through this linear skinning field.\n\nSee Also:\n    :class:`~superdex.physics.MeshDataView`,\n    :func:`~superdex.physics.get_shape_mesh`,\n    :func:`~superdex.physics.get_shape_surface_mesh`,\n    :meth:`~superdex.physics.Actor.get_visual_mesh`"
     );
 
@@ -465,7 +467,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("shape")
+      , nb::arg("shape")
       , "Get an axis-aligned bounding box (AABB) that contains the shape, in its local\ncoordinate frame.\n\nArgs:\n    shape (ShapeHandle): Handle to a valid shape.\n\nReturns:\n    The axis-aligned bounding box of the shape in local coordinates.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Call on any thread.\n\nNote:\n    Sets an error for shapes that do not have a bounding volume (e.g.,\n    articulated shapes — query their link shapes individually instead)."
     );
 
@@ -478,7 +480,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       }
       return result;
     }
-      , py::arg("shape")
+      , nb::arg("shape")
       , "Get information about an articulated shape.\n\nArgs:\n    shape (ShapeHandle): Handle to an articulated shape.\n\nReturns:\n    The :class:`~superdex.physics.ArticulatedShapeInfo` for the specified shape.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only supported for articulated shapes. Sets error otherwise.\n\nNote:\n    Can be called on any thread.\n\nNote:\n    The returned information will be invalid after the shape handle has been\n    released.\n\nSee Also:\n    :class:`~superdex.physics.ArticulatedShapeInfo`,\n    :meth:`~superdex.physics.Actor.get_articulated_shape_info`"
     );
 
@@ -486,7 +488,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       CheckContext();
       GetContext()->ReleaseShape(shape);
     }
-      , py::arg("shape")
+      , nb::arg("shape")
       , "Release a shape handle.\n\nIn the C API, this must be called for every\n:class:`~superdex.physics.ShapeHandle` when you are done with it. In C++ and\nPython, this is optional because :class:`~superdex.physics.ShapeHandle` releases\nits reference automatically when destroyed. The shape memory is freed when it is\nno longer referenced by any handle, actor, or file cache entry.\n\nArgs:\n    shape (ShapeHandle): Handle to the shape to release.\n\nNote:\n    Call on any thread.\n\nNote:\n    If the shape handle is invalid or already released, then it will be ignored.\n\nSee Also:\n    :class:`~superdex.physics.ShapeHandle`,\n    :func:`~superdex.physics.is_file_cache_enabled`"
     );
 
@@ -502,7 +504,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       CheckContext();
       GetContext()->EnableFileCache(enable);
     }
-      , py::arg("enable")
+      , nb::arg("enable")
       , "Enable or disable the file cache.\n\nWhen enabled, shape memory will be preserved even after the\n:class:`~superdex.physics.ShapeHandle` has been released. Subsequent requests\nfor the same file (with the same baked-in scale and transform) will be fast\nbecause the data will already be loaded. This can be an important optimization,\nbut beware that it could waste memory if it preserves shapes that are no longer\nneeded.\n\nArgs:\n    enable (bool): True to enable, false to disable the feature.\n\nNote:\n    Call on any thread.\n\nNote:\n    Disabling the cache (passing false) immediately releases all currently\n    cached shapes, equivalent to calling\n    :func:`~superdex.physics.clear_file_cache`.\n\nSee Also:\n    :func:`~superdex.physics.is_file_cache_enabled`,\n    :func:`~superdex.physics.clear_file_cache`,\n    :func:`~superdex.physics.clear_file_from_cache`"
     );
 
@@ -525,7 +527,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       CheckContext();
       GetContext()->ClearFileFromCache(file_path);
     }
-      , py::arg("file_path")
+      , nb::arg("file_path")
       , "Release all cached entries for a given shape file.\n\nUse this to free up memory, or to force the next file request to be loaded from\ndisk, in case the file had been modified. All entries for ``file_path`` are\nremoved, including every variant produced by different bake scale/transform\ncombinations.\n\nArgs:\n    file_path (str): Path to a file that may have been loaded. The match is\n        case-sensitive and must equal the path used at load time exactly.\n\nNote:\n    Call on any thread.\n\nSee Also:\n    :func:`~superdex.physics.is_file_cache_enabled`,\n    :func:`~superdex.physics.clear_file_cache`"
     );
 
@@ -534,15 +536,16 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       auto result = GetContext()->CreateScene(name);
       return result;
     }
-      , py::arg("name")
+      , nb::arg("name")
       , "Create a new :class:`~superdex.physics.Scene`.\n\nA scene is a collection of actors and constraints, which can be stepped to\nadvance the simulation. Each scene is independent. Actors from one scene cannot\naffect another scene.\n\nYou can create a new scene on any thread, but that scene must only be accessed\nfrom one thread at a time. All reads and writes to the scene must be synchronous\nand well ordered. However, if you have multiple scenes, then it is safe to step\nthem concurrently.\n\nArgs:\n    name (str): Name of the new scene (for debugging).\n\nReturns:\n    Pointer to the new scene. Call :func:`~superdex.physics.destroy_scene` when\n    done with it.\n\nNote:\n    Call on any thread.\n\nSee Also:\n    :func:`~superdex.physics.destroy_scene`"
+      , nb::rv_policy::reference
     );
 
     m.def("destroy_scene", [](mochi::Scene* scene) {
       CheckContext();
       GetContext()->DestroyScene(scene);
     }
-      , py::arg("scene")
+      , nb::arg("scene").none()
       , "Immediately destroy a scene and all its actors and constraints.\n\nArgs:\n    scene (Optional[Scene]): Pointer to the scene to destroy.\n\nNote:\n    No-op if ``scene`` is None or unknown to this Mochi context.\n\nNote:\n    Call on any thread.\n\nNote:\n    Any remaining scenes will be cleaned up automatically when the Mochi context\n    is destroyed.\n\nWarning:\n    This documentation references the following C++ APIs, which are not\n    available in Python: ``mochi::AsyncScene``,\n    ``mochi::Context::DestroyAsyncScene``.\n\nWarning:\n    Do not dereference pointers to the scene, actors, constraints, etc. after\n    this call.\n\nWarning:\n    If ``scene`` is owned by an ``mochi::AsyncScene``, the call is a no-op (a\n    warning is logged). Call ``mochi::Context::DestroyAsyncScene`` instead.\n\nSee Also:\n    :func:`~superdex.physics.create_scene`,\n    ``mochi::Context::DestroyAsyncScene``"
     );
 
@@ -551,8 +554,9 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       auto result = GetContext()->GetScene(handle);
       return result;
     }
-      , py::arg("handle")
+      , nb::arg("handle")
       , "Get a pointer to a scene by its handle.\n\nArgs:\n    handle (SceneHandle): Handle to the scene.\n\nReturns:\n    Pointer to the scene, or None if the handle is invalid in this context.\n\nNote:\n    Call on any thread."
+      , nb::rv_policy::reference
     );
 
     m.def("is_valid_scene", [](mochi::Scene const* scene) {
@@ -560,7 +564,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       auto result = GetContext()->IsValidScene(scene);
       return result;
     }
-      , py::arg("scene")
+      , nb::arg("scene").none()
       , "Check if a scene is valid (not destroyed), and belongs to this Mochi context.\n\nArgs:\n    scene (Optional[Scene]): Pointer to the scene to check.\n\nReturns:\n    True if the scene is valid and belongs to this Mochi context.\n\nNote:\n    Call on any thread.\n\nSee Also:\n    :func:`~superdex.physics.create_scene`,\n    :func:`~superdex.physics.destroy_scene`"
     );
 
@@ -570,7 +574,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsContext([[maybe_unused]] py::module_&
       return &result;
     }
       , "Get the debug server for this context.\n\nReturns:\n    Reference to the :class:`~superdex.physics.DebugServer`, which accepts\n    connections from external debug tools.\n\nSee Also:\n    :class:`~superdex.physics.DebugServer`"
-      , py::return_value_policy::reference
+      , nb::rv_policy::reference
     );
 
 }

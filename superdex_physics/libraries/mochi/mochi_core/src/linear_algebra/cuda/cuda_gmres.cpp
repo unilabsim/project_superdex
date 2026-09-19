@@ -54,6 +54,7 @@ std::tuple<int, double, double, IterationStatus> CudaGMRes_impl(
     double rTol,
     double dTol,
     int restartSize) {
+  MOCHI_ASSERT_VERBOSE(maxIter > 0, "Maximum number of iterations must be positive.");
   MOCHI_ASSERT(bNorm > 0, "CudaGMRes_impl requires non-zero initial RHS.");
 
   auto blasHandle = reinterpret_cast<cublasHandle_t>(mochi::details::GetCuBLASHandle());

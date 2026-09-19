@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <set>
+#include <utility>
 #include <vector>
 
 using namespace mochi;
@@ -155,6 +156,22 @@ TEST(Graph, Traverse) {
       EXPECT_EQ(neighbors[i], eleList[i]);
     }
   }
+}
+
+TEST(Graph, SortTargetsMovesStorage) {
+  Graph<int, int> graph{{0, 3}, {2, 0, 1}};
+  auto const* pointers = graph.GetPointers().data();
+  auto const* targets = graph.GetTargets().data();
+
+  auto sorted = std::move(graph).SortTargets();
+
+  EXPECT_EQ(pointers, sorted.GetPointers().data());
+  EXPECT_EQ(targets, sorted.GetTargets().data());
+
+  Graph<int, int> emptyGraph{{0}, {}};
+  auto const* emptyPointers = emptyGraph.GetPointers().data();
+  auto sortedEmpty = std::move(emptyGraph).SortTargets();
+  EXPECT_EQ(emptyPointers, sortedEmpty.GetPointers().data());
 }
 
 TEST(GraphUtils, RedBlack2D) {

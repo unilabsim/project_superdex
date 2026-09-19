@@ -161,9 +161,10 @@ struct CollidingPointCloudDiscretization {
         value);
   }
 };
-/// Validates shared @ref experimental::PointCloudColliderParams fields.
+/// Validates point-cloud collider parameters and their combined contact range.
 void ValidatePointCloudColliderParams(
     experimental::PointCloudColliderParams const& params,
+    ContactParams const& contactParams,
     Error& error);
 
 SpatialHashTable CreateSpatialHashTable(

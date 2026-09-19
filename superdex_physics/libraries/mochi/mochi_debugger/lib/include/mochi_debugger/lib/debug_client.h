@@ -282,6 +282,33 @@ class DebugClient {
   void RestoreSceneState();
 
   /**
+   * @brief Get the catalog of debug draw features reported by the server, with the client's
+   * current enable state.
+   *
+   * @return A thread-safe snapshot of the current feature catalog and enable state.
+   */
+  [[nodiscard]] DynamicArray<protocol::DbgDrawFeature> GetDebugDrawFeatures() const;
+
+  /**
+   * @brief Enable or disable one debug draw feature.
+   *
+   * @note An invalid feature name will be ignored (no change).
+   * @note When a feature is enabled, the master enable bool will also be set to true.
+   *
+   * @param featureName Name of a debug draw feature.
+   * @param enable True to enable the Feature. False to disable.
+   *
+   * @see GetDebugDrawFeatures
+   */
+  void EnableDebugDrawFeature(std::string_view featureName, bool enable);
+
+  /** @brief Return the state of the debug draw master switch. */
+  [[nodiscard]] bool IsDebugDrawEnabled() const;
+
+  /** @brief Set the debug draw master switch. */
+  void EnableDebugDraw(bool enable);
+
+  /**
    * @brief Execute a console command
    *
    * @param str A command string. First token is the command. Additional tokens are arguments.
@@ -330,6 +357,7 @@ class DebugClient {
     DynamicArray<std::string> cmdPath; // Current console command path
     DynamicArray<SceneInfo> scenes; // Cached list of scenes, kept in sync with the server
     CoordinateSpace coordinateSpace = CoordinateSpace::Filament(); // Synced from the server
+    protocol::DbgDrawFeatures debugDraw; // Feature catalog plus the client's desired enable state
     SceneHandle selectedScene; // Currently selected scene (if any)
     SceneSyncData syncData; // Latest sync data received from the server.
     uint64_t syncCounter = 0; // Incremented when sync data changes.
@@ -347,12 +375,14 @@ class DebugClient {
   DynamicArray<std::string> ResolvePath(std::string_view pathArg, Error& error);
   void ValidatePath(Span<std::string const> path, Error& error);
   static protocol::SceneSyncRequest MakeSyncRequest(State const& state);
+  static protocol::DebugDrawRequest MakeDebugDrawRequest(State const& state);
   static bool IsAutoSelectableScene(SceneInfo const& scene);
   static SceneHandle FindAutoSelectableScene(Span<SceneInfo const> scenes);
   static void SetSelectedScene(
       State& state,
       SceneHandle handle,
-      DynamicArray<protocol::SceneSyncRequest>& outRequests);
+      DynamicArray<protocol::SceneSyncRequest>& outSyncRequests,
+      DynamicArray<protocol::DebugDrawRequest>& outDebugDrawRequests);
   static void UpdateActorMeshes(
       protocol::SceneSyncReply const& reply,
       std::unordered_map<ActorHandle, MeshInfo>& meshCache,
@@ -373,6 +403,7 @@ class DebugClient {
   // Message handlers
   void OnLogMessage(protocol::LogMessage&& msg);
   void OnWelcomeMessage(protocol::WelcomeMessage&& msg);
+  void OnDebugDrawReply(protocol::DebugDrawReply&& reply);
   void OnSceneAddRemove(protocol::SceneAddRemove&& msg);
   void OnSceneStepReply(protocol::SceneStepReply&& reply);
   void OnSceneSyncReply(protocol::SceneSyncReply&& reply);

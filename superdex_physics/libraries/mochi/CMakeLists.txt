@@ -121,24 +121,80 @@ endif ()
 if (MOCHI_USE_PYBIND OR MOCHI_BUILD_RENDERER)
     # Components needed:
     #   Interpreter: runs bin_to_c.py (mochi_renderer + Filament resource wiring)
-    #   Development.Module: provides Python.h and the extension-module link rules (pybind11)
+    #   Development.Module: provides Python.h and the extension-module link rules (nanobind)
     #
     # Not plain Development: it implies Development.Embed, which requires libpython. manylinux
     # CPython ships none, so requiring Embed fails configure on the wheel-build platform.
     set(_mochi_python3_components Interpreter)
     if (MOCHI_USE_PYBIND)
         list(APPEND _mochi_python3_components Development.Module)
+        if (SKBUILD_SABI_VERSION)
+            if (CMAKE_VERSION VERSION_LESS 3.26)
+                message(FATAL_ERROR
+                    "[Mochi] Stable-ABI wheels require CMake 3.26 or newer."
+                )
+            endif ()
+            list(APPEND _mochi_python3_components Development.SABIModule)
+        endif ()
     endif ()
-    # Pass the same version range pybind11's later find_package() uses so the
-    # first (sticky) lookup picks a compatible interpreter. Without this CMake
-    # may resolve to an older system Python (e.g. /usr/bin/python3.9), which
-    # then fails pybind11's 3.12.x check.
-    find_package(Python3 3.12...3.12.99 REQUIRED COMPONENTS ${_mochi_python3_components})
+    # Require the oldest supported Python while allowing source builds with newer versions.
+    # cibuildwheel separately selects Python 3.12 when producing stable-ABI wheels.
+    find_package(Python3 3.12 REQUIRED COMPONENTS ${_mochi_python3_components})
     unset(_mochi_python3_components)
-endif ()
 
-if (MOCHI_USE_PYBIND AND MOCHI_PYBIND_FIND_PACKAGE)
-    find_package(pybind11 2.13.6 REQUIRED)
+    if (MOCHI_USE_PYBIND)
+        if (TARGET Python::Interpreter OR TARGET Python::Module)
+            if (NOT TARGET Python::Interpreter OR NOT TARGET Python::Module)
+                message(FATAL_ERROR
+                    "[Mochi] Python::Interpreter and Python::Module must be defined together."
+                )
+            endif ()
+            if (NOT DEFINED Python_VERSION OR NOT DEFINED Python_EXECUTABLE)
+                message(FATAL_ERROR
+                    "[Mochi] Existing Python targets must define Python_VERSION and Python_EXECUTABLE."
+                )
+            endif ()
+            file(REAL_PATH "${Python_EXECUTABLE}" _mochi_python_executable)
+            file(REAL_PATH "${Python3_EXECUTABLE}" _mochi_python3_executable)
+            if (
+                NOT Python_VERSION VERSION_EQUAL Python3_VERSION
+                OR NOT _mochi_python_executable STREQUAL _mochi_python3_executable
+            )
+                message(FATAL_ERROR
+                    "[Mochi] Existing Python targets do not match Python3 ${Python3_VERSION} "
+                    "at '${Python3_EXECUTABLE}'."
+                )
+            endif ()
+            unset(_mochi_python_executable)
+            unset(_mochi_python3_executable)
+        endif ()
+
+        # Nanobind consumes the FindPython variable and target names. The rest of Mochi
+        # uses FindPython3, so cache the equivalent values for sibling binding directories.
+        set(Python_EXECUTABLE "${Python3_EXECUTABLE}" CACHE INTERNAL "" FORCE)
+        set(Python_INCLUDE_DIRS "${Python3_INCLUDE_DIRS}" CACHE INTERNAL "" FORCE)
+        set(Python_VERSION "${Python3_VERSION}" CACHE INTERNAL "" FORCE)
+        set(Python_VERSION_MAJOR "${Python3_VERSION_MAJOR}" CACHE INTERNAL "" FORCE)
+        set(Python_VERSION_MINOR "${Python3_VERSION_MINOR}" CACHE INTERNAL "" FORCE)
+        set(Python_SOABI "${Python3_SOABI}" CACHE INTERNAL "" FORCE)
+        set(Python_SOSABI "${Python3_SOSABI}" CACHE INTERNAL "" FORCE)
+        set(Python_INTERPRETER_ID "${Python3_INTERPRETER_ID}" CACHE INTERNAL "" FORCE)
+
+        if (NOT TARGET Python::Interpreter)
+            add_executable(Python::Interpreter IMPORTED GLOBAL)
+            set_target_properties(Python::Interpreter PROPERTIES
+                IMPORTED_LOCATION "${Python3_EXECUTABLE}"
+            )
+        endif ()
+        if (NOT TARGET Python::Module)
+            add_library(Python::Module INTERFACE IMPORTED GLOBAL)
+            target_link_libraries(Python::Module INTERFACE Python3::Module)
+        endif ()
+        if (TARGET Python3::SABIModule AND NOT TARGET Python::SABIModule)
+            add_library(Python::SABIModule INTERFACE IMPORTED GLOBAL)
+            target_link_libraries(Python::SABIModule INTERFACE Python3::SABIModule)
+        endif ()
+    endif ()
 endif ()
 
 if (MOCHI_USE_TRACY)

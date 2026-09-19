@@ -20,42 +20,91 @@
 
 namespace mochi {
 
+inline constexpr char kDynamicArrayDoc[] = R"doc(A resizable array with contiguous storage.
+
+Warning:
+    Instances are not thread-safe. Concurrent access to the same instance requires
+    external synchronization if any access mutates the array or its exported storage.)doc";
+
 template <class T>
-inline auto DefDynamicArray(pybind11::module& m, char const* pyName) {
+struct DynamicArrayBufferProtocol {
   using DynamicArrayT = DynamicArray<T>;
-  auto c = pybind11::class_<DynamicArrayT>(m, pyName, pybind11::buffer_protocol());
-  c.def(pybind11::init<>());
-  c.def(pybind11::init<size_t, T const&>(), pybind11::arg("size"), pybind11::arg("value") = T{});
+
+  static int GetBuffer(PyObject* exporter, Py_buffer* view, int flags) noexcept {
+    auto* self = nanobind::inst_ptr<DynamicArrayT>(nanobind::handle(exporter));
+    std::array<Py_ssize_t, 1> shape{static_cast<Py_ssize_t>(self->size())};
+    return FillPythonBuffer(
+        exporter,
+        view,
+        flags,
+        self->data(),
+        sizeof(T),
+        PythonBufferFormat<T>(),
+        false,
+        shape.data(),
+        shape.size());
+  }
+
+  inline static PyType_Slot kSlots[] = {
+      {Py_bf_getbuffer, reinterpret_cast<void*>(GetBuffer)},
+      {Py_bf_releasebuffer, reinterpret_cast<void*>(ReleasePythonBuffer)},
+      {0, nullptr},
+  };
+};
+
+template <class T>
+T CastDynamicArrayItem(nanobind::handle item) {
+  try {
+    return nanobind::cast<T>(item);
+  } catch (nanobind::cast_error const&) {
+    throw nanobind::type_error("DynamicArray sequence item has an incompatible type");
+  }
+}
+
+template <class T>
+inline auto DefDynamicArray(nanobind::module_& m, char const* pyName) {
+  namespace nb = nanobind;
+  using DynamicArrayT = DynamicArray<T>;
+  auto c = [&]() {
+    if constexpr (std::is_arithmetic_v<T>) {
+      return nb::class_<DynamicArrayT>(
+          m, pyName, kDynamicArrayDoc, nb::type_slots(DynamicArrayBufferProtocol<T>::kSlots));
+    } else {
+      return nb::class_<DynamicArrayT>(m, pyName, kDynamicArrayDoc);
+    }
+  }();
+  nb::handle scope = c; // Non-owning handle to the class (owned by the module) for make_iterator.
+  c.def(nb::init<>());
   c.def(
-      pybind11::init([](pybind11::sequence sequence) {
-        DynamicArrayT array;
-        array.reserve(pybind11::len(sequence));
+      "__init__",
+      [](DynamicArrayT* self, size_t size, T const& value) {
+        new (self) DynamicArrayT(size, value);
+      },
+      nb::arg("size"),
+      nb::arg("value") = T{});
+  c.def(
+      "__init__",
+      [](DynamicArrayT* self, nb::sequence sequence) {
+        DynamicArrayT result;
+        result.reserve(nb::len(sequence));
         for (auto item : sequence) {
-          array.push_back(pybind11::cast<T>(item));
+          result.push_back(CastDynamicArrayItem<T>(item));
         }
-        return array;
-      }),
-      pybind11::arg("sequence"));
+        new (self) DynamicArrayT(std::move(result));
+      },
+      nb::arg("sequence"));
   if constexpr (std::is_arithmetic_v<T>) {
     c.def(
         "__array__",
-        [](DynamicArrayT const& self,
-           pybind11::object dtype,
-           pybind11::object /*copy*/) -> pybind11::object {
-          auto result = pybind11::array_t<T>(self.size());
-          pybind11::buffer_info buf = result.request();
-          T* ptr = static_cast<T*>(buf.ptr);
-          for (size_t i = 0; i < self.size(); ++i) {
-            ptr[i] = self[i];
+        [](DynamicArrayT const& self, nb::object dtype, nb::object /*copy*/) -> nb::object {
+          nb::object result = MakeOwningNumpy1D<T>(self.data(), self.size());
+          if (!dtype.is_none()) {
+            result = result.attr("astype")(dtype);
           }
-          if (dtype.is_none()) {
-            return result;
-          } else {
-            return pybind11::cast<pybind11::array>(result).attr("astype")(dtype);
-          }
+          return result;
         },
-        pybind11::arg("dtype") = pybind11::none(),
-        pybind11::arg("copy") = pybind11::none());
+        nb::arg("dtype") = nb::none(),
+        nb::arg("copy") = nb::none());
   }
   c.def("__len__", &DynamicArrayT::size);
   c.def("__bool__", [](DynamicArrayT const& self) { return !self.empty(); });
@@ -65,7 +114,7 @@ inline auto DefDynamicArray(pybind11::module& m, char const* pyName) {
   if constexpr (std::is_arithmetic_v<T>) {
     c.def("__getitem__", [](DynamicArrayT const& self, size_t index) -> T {
       if (index >= self.size()) {
-        throw pybind11::index_error();
+        throw nb::index_error();
       }
       return self[index];
     });
@@ -74,68 +123,85 @@ inline auto DefDynamicArray(pybind11::module& m, char const* pyName) {
         "__getitem__",
         [](DynamicArrayT& self, size_t index) -> T& {
           if (index >= self.size()) {
-            throw pybind11::index_error();
+            throw nb::index_error();
           }
           return self[index];
         },
-        pybind11::return_value_policy::reference_internal);
+        nb::rv_policy::reference_internal);
   }
   c.def("__setitem__", [](DynamicArrayT& self, size_t index, T const& value) {
     if (index >= self.size()) {
-      throw pybind11::index_error();
+      throw nb::index_error();
     }
     self[index] = value;
   });
-  c.def(
-      "__iter__",
-      [](DynamicArrayT& self) { return pybind11::make_iterator(self.begin(), self.end()); },
-      pybind11::keep_alive<0, 1>());
+  if constexpr (std::is_arithmetic_v<T>) {
+    c.def(
+        "__iter__",
+        [scope](DynamicArrayT& self) {
+          return nb::make_iterator<nb::rv_policy::copy>(
+              scope, "Iterator", self.begin(), self.end());
+        },
+        nb::keep_alive<0, 1>());
+  } else {
+    c.def(
+        "__iter__",
+        [scope](DynamicArrayT& self) {
+          return nb::make_iterator<nb::rv_policy::reference_internal>(
+              scope, "Iterator", self.begin(), self.end());
+        },
+        nb::keep_alive<0, 1>());
+  }
   c.def("__reduce__", [pyName](DynamicArrayT const& self) {
+    nb::object values;
     if constexpr (std::is_arithmetic_v<T>) {
-      // Create a numpy array that shares the same memory (no copy)
-      auto array = pybind11::array_t<T>(self.size(), self.data(), pybind11::cast(self));
-      return pybind11::make_tuple(
-          pybind11::module::import(MOCHI_PHYSICS_MODULE_NAME_STR).attr(pyName),
-          pybind11::make_tuple(array));
+      if (self.empty()) {
+        values = nb::list();
+      } else {
+        using ArrayView = nb::ndarray<nb::numpy, T const, nb::ndim<1>, nb::c_contig>;
+        values = ArrayView(self.data(), {self.size()})
+                     .cast(nb::rv_policy::reference_internal, nb::find(self));
+      }
     } else {
-      return pybind11::make_tuple(
-          pybind11::module::import(MOCHI_PHYSICS_MODULE_NAME_STR).attr(pyName),
-          pybind11::make_tuple(std::vector<T>(self.begin(), self.end())));
+      nb::list items;
+      for (auto const& item : self) {
+        items.append(item);
+      }
+      values = std::move(items);
     }
+    return nb::make_tuple(
+        nb::module_::import_(MOCHI_PHYSICS_MODULE_NAME_STR).attr(pyName), nb::make_tuple(values));
   });
-  c.def(
-      "append",
-      pybind11::overload_cast<T const&>(&DynamicArrayT::push_back),
-      pybind11::arg("item"));
+  c.def("append", nb::overload_cast<T const&>(&DynamicArrayT::push_back), nb::arg("item"));
   c.def(
       "extend",
-      [](DynamicArrayT& self, pybind11::sequence sequence) {
-        self.reserve(self.size() + pybind11::len(sequence));
+      [](DynamicArrayT& self, nb::sequence sequence) {
+        self.reserve(self.size() + nb::len(sequence));
         for (auto item : sequence) {
-          self.push_back(pybind11::cast<T>(item));
+          self.push_back(CastDynamicArrayItem<T>(item));
         }
       },
-      pybind11::arg("sequence"));
+      nb::arg("sequence"));
   c.def(
       "extend",
       [](DynamicArrayT& self, DynamicArrayT const& sequence) { self.append(sequence); },
-      pybind11::arg("sequence"));
+      nb::arg("sequence"));
   c.def("clear", &DynamicArrayT::clear);
   c.def("empty", &DynamicArrayT::empty);
   c.def("size", &DynamicArrayT::size);
   c.def("capacity", &DynamicArrayT::capacity);
-  c.def("reserve", &DynamicArrayT::reserve, pybind11::arg("capacity"));
+  c.def("reserve", &DynamicArrayT::reserve, nb::arg("capacity"));
   c.def(
       "resize",
       static_cast<void (DynamicArrayT::*)(size_t)>(&DynamicArrayT::resize),
-      pybind11::arg("size"));
+      nb::arg("size"));
   c.def(
       "resize",
       static_cast<void (DynamicArrayT::*)(size_t, T const&)>(&DynamicArrayT::resize),
-      pybind11::arg("size"),
-      pybind11::arg("value"));
+      nb::arg("size"),
+      nb::arg("value"));
   c.def("tolist", [](DynamicArrayT const& self) {
-    pybind11::list result;
+    nb::list result;
     for (auto const& item : self) {
       result.append(item);
     }
@@ -148,26 +214,12 @@ inline auto DefDynamicArray(pybind11::module& m, char const* pyName) {
     c.def("__str__", [](DynamicArrayT const& self) { return ToPyString(self); });
   }
 
-  // Add buffer protocol support for arithmetic types
-  if constexpr (std::is_arithmetic_v<T>) {
-    c.def_buffer([](DynamicArrayT& self) -> pybind11::buffer_info {
-      return pybind11::buffer_info(
-          self.data(), // Pointer to buffer
-          sizeof(T), // Size of one item
-          pybind11::format_descriptor<T>::format(), // Python struct-style format descriptor
-          1, // Number of dimensions
-          {self.size()}, // Buffer dimensions
-          {sizeof(T)} // Strides (in bytes) for each index
-      );
-    });
-  }
-
   // Equality operators (only if T supports them)
   if constexpr (requires(T const& a, T const& b) { a == b; }) {
-    c.def(pybind11::self == pybind11::self);
+    c.def(nb::self == nb::self);
   }
   if constexpr (requires(T const& a, T const& b) { a != b; }) {
-    c.def(pybind11::self != pybind11::self);
+    c.def(nb::self != nb::self);
   }
 
   // copy.copy / copy.deepcopy. DynamicArray owns its memory so the C++ copy
@@ -176,11 +228,11 @@ inline auto DefDynamicArray(pybind11::module& m, char const* pyName) {
   c.def("__copy__", [](DynamicArrayT const& self) { return DynamicArrayT(self); });
   c.def(
       "__deepcopy__",
-      [](DynamicArrayT const& self, pybind11::dict) { return DynamicArrayT(self); },
-      pybind11::arg("memo"));
+      [](DynamicArrayT const& self, nb::dict) { return DynamicArrayT(self); },
+      nb::arg("memo"));
 
-  // Allow implicit conversion using the pybind11::sequence initializer (above)
-  pybind11::implicitly_convertible<pybind11::sequence, DynamicArray<T>>();
+  // Allow implicit conversion using the nb::sequence initializer (above)
+  nb::implicitly_convertible<nb::sequence, DynamicArray<T>>();
 
   return c;
 }

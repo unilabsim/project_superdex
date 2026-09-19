@@ -22,6 +22,24 @@
 
 namespace mochi::rod {
 
+Aabb CalcDeformedRodCenterlineAabb(
+    Span<Real3 const> meshNodes,
+    ColumnVectorView<real const> displacements) {
+  MOCHI_ASSERT_VERBOSE(isize(meshNodes) >= 2, "Rod must have at least 2 nodes");
+  MOCHI_ASSERT_VERBOSE(
+      isize(displacements) == isize(meshNodes) * fem::kNumRodFields, "displacements size mismatch");
+
+  Vec4r min = ToSimd(meshNodes[0], 0_r) + Load<Vec4r>(&displacements[0]);
+  Vec4r max = min;
+  for (int i = 1; i < isize(meshNodes); ++i) {
+    int const offset = i * fem::kNumRodFields;
+    Vec4r const pos = ToSimd(meshNodes[i], 0_r) + Load<Vec4r>(&displacements[offset]);
+    min = Min(min, pos);
+    max = Max(max, pos);
+  }
+  return Aabb{Set(min, 3, 0_r), Set(max, 3, 0_r)};
+}
+
 Real3 ComputeRodElementTangent(
     Span<Real3 const> meshNodes,
     ColumnVectorView<real const> displacement,

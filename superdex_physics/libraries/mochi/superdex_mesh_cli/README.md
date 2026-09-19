@@ -13,8 +13,8 @@ CGAL symbol.
 - `ApproximateHausdorffDistance` — one-sided approximate Hausdorff distance between two meshes.
 
 `main()` reads one framed request from stdin to EOF, dispatches, writes a framed response to stdout,
-and exits. The wire format is defined in `mochi_mesh/protocol` (CGAL-free). Coordinates are
-`double` on the wire, so it is lossless for both single- and double-precision callers.
+and exits. The wire format is defined in `mochi_mesh/protocol` (CGAL-free). Coordinates use the
+C++ `double` type on the wire, so encoding is lossless for both FP32 and FP64 callers.
 
 ## How callers find it
 

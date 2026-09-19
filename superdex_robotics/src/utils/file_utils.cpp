@@ -785,7 +785,7 @@ void superdex::robotics::SaveToFile(
   }
 }
 
-#if MOCHI_INTERNAL
+#if SUPERDEXROBOTICS_WITH_BOT_SCENE
 void superdex::robotics::SaveToFile(
     BotScenePrefab const& scenePrefab,
     std::string_view path,
@@ -820,7 +820,7 @@ void superdex::robotics::SaveToFile(
   // splicing needed.
   SaveParamsToFile(temp, path, error);
 }
-#endif // MOCHI_INTERNAL
+#endif // SUPERDEXROBOTICS_WITH_BOT_SCENE
 
 static void HashFileIntoState(XXH3_state_t* state, std::string_view path, Error& error) {
   MOCHI_ERROR_RETURN(error);

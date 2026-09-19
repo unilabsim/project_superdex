@@ -49,7 +49,7 @@ namespace mochi::krylov {
  * @param[in] b The right-hand side vector of \f$ A x = b\f$.
  * @param[in,out] x Vector containing the initial guess at input and the solution at output.
  * @param[in] prec The preconditioner application functor.
- * @param[in] maxIter Maximum number of iterations.
+ * @param[in] maxIter Maximum number of iterations. Must be positive.
  * @param[in,out] statusCheck A functor called every iteration to check the stop criteria. The norm
  * used in the stop criteria is determined by this object.
  * @param[in] abortIfNotSpd Boolean to abort the solve if the matrix is detected not to be symmetric
@@ -114,13 +114,16 @@ LinearSolverStatus AsyncPCG(
           std::is_same_v<StopCriterion, StatusPreconditionedResidualL2<Dot, NonConstScalar>> ||
           std::is_same_v<StopCriterion, StatusResidualPreconditionerInduced<Dot, NonConstScalar>>,
       "Unsupported stop criterion");
-  MOCHI_ASSERT(!abortIfNotSpd, "Asynchronous PCG does not support aborting if not SPD.");
-  MOCHI_ASSERT_VERBOSE(restartPeriod > 0, "Restart period must be positive.");
   constexpr bool kStatusCheckNeedsPrecResidual =
       std::is_same_v<StopCriterion, StatusPreconditionedResidualL2<Dot, NonConstScalar>> ||
       std::is_same_v<StopCriterion, StatusResidualPreconditionerInduced<Dot, NonConstScalar>>;
-  constexpr bool kCheckStatusComputesRTz =
+  // The criterion owns a separate Dot. Reusing its rTz is safe only when both instances produce
+  // identical results. UsualDot guarantees this.
+  constexpr bool kCanReuseCriterionRTz = std::is_same_v<Dot, UsualDot> &&
       std::is_same_v<StopCriterion, StatusResidualPreconditionerInduced<Dot, NonConstScalar>>;
+  MOCHI_ASSERT_VERBOSE(maxIter > 0, "Maximum number of iterations must be positive.");
+  MOCHI_ASSERT(!abortIfNotSpd, "Asynchronous PCG does not support aborting if not SPD.");
+  MOCHI_ASSERT_VERBOSE(restartPeriod > 0, "Restart period must be positive.");
   MOCHI_ASSERT_VERBOSE(
       initialGuessHint != InitialGuessHint::Zero || dot(x, x) == 0,
       "InitialGuessHint::Zero requires an exactly zero initial guess.");
@@ -167,7 +170,7 @@ LinearSolverStatus AsyncPCG(
 
   p = z; // p_0 = z_0
   NonConstScalar rTz{}; // r_0^T z_0
-  if constexpr (kCheckStatusComputesRTz) {
+  if constexpr (kCanReuseCriterionRTz) {
     rTz = statusCheck.GetLatestResidualNormSqr();
   } else {
     rTz = dot(r, z);
@@ -240,7 +243,7 @@ LinearSolverStatus AsyncPCG(
 
       if (status == IterationStatus::Active) {
         auto const rTzPrev = rTz;
-        if constexpr (kCheckStatusComputesRTz) {
+        if constexpr (kCanReuseCriterionRTz) {
           rTz = statusCheck.GetLatestResidualNormSqr();
         } else {
           rTz = dot(r, z);
@@ -289,7 +292,7 @@ LinearSolverStatus AsyncPCG(
       }
 
       if (status == IterationStatus::Active) {
-        if constexpr (kCheckStatusComputesRTz) {
+        if constexpr (kCanReuseCriterionRTz) {
           rTz = statusCheck.GetLatestResidualNormSqr();
         } else {
           rTz = dot(r, z);

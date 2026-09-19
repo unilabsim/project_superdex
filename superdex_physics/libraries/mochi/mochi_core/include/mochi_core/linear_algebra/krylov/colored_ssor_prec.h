@@ -610,10 +610,8 @@ void ColoredSSORPrec<BlockSparseMatrix<Scalar, kBlockSize, CRIdx, Ptr, Storage>>
   //
   Preconditioner<NonConstScalar>::ValidateInputOutput(_coloredL.Rows(), x, Px);
   //
-  if ((_workSpace.Rows() < x.Rows()) || (_workSpace.Cols() < 2 * x.Cols())) {
-    if (iWorker == 0) {
-      _workSpace.Reset(x.Rows(), 2 * x.Cols());
-    }
+  if (iWorker == 0 && ((_workSpace.Rows() < x.Rows()) || (_workSpace.Cols() < 2 * x.Cols()))) {
+    _workSpace.Reset(x.Rows(), 2 * x.Cols());
   }
   data.BarrierWait();
   //
@@ -960,10 +958,8 @@ void ColoredSSORPrec<SparseMatrix<Scalar, CRIdx, Ptr, Storage>>::ConcurrentSolve
   //
   Preconditioner<NonConstScalar>::ValidateInputOutput(_coloredL.Rows(), x, Px);
   //
-  if ((_workSpace.Rows() < x.Rows()) || (_workSpace.Cols() < 2 * x.Cols())) {
-    if (iWorker == 0) {
-      _workSpace.Reset(x.Rows(), 2 * x.Cols());
-    }
+  if (iWorker == 0 && ((_workSpace.Rows() < x.Rows()) || (_workSpace.Cols() < 2 * x.Cols()))) {
+    _workSpace.Reset(x.Rows(), 2 * x.Cols());
   }
   data.BarrierWait();
   //

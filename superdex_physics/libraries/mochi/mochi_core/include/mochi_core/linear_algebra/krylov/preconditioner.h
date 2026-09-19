@@ -18,6 +18,7 @@
 
 #include <mochi_core/linear_algebra/matrix.h>
 #include <mochi_core/solvers/linear_solver_params.h>
+#include <mochi_core/utils/span.h>
 #include <mochi_core/utils/task_scheduler.h>
 
 #include <type_traits>
@@ -25,15 +26,15 @@
 namespace mochi {
 
 struct ParallelWorkerInfo {
-  /// @brief workerId Index for the current worker
+  /// @brief Zero-based index of the current worker within this worker group.
   int workerId;
-  /// @brief numWorkers Total number of workers
+  /// @brief Number of workers in this worker group.
   int numWorkers;
-  /// @brief rBegin Starting row (when working on matrix or vector --- inclusive)
+  /// @brief First assigned row, relative to the vectors passed to the operation.
   int rBegin;
-  /// @brief rEnd End row (when working on matrix or vector --- exclusive)
+  /// @brief One past the last assigned row, relative to the vectors passed to the operation.
   int rEnd;
-  /// @brief barrier Parallel barrier among the 'numWorkers' workers
+  /// @brief Barrier shared by this worker group.
   ParallelBarrier const& barrier;
 
   /// @brief Wait for all the workers to reach the barrier point.
@@ -55,9 +56,12 @@ struct Preconditioner {
   /// The calling worker is responsible for applying its own preconditioner contribution.
   /// @param[in] x Input column vector.
   /// @param[out] Px Output column vector.
-  /// @param[in] data Parallel information for each worker.
+  /// @param[in] data Parallel information for the calling worker.
   /// @note It's the responsibility of the caller to ensure each worker is allocated to a different
   /// thread, which can be accomplished through TaskScheduler::BatchEnqueueOnAvailableWorkers.
+  /// @note `[data.rBegin, data.rEnd)` is the matrix-vector-product row range assigned to the
+  /// calling worker. If it writes a row assigned to another worker, the implementation must ensure
+  /// the write is complete and visible before that other worker returns from @ref ConcurrentSolve.
   virtual void ConcurrentSolve(
       ColumnVectorView<Scalar const> /*x*/,
       ColumnVectorView<Scalar> /*Px*/,
@@ -67,6 +71,20 @@ struct Preconditioner {
 
   /// @brief Get the preconditioner type.
   virtual constexpr PreconditionerType GetType() const = 0;
+
+  /// @brief Prepare for concurrent application by a pool of workers.
+  /// @param[in] workerRowRanges Boundaries of the workers' matrix-vector-product row partitions.
+  /// For N > 0 workers, the span contains N + 1 nondecreasing entries. The first is zero, the last
+  /// is the number of rows processed by the preconditioner, and equal adjacent entries represent
+  /// empty partitions.
+  /// @note The partitions are locality hints. Preconditioners may distribute rows differently.
+  /// @note The caller must invoke this method once on a single thread and synchronize the workers
+  /// before calling @ref ConcurrentSolve.
+  /// @note Implementations must not retain @p workerRowRanges.
+  /// @note Prepared state remains valid until this function is called again, the configuration
+  /// changes, or the instance is moved from.
+  /// @warning An instance must not participate in multiple linear solves concurrently.
+  virtual void PrepareConcurrentSolve(Span<int const> /*workerRowRanges*/) const {}
 
   /// @brief Validates the input and output vectors for preconditioner application.
   ///

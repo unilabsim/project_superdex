@@ -446,17 +446,21 @@ struct TransformRTContainer {
   MOCHI_STRUCT_END();
 };
 
+/// @brief Component for time integration of rigid body pose.
+MOCHI_DEFINE_INTEGRATION_COMPONENT(CIntegrationRigidStates, TransformRTContainer);
+
 template <TimeStep kStep>
 struct CRigidState : public TransformRTContainer {
   using TransformRTContainer::TransformRTContainer;
   MOCHI_TEMPLATE_BEGIN(mochi::CRigidState, kStep);
-  MOCHI_ATTRIBUTE_IF(kStep == TimeStep::Current, CaptureState);
+  // This component is captured only when it represents true state, which is signaled by the
+  // existence of a corresponding integration component.
+  MOCHI_ATTRIBUTE_IF(
+      kStep == TimeStep::Current,
+      CaptureState(ecs::Included<CIntegrationRigidStates>{}));
   MOCHI_BASE_CLASS(mochi::TransformRTContainer);
   MOCHI_TEMPLATE_END();
 };
-
-/// @brief Component for time integration of rigid body pose.
-MOCHI_DEFINE_INTEGRATION_COMPONENT(CIntegrationRigidStates, TransformRTContainer);
 
 // Traits that define metadata for different vector types that might be part of an
 // actor's state.
@@ -659,13 +663,9 @@ using CDenseTimeSliceVector = CDenseTimeSlice<
 template <typename Scalar, typename MetadataType, TimeStep kRelTime>
 struct CTimeSlice : public CVectorComponent<Scalar, MetadataType> {
   using BaseType = CVectorComponent<Scalar, MetadataType>;
-  CTimeSlice() = default;
-  explicit CTimeSlice(int numDofs) : BaseType(numDofs) {}
-  explicit CTimeSlice(ColumnVector<Scalar> const& value) : BaseType(value) {}
-  explicit CTimeSlice(ColumnVector<Scalar>&& value) : BaseType(std::move(value)) {}
+  using BaseType::BaseType;
 
   MOCHI_TEMPLATE_BEGIN(mochi::CTimeSlice, Scalar, MetadataType, kRelTime);
-  MOCHI_ATTRIBUTE_IF(kRelTime == TimeStep::Current, CaptureState);
   MOCHI_BASE_CLASS(BaseType);
   MOCHI_TEMPLATE_END()
 };
@@ -691,8 +691,20 @@ struct DisplacementVectorMetadata : public MatrixMetadata<MatrixSemantics::Displ
   MOCHI_BASE_CLASS(BaseType);
   MOCHI_TEMPLATE_END();
 };
+
 template <typename Scalar, TimeStep kRelTime, DisplacementLayer kLayer = DisplacementLayer::Default>
-using CDisplacementSlice = CTimeSlice<Scalar, DisplacementVectorMetadata<kLayer>, kRelTime>;
+struct CDisplacementSlice
+    : public CTimeSlice<Scalar, DisplacementVectorMetadata<kLayer>, kRelTime> {
+  using BaseType = CTimeSlice<Scalar, DisplacementVectorMetadata<kLayer>, kRelTime>;
+  using BaseType::BaseType;
+
+  MOCHI_TEMPLATE_BEGIN(mochi::CDisplacementSlice, Scalar, kRelTime, kLayer);
+  MOCHI_ATTRIBUTE_IF(
+      kRelTime == TimeStep::Current && kLayer == DisplacementLayer::Default,
+      CaptureState);
+  MOCHI_BASE_CLASS(BaseType);
+  MOCHI_TEMPLATE_END()
+};
 
 template <DisplacementLayer kLayer>
 struct VelocityVectorMetadata : public MatrixMetadata<MatrixSemantics::TangentSpaceVector> {
@@ -701,13 +713,6 @@ struct VelocityVectorMetadata : public MatrixMetadata<MatrixSemantics::TangentSp
   MOCHI_BASE_CLASS(BaseType);
   MOCHI_TEMPLATE_END();
 };
-template <typename Scalar, TimeStep kRelTime, DisplacementLayer kLayer = DisplacementLayer::Default>
-using CVelocitySlice = CTimeSlice<Scalar, VelocityVectorMetadata<kLayer>, kRelTime>;
-
-using DefaultDisplacementSlice =
-    VectorComponent<real, DisplacementVectorMetadata<DisplacementLayer::Default>>;
-/// @brief Component for time integration of displacement slices.
-MOCHI_DEFINE_INTEGRATION_COMPONENT(CIntegrationDisplacementSlices, DefaultDisplacementSlice);
 
 template <DisplacementLayer kLayer>
 using VelocityIntegrationValue = VectorComponent<real, VelocityVectorMetadata<kLayer>>;
@@ -717,6 +722,27 @@ MOCHI_DEFINE_INTEGRATION_COMPONENT_TEMPLATE(
     CIntegrationVelocitySlices,
     VelocityIntegrationValue<kLayer>,
     kLayer);
+
+template <typename Scalar, TimeStep kRelTime, DisplacementLayer kLayer = DisplacementLayer::Default>
+struct CVelocitySlice : public CTimeSlice<Scalar, VelocityVectorMetadata<kLayer>, kRelTime> {
+  using BaseType = CTimeSlice<Scalar, VelocityVectorMetadata<kLayer>, kRelTime>;
+  using BaseType::BaseType;
+
+  MOCHI_TEMPLATE_BEGIN(mochi::CVelocitySlice, Scalar, kRelTime, kLayer);
+  MOCHI_ATTRIBUTE_IF(
+      kRelTime == TimeStep::Current && kLayer == DisplacementLayer::Default,
+      CaptureState);
+  MOCHI_ATTRIBUTE_IF(
+      kRelTime == TimeStep::Current && kLayer == DisplacementLayer::Skinned,
+      CaptureState(ecs::Included<CIntegrationVelocitySlices<kLayer>>{}));
+  MOCHI_BASE_CLASS(BaseType);
+  MOCHI_TEMPLATE_END()
+};
+
+using DefaultDisplacementSlice =
+    VectorComponent<real, DisplacementVectorMetadata<DisplacementLayer::Default>>;
+/// @brief Component for time integration of displacement slices.
+MOCHI_DEFINE_INTEGRATION_COMPONENT(CIntegrationDisplacementSlices, DefaultDisplacementSlice);
 
 template <typename... Ts>
 struct CVariant {

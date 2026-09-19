@@ -18,93 +18,93 @@
 
 // clang-format off
 
-#include <pybind11/pybind11.h>
+#include <limits>
+#include <nanobind/nanobind.h>
 #include "../pybind_include.h"
 
 using namespace mochi;
-namespace py = pybind11;
-using namespace pybind11::literals;
+namespace nb = nanobind;
 
 namespace mochi {
   // Forward declarations for the definitions below.
-  void DeclareMochiPhysics_MochiDiffsim(py::module_& m, PybindRegistry& registry);
-  void DefineMochiPhysics_MochiDiffsim(py::module_& m, PybindRegistry& registry);
+  void DeclareMochiPhysics_MochiDiffsim(nb::module_& m, PybindRegistry& registry);
+  void DefineMochiPhysics_MochiDiffsim(nb::module_& m, PybindRegistry& registry);
 } // namespace mochi
 
-void mochi::DeclareMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+void mochi::DeclareMochiPhysics_MochiDiffsim([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
   auto m_diffsim = m.def_submodule("diffsim");
 
-  registry.StoreClass(py::class_<mochi::diffsim::BackPropagationSolverParams>(m_diffsim, "BackPropagationSolverParams", "Parameters of the solve in differentiability back-propagation."));
-  registry.StoreClass(py::class_<mochi::diffsim::BackPropagationSceneStats>(m_diffsim, "BackPropagationSceneStats", "Performance metrics for the last back-propagation step."));
+  registry.StoreClass(nb::class_<mochi::diffsim::BackPropagationSolverParams>(m_diffsim, "BackPropagationSolverParams", "Parameters of the solve in differentiability back-propagation."));
+  registry.StoreClass(nb::class_<mochi::diffsim::BackPropagationSceneStats>(m_diffsim, "BackPropagationSceneStats", "Performance metrics for the last back-propagation step."));
 }
 
-void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
   auto m_diffsim = m.def_submodule("diffsim");
 
   registry.GetClass<mochi::diffsim::BackPropagationSolverParams>()
-    .def(py::init([](py::object verbosity, py::object use_newton_outer_solver, py::object outer_solver_max_iter, py::object outer_solver_abs_tol, py::object outer_solver_rel_tol, py::object outer_solver_convergence_mode, py::object inner_solver_abs_tol, py::object eps_finite_diff, py::object validate_finite_diff) {
-      mochi::diffsim::BackPropagationSolverParams result;
-      result.verbosity = py::cast<mochi::VerbosityLevel>(verbosity);
-      result.useNewtonOuterSolver = py::cast<bool>(use_newton_outer_solver);
-      result.outerSolverMaxIter = py::cast<int>(outer_solver_max_iter);
-      result.outerSolverAbsTol = py::cast<mochi::real>(outer_solver_abs_tol);
-      result.outerSolverRelTol = py::cast<mochi::real>(outer_solver_rel_tol);
-      result.outerSolverConvergenceMode = py::cast<mochi::NonLinearSolverConvergenceMode>(outer_solver_convergence_mode);
-      result.innerSolverAbsTol = py::cast<mochi::real>(inner_solver_abs_tol);
-      result.epsFiniteDiff = py::cast<mochi::real>(eps_finite_diff);
-      result.validateFiniteDiff = py::cast<bool>(validate_finite_diff);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("verbosity") = mochi::diffsim::BackPropagationSolverParams{}.verbosity
-      , py::arg("use_newton_outer_solver") = mochi::diffsim::BackPropagationSolverParams{}.useNewtonOuterSolver
-      , py::arg("outer_solver_max_iter") = mochi::diffsim::BackPropagationSolverParams{}.outerSolverMaxIter
-      , py::arg("outer_solver_abs_tol") = mochi::diffsim::BackPropagationSolverParams{}.outerSolverAbsTol
-      , py::arg("outer_solver_rel_tol") = mochi::diffsim::BackPropagationSolverParams{}.outerSolverRelTol
-      , py::arg("outer_solver_convergence_mode") = mochi::diffsim::BackPropagationSolverParams{}.outerSolverConvergenceMode
-      , py::arg("inner_solver_abs_tol") = mochi::diffsim::BackPropagationSolverParams{}.innerSolverAbsTol
-      , py::arg("eps_finite_diff") = mochi::diffsim::BackPropagationSolverParams{}.epsFiniteDiff
-      , py::arg("validate_finite_diff") = mochi::diffsim::BackPropagationSolverParams{}.validateFiniteDiff
+    .def("__init__", [](mochi::diffsim::BackPropagationSolverParams* self, nb::object verbosity, nb::object use_newton_outer_solver, nb::object outer_solver_max_iter, nb::object outer_solver_abs_tol, nb::object outer_solver_rel_tol, nb::object outer_solver_convergence_mode, nb::object inner_solver_abs_tol, nb::object eps_finite_diff, nb::object validate_finite_diff) {
+      mochi::diffsim::BackPropagationSolverParams result{};
+      result.verbosity = nb::cast<mochi::VerbosityLevel>(verbosity);
+      result.useNewtonOuterSolver = nb::cast<bool>(use_newton_outer_solver);
+      result.outerSolverMaxIter = nb::cast<int>(outer_solver_max_iter);
+      result.outerSolverAbsTol = nb::cast<mochi::real>(outer_solver_abs_tol);
+      result.outerSolverRelTol = nb::cast<mochi::real>(outer_solver_rel_tol);
+      result.outerSolverConvergenceMode = nb::cast<mochi::NonLinearSolverConvergenceMode>(outer_solver_convergence_mode);
+      result.innerSolverAbsTol = nb::cast<mochi::real>(inner_solver_abs_tol);
+      result.epsFiniteDiff = nb::cast<mochi::real>(eps_finite_diff);
+      result.validateFiniteDiff = nb::cast<bool>(validate_finite_diff);
+      new (self) mochi::diffsim::BackPropagationSolverParams(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("verbosity") = mochi::diffsim::BackPropagationSolverParams{}.verbosity
+      , nb::arg("use_newton_outer_solver") = mochi::diffsim::BackPropagationSolverParams{}.useNewtonOuterSolver
+      , nb::arg("outer_solver_max_iter") = mochi::diffsim::BackPropagationSolverParams{}.outerSolverMaxIter
+      , nb::arg("outer_solver_abs_tol") = mochi::diffsim::BackPropagationSolverParams{}.outerSolverAbsTol
+      , nb::arg("outer_solver_rel_tol") = mochi::diffsim::BackPropagationSolverParams{}.outerSolverRelTol
+      , nb::arg("outer_solver_convergence_mode") = mochi::diffsim::BackPropagationSolverParams{}.outerSolverConvergenceMode
+      , nb::arg("inner_solver_abs_tol") = mochi::diffsim::BackPropagationSolverParams{}.innerSolverAbsTol
+      , nb::arg("eps_finite_diff") = mochi::diffsim::BackPropagationSolverParams{}.epsFiniteDiff
+      , nb::arg("validate_finite_diff") = mochi::diffsim::BackPropagationSolverParams{}.validateFiniteDiff
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::diffsim::BackPropagationSolverParams const& self) { return mochi::diffsim::BackPropagationSolverParams(self); })
-    .def("__deepcopy__", [](mochi::diffsim::BackPropagationSolverParams const& self, py::dict) { return mochi::diffsim::BackPropagationSolverParams(self); })
-    .def_readwrite("verbosity", &mochi::diffsim::BackPropagationSolverParams::verbosity, "Verbosity level of the back-propagation solver's logging.")
-    .def_readwrite("use_newton_outer_solver", &mochi::diffsim::BackPropagationSolverParams::useNewtonOuterSolver, "Use a Newton solver for the outer adjoint solve instead of the default Krylov\nsolver.")
-    .def_readwrite("outer_solver_max_iter", &mochi::diffsim::BackPropagationSolverParams::outerSolverMaxIter, "Maximum number of outer-solver iterations for the adjoint solve.")
-    .def_readwrite("outer_solver_abs_tol", &mochi::diffsim::BackPropagationSolverParams::outerSolverAbsTol, "Absolute convergence tolerance for the outer solver.")
-    .def_readwrite("outer_solver_rel_tol", &mochi::diffsim::BackPropagationSolverParams::outerSolverRelTol, "Relative convergence tolerance for the outer solver.")
-    .def_readwrite("outer_solver_convergence_mode", &mochi::diffsim::BackPropagationSolverParams::outerSolverConvergenceMode, "Convergence-checking mode for the outer solver.")
-    .def_readwrite("inner_solver_abs_tol", &mochi::diffsim::BackPropagationSolverParams::innerSolverAbsTol, "Absolute convergence tolerance for the inner (linear) solver.")
-    .def_readwrite("eps_finite_diff", &mochi::diffsim::BackPropagationSolverParams::epsFiniteDiff, "Finite-difference step size used for Hessian-vector products in the adjoint\nsolve.")
-    .def_readwrite("validate_finite_diff", &mochi::diffsim::BackPropagationSolverParams::validateFiniteDiff, "Validate analytic Hessian-vector products against finite differences\n(diagnostic; slower).")
+    .def("__deepcopy__", [](mochi::diffsim::BackPropagationSolverParams const& self, nb::dict) { return mochi::diffsim::BackPropagationSolverParams(self); })
+    .def_rw("verbosity", &mochi::diffsim::BackPropagationSolverParams::verbosity, "Verbosity level of the back-propagation solver's logging.")
+    .def_rw("use_newton_outer_solver", &mochi::diffsim::BackPropagationSolverParams::useNewtonOuterSolver, "Use a Newton solver for the outer adjoint solve instead of the default Krylov\nsolver.")
+    .def_rw("outer_solver_max_iter", &mochi::diffsim::BackPropagationSolverParams::outerSolverMaxIter, "Maximum number of outer-solver iterations for the adjoint solve.")
+    .def_rw("outer_solver_abs_tol", &mochi::diffsim::BackPropagationSolverParams::outerSolverAbsTol, "Absolute convergence tolerance for the outer solver.")
+    .def_rw("outer_solver_rel_tol", &mochi::diffsim::BackPropagationSolverParams::outerSolverRelTol, "Relative convergence tolerance for the outer solver.")
+    .def_rw("outer_solver_convergence_mode", &mochi::diffsim::BackPropagationSolverParams::outerSolverConvergenceMode, "Convergence-checking mode for the outer solver.")
+    .def_rw("inner_solver_abs_tol", &mochi::diffsim::BackPropagationSolverParams::innerSolverAbsTol, "Absolute convergence tolerance for the inner (linear) solver.")
+    .def_rw("eps_finite_diff", &mochi::diffsim::BackPropagationSolverParams::epsFiniteDiff, "Finite-difference step size used for Hessian-vector products in the adjoint\nsolve.")
+    .def_rw("validate_finite_diff", &mochi::diffsim::BackPropagationSolverParams::validateFiniteDiff, "Validate analytic Hessian-vector products against finite differences\n(diagnostic; slower).")
   ;
 
   registry.GetClass<mochi::diffsim::BackPropagationSceneStats>()
-    .def(py::init([](py::object total_duration_sec, py::object solve_duration_sec, py::object max_outer_iters, py::object residual_norm, py::object finite_diff_valid) {
-      mochi::diffsim::BackPropagationSceneStats result;
-      result.totalDurationSec = py::cast<double>(total_duration_sec);
-      result.solveDurationSec = py::cast<double>(solve_duration_sec);
-      result.maxOuterIters = py::cast<int>(max_outer_iters);
-      result.residualNorm = py::cast<double>(residual_norm);
-      result.finiteDiffValid = py::cast<bool>(finite_diff_valid);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("total_duration_sec") = mochi::diffsim::BackPropagationSceneStats{}.totalDurationSec
-      , py::arg("solve_duration_sec") = mochi::diffsim::BackPropagationSceneStats{}.solveDurationSec
-      , py::arg("max_outer_iters") = mochi::diffsim::BackPropagationSceneStats{}.maxOuterIters
-      , py::arg("residual_norm") = mochi::diffsim::BackPropagationSceneStats{}.residualNorm
-      , py::arg("finite_diff_valid") = mochi::diffsim::BackPropagationSceneStats{}.finiteDiffValid
+    .def("__init__", [](mochi::diffsim::BackPropagationSceneStats* self, nb::object total_duration_sec, nb::object solve_duration_sec, nb::object max_outer_iters, nb::object residual_norm, nb::object finite_diff_valid) {
+      mochi::diffsim::BackPropagationSceneStats result{};
+      result.totalDurationSec = nb::cast<double>(total_duration_sec);
+      result.solveDurationSec = nb::cast<double>(solve_duration_sec);
+      result.maxOuterIters = nb::cast<int>(max_outer_iters);
+      result.residualNorm = nb::cast<double>(residual_norm);
+      result.finiteDiffValid = nb::cast<bool>(finite_diff_valid);
+      new (self) mochi::diffsim::BackPropagationSceneStats(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("total_duration_sec") = mochi::diffsim::BackPropagationSceneStats{}.totalDurationSec
+      , nb::arg("solve_duration_sec") = mochi::diffsim::BackPropagationSceneStats{}.solveDurationSec
+      , nb::arg("max_outer_iters") = mochi::diffsim::BackPropagationSceneStats{}.maxOuterIters
+      , nb::arg("residual_norm") = mochi::diffsim::BackPropagationSceneStats{}.residualNorm
+      , nb::arg("finite_diff_valid") = mochi::diffsim::BackPropagationSceneStats{}.finiteDiffValid
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::diffsim::BackPropagationSceneStats const& self) { return mochi::diffsim::BackPropagationSceneStats(self); })
-    .def("__deepcopy__", [](mochi::diffsim::BackPropagationSceneStats const& self, py::dict) { return mochi::diffsim::BackPropagationSceneStats(self); })
-    .def_readwrite("total_duration_sec", &mochi::diffsim::BackPropagationSceneStats::totalDurationSec, "Total wall-clock time spent in the last back-propagation step.")
-    .def_readwrite("solve_duration_sec", &mochi::diffsim::BackPropagationSceneStats::solveDurationSec, "Wall-clock time spent in the adjoint solve of the last back-propagation step.")
-    .def_readwrite("max_outer_iters", &mochi::diffsim::BackPropagationSceneStats::maxOuterIters, "Maximum number of outer-solver iterations across all islands in the last\nback-propagation step.")
-    .def_readwrite("residual_norm", &mochi::diffsim::BackPropagationSceneStats::residualNorm, "Final residual norm of the adjoint solve in the last back-propagation step.")
-    .def_readwrite("finite_diff_valid", &mochi::diffsim::BackPropagationSceneStats::finiteDiffValid, "True if every finite-difference Hvp validation check across every island and\nevery Hvp evaluation in this back-prop step passed its tolerance.\n\nNote:\n    Only meaningful when\n    :attr:`~superdex.physics.diffsim.BackPropagationSolverParams.validate_finite_diff`\n    is set; otherwise stays at its default of true.")
+    .def("__deepcopy__", [](mochi::diffsim::BackPropagationSceneStats const& self, nb::dict) { return mochi::diffsim::BackPropagationSceneStats(self); })
+    .def_rw("total_duration_sec", &mochi::diffsim::BackPropagationSceneStats::totalDurationSec, "Total wall-clock time spent in the last back-propagation step.")
+    .def_rw("solve_duration_sec", &mochi::diffsim::BackPropagationSceneStats::solveDurationSec, "Wall-clock time spent in the adjoint solve of the last back-propagation step.")
+    .def_rw("max_outer_iters", &mochi::diffsim::BackPropagationSceneStats::maxOuterIters, "Maximum number of outer-solver iterations across all islands in the last\nback-propagation step.")
+    .def_rw("residual_norm", &mochi::diffsim::BackPropagationSceneStats::residualNorm, "Final residual norm of the adjoint solve in the last back-propagation step.")
+    .def_rw("finite_diff_valid", &mochi::diffsim::BackPropagationSceneStats::finiteDiffValid, "True if every finite-difference Hvp validation check across every island and\nevery Hvp evaluation in this back-prop step passed its tolerance.\n\nNote:\n    Only meaningful when\n    :attr:`~superdex.physics.diffsim.BackPropagationSolverParams.validate_finite_diff`\n    is set; otherwise stays at its default of true.")
   ;
 
     m_diffsim.def("make_scene_differentiable", [](mochi::Scene* scene) {
@@ -114,7 +114,7 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("scene")
+      , nb::arg("scene").none()
       , "Make a scene differentiable.\n\nFor accuracy reasons, differentiability is only recommended in double precision.\nDifferentiability is only supported for rigid and articulated actors, and\nrequires :attr:`~superdex.physics.SolverParams.integration_method` to be\n:class:`BACKWARD_EULER <superdex.physics.IntegrationMethod>`. It adds internal\ndata to support the invocation of the functions\n:func:`~superdex.physics.diffsim.back_propagate` and\n:func:`~superdex.physics.diffsim.get_step_jacobian`. It also calls\n:func:`~superdex.physics.experimental.apply_improved_convergence_settings`, and\nit logs warnings when overriding non-default scene or actor settings selected by\nthe user. Consider changing those settings to retain the same simulation\nbehavior if the scene is used elsewhere.\n\nArgs:\n    scene (Scene): The scene to make differentiable.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -126,7 +126,7 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
       }
       return result;
     }
-      , py::arg("scene")
+      , nb::arg("scene").none()
       , "Get solver parameters.\n\nArgs:\n    scene (Scene): The differentiable scene.\n\nReturns:\n    The back-propagation solver parameters.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -137,8 +137,8 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("scene")
-      , py::arg("params")
+      , nb::arg("scene").none()
+      , nb::arg("params")
       , "Set solver parameters.\n\nArgs:\n    scene (Scene): The differentiable scene.\n    params (BackPropagationSolverParams): The back-propagation solver parameters\n        to set.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -150,7 +150,7 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
       }
       return result;
     }
-      , py::arg("scene")
+      , nb::arg("scene").none()
       , "Get the performance metrics of the last back-propagation step.\n\nArgs:\n    scene (Scene): The differentiable scene.\n\nReturns:\n    The performance metrics of the last back-propagation step.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -161,7 +161,7 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("scene")
+      , nb::arg("scene").none()
       , "Reset back-propagation state.\n\nMust be called once before a backward pass.\n\nArgs:\n    scene (Scene): The differentiable scene.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -172,11 +172,11 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("scene")
-      , py::arg("state_new")
-      , py::arg("state_old")
+      , nb::arg("scene").none()
+      , nb::arg("state_new")
+      , nb::arg("state_old")
       , "Prepare one simulation step for backward mode differentiation.\n\nValidates the state pair and marks the scene as ready for per-step output\nbackward functions and :func:`~superdex.physics.diffsim.back_propagate`. Must be\ncalled before accumulating per-step loss gradients with output backward\nfunctions.\n\nArgs:\n    scene (Scene): The differentiable scene.\n    state_new (StateHandle): State handle at step k (q_k).\n    state_old (StateHandle): State handle at step k-1 (q_{k-1}).\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
-      , py::call_guard<py::gil_scoped_release>()
+      , nb::call_guard<nb::gil_scoped_release>()
     );
 
     m_diffsim.def("back_propagate", [](mochi::Scene* scene) {
@@ -186,9 +186,9 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("scene")
+      , nb::arg("scene").none()
       , "Backward mode differentiation through the step function.\n\nSolves the adjoint system to propagate gradients backward through one simulation\nstep. Per-step loss gradients should be accumulated into per-actor adjoint\ncomponents after calling\n:func:`~superdex.physics.diffsim.prepare_back_propagate` and before calling this\nfunction, using output backward functions (e.g.,\n:func:`~superdex.physics.diffsim.get_center_of_mass_transform_backward`,\n:func:`~superdex.physics.diffsim.get_articulated_pose_backward`). The internal\nadjoint buffers are managed by the scene and must be initialized via\n:func:`~superdex.physics.diffsim.reset_back_propagation` before the first call.\nEach call to this function must be preceded by\n:func:`~superdex.physics.diffsim.prepare_back_propagate` for the same state\npair. Per-actor gradients wrt control inputs and initial conditions can be\nextracted via the corresponding backward functions (e.g.,\n:func:`~superdex.physics.diffsim.set_articulated_target_pose_backward`,\n:func:`~superdex.physics.diffsim.set_center_of_mass_transform_backward`) after\neach BackPropagate call. This function assumes that the forward simulation is\nexecuted per step by setting inputs, running the step, and reading outputs. The\nstate handles must be captured right before and after stepping the simulation\nforward, without setting any inputs in between.\n\nArgs:\n    scene (Scene): The differentiable scene.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    TODO: The function is not tested with variable time-stepping yet."
-      , py::call_guard<py::gil_scoped_release>()
+      , nb::call_guard<nb::gil_scoped_release>()
     );
 
     m_diffsim.def("get_step_jacobian", [](mochi::Scene* scene, mochi::StateHandle state_new, mochi::StateHandle state_curr, mochi::StateHandle state_old, mochi::Span<mochi::real> out_jac_curr, mochi::Span<mochi::real> out_jac_old) {
@@ -198,12 +198,12 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("scene")
-      , py::arg("state_new")
-      , py::arg("state_curr")
-      , py::arg("state_old")
-      , py::arg("out_jac_curr")
-      , py::arg("out_jac_old")
+      , nb::arg("scene").none()
+      , nb::arg("state_new")
+      , nb::arg("state_curr")
+      , nb::arg("state_old")
+      , nb::arg("out_jac_curr")
+      , nb::arg("out_jac_old")
       , "Forward mode differentiation through the step function.\n\nProvides the full column-major Jacobian matrices with the following sizes:\noutJacCurr = dq_t/dq_t-1 (|q| x |q|) and outJacOld = dq_t/dq_t-2 (|q| x |q|).\nThe rows and columns of the Jacobian matrices are sorted according to the order\ngiven in Scene.GetActors(). The input states are three consecutive states\ncaptured during a simulated trajectory: stateNew = state_t, stateCurr =\nstate_t-1, stateOld = state_t-2.\n\nArgs:\n    scene (Scene): The differentiable scene.\n    state_new (StateHandle): State handle at step t.\n    state_curr (StateHandle): State handle at step t-1.\n    state_old (StateHandle): State handle at step t-2.\n    out_jac_curr (ArrayLikeReal): Jacobian dq_t/dq_t-1, column-major, sized |q|\n        x |q|.\n    out_jac_old (ArrayLikeReal): Jacobian dq_t/dq_t-2, column-major, sized |q| x\n        |q|.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -214,8 +214,8 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("state")
-      , py::arg("out_grad")
+      , nb::arg("state")
+      , nb::arg("out_grad")
       , "Convert in-place gradient wrt rigid-actor state from local (Lie-parameterized)\nrepresentation to full rotation-vector representation.\n\nThis conversion is necessary for gradient-based optimization. outGrad must have\nsize 6 (3 translation + 3 rotation DoFs).\n\nArgs:\n    state (TransformRT): The rigid-actor state transform.\n    out_grad (ArrayLikeReal): In: Lie-parameterized gradient. Out:\n        rotation-vector gradient. Size 6.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -226,9 +226,9 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("state")
-      , py::arg("in_grad")
-      , py::arg("out_grad")
+      , nb::arg("state")
+      , nb::arg("in_grad")
+      , nb::arg("out_grad")
       , "Convert gradient wrt rigid-actor state from local (Lie-parameterized) to\nquaternion representation.\n\nThis conversion is necessary for gradient-based optimization. inGrad must have\nsize 6 (3 translation + 3 rotation DoFs). outGrad must have size 7 (3\ntranslation + 4 rotation DoFs).\n\nArgs:\n    state (TransformRT): The rigid-actor state transform.\n    in_grad (ArrayLikeReal): Lie-parameterized gradient. Size 6.\n    out_grad (ArrayLikeReal): Quaternion-parameterized gradient. Size 7.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -239,9 +239,9 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("actor")
-      , py::arg("pose")
-      , py::arg("out_grad")
+      , nb::arg("actor").none()
+      , nb::arg("pose")
+      , nb::arg("out_grad")
       , "Convert in-place gradient wrt articulated-actor pose from local\n(Lie-parameterized) representation to full rotation-vector representation.\n\nThe conversion is applied only to joints with 3D rotations. This conversion is\nnecessary for gradient-based optimization. outGrad must have size equal to the\nnumber of DoFs of the articulated actor.\n\nArgs:\n    actor (Actor): The articulated actor.\n    pose (ArrayLikeReal): The articulated-actor pose.\n    out_grad (ArrayLikeReal): In: Lie-parameterized gradient. Out:\n        rotation-vector gradient.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -252,9 +252,9 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("state")
-      , py::arg("in_grad")
-      , py::arg("out_grad")
+      , nb::arg("state")
+      , nb::arg("in_grad")
+      , nb::arg("out_grad")
       , "Convert gradient wrt rigid-actor state from quaternion to local\n(Lie-parameterized) representation.\n\nThis conversion is necessary for gradient-based optimization. inGrad must have\nsize 7 (3 translation + 4 rotation DoFs). outGrad must have size 6 (3\ntranslation + 3 rotation DoFs).\n\nArgs:\n    state (TransformRT): The rigid-actor state transform.\n    in_grad (ArrayLikeReal): Quaternion-parameterized gradient. Size 7.\n    out_grad (ArrayLikeReal): Lie-parameterized gradient. Size 6.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -265,9 +265,9 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("actor")
-      , py::arg("pose")
-      , py::arg("out_grad")
+      , nb::arg("actor").none()
+      , nb::arg("pose")
+      , nb::arg("out_grad")
       , "Convert in-place gradient wrt articulated-actor pose from full rotation-vector\nrepresentation to local (Lie-parameterized) representation.\n\nThe conversion is applied only to joints with 3D rotations. This conversion is\nnecessary for gradient-based optimization. outGrad must have size equal to the\nnumber of DoFs of the articulated actor.\n\nArgs:\n    actor (Actor): The articulated actor.\n    pose (ArrayLikeReal): The articulated-actor pose.\n    out_grad (ArrayLikeReal): In: rotation-vector gradient. Out:\n        Lie-parameterized gradient.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -278,8 +278,8 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("actor")
-      , py::arg("grad_output")
+      , nb::arg("actor").none()
+      , nb::arg("grad_output")
       , "Backward pass for :meth:`~superdex.physics.Actor.get_center_of_mass_transform`.\n\nConverts the gradient w.r.t. the center-of-mass transform output (translation +\nquaternion) to a Lie-parameterized state gradient and accumulates it into the\nactor. Only rigid actors are supported (standalone or links). Must be called\nbefore :func:`~superdex.physics.diffsim.back_propagate`.\n\nArgs:\n    actor (Actor): The rigid actor (standalone or link).\n    grad_output (ArrayLikeReal): Gradient w.r.t. center-of-mass transform output\n        (3 translation + 4 quaternion XYZW). Must be of size 7.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -290,8 +290,8 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("actor")
-      , py::arg("grad_output")
+      , nb::arg("actor").none()
+      , nb::arg("grad_output")
       , "Backward pass for :meth:`~superdex.physics.Actor.get_root_transform`.\n\nConverts the gradient w.r.t. the root transform output (translation +\nquaternion) to a Lie-parameterized state gradient and accumulates it into the\nactor. Only rigid actors are supported (standalone or links). Must be called\nbefore :func:`~superdex.physics.diffsim.back_propagate`.\n\nArgs:\n    actor (Actor): The rigid actor (standalone or link).\n    grad_output (ArrayLikeReal): Gradient w.r.t. root transform output (3\n        translation + 4 quaternion XYZW). Must be of size 7.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -302,8 +302,8 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("actor")
-      , py::arg("grad_output")
+      , nb::arg("actor").none()
+      , nb::arg("grad_output")
       , "Backward pass for :meth:`~superdex.physics.Actor.get_contact_force_world`.\n\nAccumulates the gradient w.r.t. the world-frame total contact force into\nprepared per-contact force adjoints. Only rigid actors are supported. Must be\ncalled after :func:`~superdex.physics.diffsim.prepare_back_propagate` and before\n:func:`~superdex.physics.diffsim.back_propagate`.\n\nArgs:\n    actor (Actor): The rigid actor.\n    grad_output (ArrayLikeReal): Gradient w.r.t. the total contact force [N] in\n        world frame. Must be of size 3.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -314,9 +314,9 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("actor")
-      , py::arg("other")
-      , py::arg("grad_output")
+      , nb::arg("actor").none()
+      , nb::arg("other").none()
+      , nb::arg("grad_output")
       , "Backward pass for\n:meth:`~superdex.physics.Actor.get_contact_force_from_actor_world`.\n\nAccumulates the gradient w.r.t. the world-frame contact force from another actor\ninto prepared per-contact force adjoints. Only rigid actors are supported. Must\nbe called after :func:`~superdex.physics.diffsim.prepare_back_propagate` and\nbefore :func:`~superdex.physics.diffsim.back_propagate`.\n\nArgs:\n    actor (Actor): The rigid actor receiving the contact force.\n    other (Actor): The actor exerting the contact force.\n    grad_output (ArrayLikeReal): Gradient w.r.t. the contact force [N] in world\n        frame. Must be of size 3.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -327,8 +327,8 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("actor")
-      , py::arg("grad_output")
+      , nb::arg("actor").none()
+      , nb::arg("grad_output")
       , "Backward pass for :meth:`~superdex.physics.Actor.get_articulated_pose`.\n\nConverts the gradient w.r.t. the articulated pose output (joint DOFs in\nrotation-vector representation) to a Lie-parameterized state gradient and\naccumulates it into the actor. Only articulated actors are supported. Must be\ncalled before :func:`~superdex.physics.diffsim.back_propagate`.\n\nArgs:\n    actor (Actor): The articulated actor.\n    grad_output (ArrayLikeReal): Gradient w.r.t. articulated pose output. Must\n        be of size :meth:`~superdex.physics.Actor.get_num_dofs`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -339,8 +339,8 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("actor")
-      , py::arg("out_grad_target_pose")
+      , nb::arg("actor").none()
+      , nb::arg("out_grad_target_pose")
       , "Backward pass for :meth:`~superdex.physics.Actor.set_articulated_target_pose`.\n\nReads the accumulated gradients wrt current and previous pose-controller targets\n(dg/dgamma_k and dg/dgamma_{k-1}) and sums them into a single output gradient\nwrt the target pose. Must be called after\n:func:`~superdex.physics.diffsim.back_propagate`.\n\nArgs:\n    actor (Actor): The articulated actor with a pose controller.\n    out_grad_target_pose (ArrayLikeReal): Gradient wrt target pose (dg/dgamma_k\n        + dg/dgamma_{k-1}). Must be of size\n        :meth:`~superdex.physics.Actor.get_num_dofs`. The caller is responsible\n        for accumulation.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -351,8 +351,8 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("actor")
-      , py::arg("out_grad_pose")
+      , nb::arg("actor").none()
+      , nb::arg("out_grad_pose")
       , "Backward pass for\n:meth:`~superdex.physics.Actor.set_articulated_pose_from_joints`.\n\n:meth:`~superdex.physics.Actor.set_articulated_pose_from_joints` sets the body\npose AND initializes the controller targets (both current and previous). This\ndual sums the gradient contributions from all three paths: state, current\ntarget, and previous target. Must be called after\n:func:`~superdex.physics.diffsim.back_propagate`.\n\nArgs:\n    actor (Actor): The articulated actor.\n    out_grad_pose (ArrayLikeReal): Gradient wrt the joint pose. Must be of size\n        :meth:`~superdex.physics.Actor.get_num_dofs`. The caller is responsible\n        for accumulation.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -363,8 +363,8 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("actor")
-      , py::arg("out_grad_target_velocity")
+      , nb::arg("actor").none()
+      , nb::arg("out_grad_target_velocity")
       , "Backward pass for\n:meth:`~superdex.physics.Actor.set_articulated_target_velocity`.\n\nThe target velocity is applied by computing the previous controller target as\ntarget_old = target_current - dt * velocity. Therefore, the gradient wrt\nvelocity is -dt * dg/dgamma_{k-1}, where dg/dgamma_{k-1} is the gradient wrt the\nprevious controller target. Must be called after\n:func:`~superdex.physics.diffsim.back_propagate`.\n\nArgs:\n    actor (Actor): The articulated actor with a pose controller.\n    out_grad_target_velocity (ArrayLikeReal): Gradient wrt target velocity. Must\n        be of size :meth:`~superdex.physics.Actor.get_num_dofs`. The caller is\n        responsible for accumulation.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -375,8 +375,8 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("actor")
-      , py::arg("out_grad_velocities")
+      , nb::arg("actor").none()
+      , nb::arg("out_grad_velocities")
       , "Backward pass for\n:meth:`~superdex.physics.Actor.set_articulated_joint_velocities`.\n\n:meth:`~superdex.physics.Actor.set_articulated_joint_velocities` sets the joint\nvelocities v of an articulated actor. The velocity determines the derived step\ndx = v * dt. Therefore: dL/dv = dt * dL/d(dx) * d(dx)/dq. Additionally, if a\npose controller is present, it also sets the target velocity which determines\nthe previous controller target; therefore it receives a gradient contribution\nfrom the old controller target. Must be called after\n:func:`~superdex.physics.diffsim.back_propagate`.\n\nArgs:\n    actor (Actor): The articulated actor.\n    out_grad_velocities (ArrayLikeReal): Gradient wrt joint velocities. Must be\n        of size :meth:`~superdex.physics.Actor.get_num_dofs`. The caller is\n        responsible for accumulation.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -387,9 +387,9 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("actor")
-      , py::arg("dof_indices")
-      , py::arg("out_grad_force_values")
+      , nb::arg("actor").none()
+      , nb::arg("dof_indices")
+      , nb::arg("out_grad_force_values")
       , "Backward pass for :meth:`~superdex.physics.Actor.set_external_forces_on_dofs`.\n\nReads the accumulated force gradient at the specified DOF indices. Only\narticulated and standalone rigid actors are supported (not rigid links). Must be\ncalled after :func:`~superdex.physics.diffsim.back_propagate`.\n\nArgs:\n    actor (Actor): The articulated or standalone rigid actor.\n    dof_indices (ArrayLikeInt): DOF indices matching the forward call. Must be\n        unique and match the size of outGradForceValues.\n    out_grad_force_values (ArrayLikeReal): Gradient wrt force values. The caller\n        is responsible for accumulation.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -400,9 +400,9 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("actor")
-      , py::arg("out_grad_linear_vel")
-      , py::arg("out_grad_angular_vel")
+      , nb::arg("actor").none()
+      , nb::arg("out_grad_linear_vel")
+      , nb::arg("out_grad_angular_vel")
       , "Backward pass for :meth:`~superdex.physics.Actor.set_velocity`.\n\n:meth:`~superdex.physics.Actor.set_velocity` sets the rigid-body velocity v =\n(v_com, omega). The velocity determines the derived step dx = v * dt. Therefore:\ndL/dv = dt * dL/d(dx), where dL/d(dx) is the derived-state adjoint. Only\nstandalone rigid actors are supported (not articulated links, not soft actors).\nMust be called after :func:`~superdex.physics.diffsim.back_propagate`.\n\nArgs:\n    actor (Actor): The rigid actor.\n    out_grad_linear_vel (ArrayLikeReal): Gradient wrt linear velocity. Must be\n        of size 3. The caller is responsible for accumulation.\n    out_grad_angular_vel (ArrayLikeReal): Gradient wrt angular velocity. Must be\n        of size 3. The caller is responsible for accumulation.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 
@@ -413,8 +413,8 @@ void mochi::DefineMochiPhysics_MochiDiffsim([[maybe_unused]] py::module_& m, [[m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("actor")
-      , py::arg("out_grad_transform")
+      , nb::arg("actor").none()
+      , nb::arg("out_grad_transform")
       , "Backward pass for :meth:`~superdex.physics.Actor.set_center_of_mass_transform`.\n\n:meth:`~superdex.physics.Actor.set_center_of_mass_transform` directly sets the\nrigid-body state (pose), so this function reads the gradient dL/d(state). The\noutput is in quaternion representation (7 elements: translation(3) +\nquaternion(4)), matching the forward API. Only standalone rigid actors are\nsupported. Must be called after\n:func:`~superdex.physics.diffsim.back_propagate`.\n\nArgs:\n    actor (Actor): The rigid actor.\n    out_grad_transform (ArrayLikeReal): Gradient wrt the CoM transform. Must be\n        of size 7 (translation(3) + quaternion_XYZW(4)). The caller is\n        responsible for accumulation.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     );
 

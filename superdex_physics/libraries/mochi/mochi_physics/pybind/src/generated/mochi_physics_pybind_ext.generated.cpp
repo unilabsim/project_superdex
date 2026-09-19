@@ -18,30 +18,30 @@
 
 // clang-format off
 
-#include <pybind11/pybind11.h>
+#include <limits>
+#include <nanobind/nanobind.h>
 #include "../pybind_include.h"
 
 using namespace mochi;
-namespace py = pybind11;
-using namespace pybind11::literals;
+namespace nb = nanobind;
 
 namespace mochi {
   // Forward declarations for the definitions below.
-  void DeclareMochiPhysics_MochiPhysicsExt(py::module_& m, PybindRegistry& registry);
-  void DefineMochiPhysics_MochiPhysicsExt(py::module_& m, PybindRegistry& registry);
+  void DeclareMochiPhysics_MochiPhysicsExt(nb::module_& m, PybindRegistry& registry);
+  void DefineMochiPhysics_MochiPhysicsExt(nb::module_& m, PybindRegistry& registry);
 } // namespace mochi
 
-void mochi::DeclareMochiPhysics_MochiPhysicsExt([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+void mochi::DeclareMochiPhysics_MochiPhysicsExt([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
 }
 
-void mochi::DefineMochiPhysics_MochiPhysicsExt([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
-    m.attr("DEFAULT_BACK_PROPAGATION_EPS_FINITE_DIFF") = py::cast(mochi::kDefaultBackPropagationEpsFiniteDiff);
+void mochi::DefineMochiPhysics_MochiPhysicsExt([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+    m.attr("DEFAULT_BACK_PROPAGATION_EPS_FINITE_DIFF") = nb::cast(mochi::kDefaultBackPropagationEpsFiniteDiff);
 
-    m.attr("TRANSFORM_RT_IDENTITY") = py::cast(mochi::kTransformRTIdentity);
+    m.attr("TRANSFORM_RT_IDENTITY") = nb::cast(mochi::kTransformRTIdentity);
 
-    m.attr("QUATERNION_IDENTITY") = py::cast(mochi::kQuaternionIdentity);
+    m.attr("QUATERNION_IDENTITY") = nb::cast(mochi::kQuaternionIdentity);
 
-    m.attr("GRID_SDF_PARAMS_DEFAULT") = py::cast(mochi::kGridSdfParamsDefault);
+    m.attr("GRID_SDF_PARAMS_DEFAULT") = nb::cast(mochi::kGridSdfParamsDefault);
 
 }
 // clang-format on

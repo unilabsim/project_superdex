@@ -370,6 +370,52 @@ class MochiShellActorContactScene : public test::MochiSceneTestBase,
   }
 };
 
+// Test rejecting a contact update that would produce a non-positive point-cloud range.
+TEST_P(MochiShellActorContactScene, SetContactParams_RejectsNonPositivePointCloudRange) {
+  ContactParams const originalParams = _bottomActor->GetContactParams(test::ExpectOK{});
+  ContactParams invalidParams = originalParams;
+  invalidParams.penaltyThresholdDefault = -kContactRadius;
+  invalidParams.penaltyThresholdExtraPadding = 0_r;
+
+  _bottomActor->SetContactParams(invalidParams, test::ExpectNotOK{});
+  EXPECT_EQ(
+      originalParams.penaltyThresholdDefault,
+      _bottomActor->GetContactParams(test::ExpectOK{}).penaltyThresholdDefault);
+}
+
+// Test that contact-range changes rebuild and repopulate the collider spatial hash table.
+TEST_P(MochiShellActorContactScene, SetContactParams_UpdatesPointCloudHashCellSize) {
+  auto& reg = GetRegistry();
+  entt::entity const entity = mochi::GetEntity(reg, _bottomActor->GetHandle(), test::ExpectOK{});
+  auto const& colliderDiscretization = reg.get<CColliderPointCloudDiscretization const>(entity);
+  auto& spatialHash = reg.get<CSpatialHashTable>(entity);
+  UpdateSpatialHashTable(
+      ecs::Included<TagUsePointCloudContact>{},
+      colliderDiscretization,
+      reg.get<CFinalDisplacementRef<TimeStep::Current> const>(entity),
+      spatialHash);
+  real const originalCellSize = spatialHash.GetCellSize();
+
+  ContactParams shrunkParams = _bottomActor->GetContactParams(test::ExpectOK{});
+  shrunkParams.penaltyThresholdDefault = -0.5_r * kContactRadius;
+  shrunkParams.penaltyThresholdExtraPadding = 0_r;
+  _bottomActor->SetContactParams(shrunkParams, test::ExpectOK{});
+  auto const& shrunkSpatialHash = reg.get<CSpatialHashTable const>(entity);
+  EXPECT_EQ(
+      kContactRadius + shrunkParams.GetPenaltyThresholdDist(true), shrunkSpatialHash.GetCellSize());
+  EXPECT_EQ(colliderDiscretization.GetNumColliderPoints(), shrunkSpatialHash.GetNumPoints());
+
+  ContactParams expandedParams = shrunkParams;
+  expandedParams.penaltyThresholdDefault = originalCellSize;
+  _bottomActor->SetContactParams(expandedParams, test::ExpectOK{});
+
+  auto const& rebuiltSpatialHash = reg.get<CSpatialHashTable const>(entity);
+  EXPECT_EQ(colliderDiscretization.GetNumColliderPoints(), rebuiltSpatialHash.GetNumPoints());
+  EXPECT_EQ(
+      kContactRadius + expandedParams.GetPenaltyThresholdDist(true),
+      rebuiltSpatialHash.GetCellSize());
+}
+
 // This tests two parallel shell actors, with one constrained, and the other one freeling falling
 // onto the constrained one. It then runs some basic sanity checks on the final configuration, to
 // verify that contact is effective. Particular emphasis is placed on ensuring that the results are

@@ -495,6 +495,10 @@ struct PointCloudColliderParams {
    * element)^(1/d), where `d` is the parametric dimension of the collider geometry (`d = 2` for
    * surfaces such as shell, `d = 1` for curves such as rods).
    *
+   * @note Must be finite and strictly positive. Its sum with the effective contact threshold in
+   * @ref ContactParams, including @ref ContactParams::penaltyThresholdExtraPadding, must also be
+   * finite and strictly positive.
+   *
    * @note This value also serves as the length scale for dimensional correction of the contact
    * penalty coefficient on the collider side. The effective penalty stiffness is scaled by
    * `pow(radius, -integralDim)`, where `integralDim` is the dimension of the collider-side
@@ -646,8 +650,8 @@ struct RodActorParams {
   ColliderType colliderType = ColliderType::None;
   PointCloudColliderParams pointCloudCollider = {};
   bool hasGravity = true;
-  bool useVisualMeshContact = false;
-  ActorBoundaryElementType visualMeshContactElementType = ActorBoundaryElementType::Default;
+  bool useContactSkin = false;
+  ActorBoundaryElementType contactSkinElementType = ActorBoundaryElementType::Default;
 
   MOCHI_STRUCT_BEGIN(mochi::experimental::RodActorParams)
   MOCHI_FIELD(name)
@@ -660,8 +664,8 @@ struct RodActorParams {
   MOCHI_FIELD(colliderType)
   MOCHI_FIELD(pointCloudCollider)
   MOCHI_FIELD(hasGravity)
-  MOCHI_FIELD(useVisualMeshContact)
-  MOCHI_FIELD(visualMeshContactElementType)
+  MOCHI_FIELD(useContactSkin)
+  MOCHI_FIELD(contactSkinElementType)
   MOCHI_STRUCT_END()
 };
 
@@ -1022,12 +1026,12 @@ MOCHI_API Actor* CreateRodActor(Scene* scene, RodActorParams const& params, Erro
     bool isClosedLoop,
     Error& error);
 
-// Generate a @ref ModelData with a polyline simulation mesh and a tubular visual mesh for use
+// Generate a @ref ModelData with a polyline simulation mesh and a tubular contact skin for use
 // with rod actors. The returned @ref ModelData can be passed to @ref Context::CreateModelShape.
 // @param[in] nodes Node positions [m] defining the polyline centerline. Must have at least 2.
 // @param[in] elementFrameAxes Unit vectors perpendicular to each element's tangent direction.
 //            If empty, these will be auto-generated using parallel transport.
-// @param[in] radius Radius [m] of the tubular visual mesh cross-section. Must be positive.
+// @param[in] radius Radius [m] of the tubular contact-skin cross-section. Must be positive.
 // @param[in] numCrossSectionSegments Number of segments around the tube circumference (>= 3).
 // @param[in] isClosedLoop If true, the polyline forms a closed loop.
 // @param[in,out] error Error status. Check @ref Error::IsOK for success.

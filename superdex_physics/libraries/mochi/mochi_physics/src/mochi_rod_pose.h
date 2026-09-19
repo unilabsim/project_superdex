@@ -79,6 +79,11 @@ struct CRodPose : public RodPoseContainer, NoCopy {
 
 namespace rod {
 
+// Compute the axis-aligned bounds of the deformed rod centerline.
+[[nodiscard]] Aabb CalcDeformedRodCenterlineAabb(
+    Span<Real3 const> meshNodes,
+    ColumnVectorView<real const> displacements);
+
 // Compute the unit tangent vector for a rod element.
 [[nodiscard]] Real3 ComputeRodElementTangent(
     Span<Real3 const> meshNodes,

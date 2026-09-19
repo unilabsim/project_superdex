@@ -12,19 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Sample environment runner for SuperDex Gym environments.
-
-This script provides a command-line interface for running any environment discovered by
-:mod:`superdex.lab.gym.utils.env_discovery`, including JSON config variants. The set of
-available samples is determined automatically, so environments absent from the current
-build simply do not appear.
+"""Sample runner for registered SuperDex Gymnasium environments.
 
 Usage:
-    python run_sample.py <sample_name> [options]
+    python run_sample.py <environment_id> [options]
 
 Examples:
-    python run_sample.py cart_pole --action_sampler random --num_episodes 5
-    python run_sample.py half_cheetah --action_sampler sweep --video
+    python run_sample.py superdex_gym/CartPole-v0 --action_sampler random --num_episodes 5
+    python run_sample.py superdex_gym/HalfCheetah-v0 --action_sampler sweep --video
 """
 
 import argparse
@@ -33,8 +28,9 @@ import pathlib
 import warnings
 from typing import Any
 
-from superdex.lab.gym.envs.mochi_env import MochiEnv
-from superdex.lab.gym.utils.env_discovery import get_env_short_names, register_all_envs
+import gymnasium as gym
+from superdex.lab.gym.registration import get_env_specs
+from superdex.lab.gym.utils.registry import MochiGymEnv, unwrap_mochi_env
 from superdex.physics.utils.logging import configure_logger
 from superdex.physics.viewer import VIEWER_AVAILABLE
 from superdex.physics.viewer.utils import AnimationWriter
@@ -48,29 +44,83 @@ except ImportError:
 ########################################################################################
 
 
-def make_env(sample: str, common_env_cfg: dict[str, Any]) -> MochiEnv:
-    """Build a discovered environment (or config variant) by its short name.
+def make_env(env_id: str, common_env_cfg: dict[str, Any]) -> MochiGymEnv:
+    """Build a registered environment, preserving variant defaults."""
+    return gym.make(env_id, **common_env_cfg)
 
-    The variant's JSON config kwargs are applied first, then overridden by the shared
-    ``common_env_cfg``, which carries only runtime settings the CLI owns (render mode,
-    render size, start paused, profiling) -- never task configuration.
+
+def _resolve_render_mode(requested: str, video_recording: bool) -> str | None:
+    """Map the --render-mode selection to a Mochi ``render_mode`` value.
+
+    ``none`` runs headless. ``auto`` keeps the historical behavior: use the viewer when
+    available (``rgb_array`` when recording, otherwise ``human``) and fall back to no
+    rendering otherwise. ``human``/``rgb_array`` are explicit and require the viewer,
+    failing with an actionable error when it is unavailable. ``VIEWER_AVAILABLE`` only
+    confirms a compatible Polyscope import, not that the display backend will start.
     """
-    entries = get_env_short_names()
-    if sample not in entries:
-        available = ", ".join(sorted(entries))
-        raise ValueError(f"Unknown sample: {sample}. Available: {available}")
-    entry = entries[sample]
-    cfg = entry.cfg_cls(**{**entry.cfg_kwargs, **common_env_cfg})
-    return entry.env_cls(cfg)
+    if requested == "none":
+        return None
+    if requested == "auto":
+        if VIEWER_AVAILABLE:
+            return "rgb_array" if video_recording else "human"
+        warnings.warn(
+            "Polyscope is not installed in the current environment, or it's an "
+            "incompatible version. Please install Polyscope >= 2.5.0 to enable the "
+            "renderer. Falling back to render mode none...",
+            stacklevel=2,
+        )
+        return None
+    if not VIEWER_AVAILABLE:
+        raise SystemExit(
+            f"--render-mode {requested} requires the Polyscope viewer (>= 2.5.0), which "
+            "is not available in this environment. Rerun with --render-mode none for "
+            "headless use."
+        )
+    return requested
+
+
+def _resolve_render_and_video(
+    render_mode: str,
+    video_path: pathlib.Path | None,
+    video_size: str | None,
+) -> tuple[str | None, pathlib.Path | None, tuple[int, ...] | None]:
+    """Resolve the renderer mode and normalize the video output settings.
+
+    Returns the effective Mochi ``render_mode`` plus the (possibly disabled) video path
+    and parsed size. Headless mode disables video output; ``human`` cannot record.
+    """
+    effective_render_mode = _resolve_render_mode(
+        render_mode, video_recording=video_path is not None
+    )
+    if effective_render_mode is None:
+        if video_path is not None:
+            warnings.warn(
+                "Rendering is disabled (--render-mode none); ignoring the requested "
+                "video output.",
+                stacklevel=2,
+            )
+        return None, None, None
+    if effective_render_mode == "human" and video_path is not None:
+        raise SystemExit(
+            "--render-mode human cannot record video (the human viewer is on-screen). "
+            "Use --render-mode rgb_array (or auto) together with --video."
+        )
+    parsed_size: tuple[int, ...] | None = None
+    if video_size is not None:
+        parsed_size = tuple(int(part) for part in video_size.split("x"))
+        if len(parsed_size) != 2:
+            raise ValueError(f"Invalid video size: {video_size}")
+    return effective_render_mode, video_path, parsed_size
 
 
 ########################################################################################
 
 
 def run_sample(
-    sample: str,
+    env_id: str,
     action_sampler: str,
     num_episodes: int,
+    render_mode: str,
     video_size: str | None,
     video_path: pathlib.Path | None,
     start_paused: bool,
@@ -83,25 +133,10 @@ def run_sample(
     the execution performance.
     """
 
-    # Check if video rendering is enabled and determine the render mode.
-    if VIEWER_AVAILABLE:
-        render_mode = "human" if video_path is None else "rgb_array"
-    else:
-        warnings.warn(
-            "Polyscope is not installed in the current environment, or it's an "
-            "incompatible version. Please install Polyscope >= 2.5.0 to enable the "
-            "renderer. Falling back to render mode None...",
-            stacklevel=2,
-        )
-        render_mode = None
-        video_path = None
-        video_size = None
-
-    # Parse video size.
-    if video_size is not None:
-        video_size = tuple(int(x) for x in video_size.split("x"))
-        if len(video_size) != 2:
-            raise ValueError(f"Invalid video size: {video_size}")
+    # Resolve renderer mode and normalize video output from the CLI selection.
+    effective_render_mode, video_path, video_size = _resolve_render_and_video(
+        render_mode, video_path, video_size
+    )
 
     # Setup common parameters. These are runtime/presentation settings owned by the CLI,
     # so they are merged over the entry config and win. Task configuration deliberately
@@ -109,7 +144,7 @@ def run_sample(
     # silently overriding a horizon supplied by a config variant, and num_worker_threads
     # already defaults to 0.
     common_env_cfg = {
-        "render_mode": render_mode,
+        "render_mode": effective_render_mode,
         "render_size": video_size,
         "start_paused": start_paused,
         "profile": True,
@@ -126,13 +161,27 @@ def run_sample(
 
     if action_sampler not in action_samplers:
         raise ValueError(f"Unknown action sampler: {action_sampler}")
-    env = make_env(sample, common_env_cfg)
+
+    # Building the env initializes the viewer backend when a render mode is active; that
+    # can still fail on a host without a usable display even when VIEWER_AVAILABLE is
+    # True, so turn it into an actionable message.
+    try:
+        env = make_env(env_id, common_env_cfg)
+    except Exception as error:  # noqa: BLE001 -- surface an actionable renderer message
+        if effective_render_mode is None:
+            raise
+        raise SystemExit(
+            f"Failed to initialize the renderer backend for --render-mode "
+            f"{effective_render_mode!r}: {error}. If this host has no display backend, "
+            "rerun with --render-mode none for headless use."
+        ) from error
+    mochi_env = unwrap_mochi_env(env)
     action_sampler_fn = action_samplers[action_sampler]
 
     # Initialize animation writer.
     animation_writer = None
     if video_path is not None:
-        fps = env.get_control_frequency()
+        fps = mochi_env.get_control_frequency()
         animation_writer = AnimationWriter(video_path, fps, "mp4")
 
     # With the environment instantiated, we can now step it.
@@ -140,16 +189,16 @@ def run_sample(
     if profile:
         pr = cProfile.Profile()
         pr.enable()
-        sample_runner(env, action_sampler_fn, num_episodes, animation_writer)
+        sample_runner(env, mochi_env, action_sampler_fn, num_episodes, animation_writer)
         pr.disable()
         print()
         print("cProfile summary")
         pr.print_stats(sort="cumulative")
     else:
-        sample_runner(env, action_sampler_fn, num_episodes, animation_writer)
+        sample_runner(env, mochi_env, action_sampler_fn, num_episodes, animation_writer)
 
     # Print the environment's profiler summary (if available).
-    profiler = env.get_profiler()
+    profiler = mochi_env.get_profiler()
     if profiler.enabled:
         print()
         print("Environment profiler summary")
@@ -160,21 +209,16 @@ def run_sample(
 
 
 def main():
-    # Discover and register the available environments up front so the CLI can list them.
-    # Test-only variants are excluded, so they are not offered nor accepted here.
-    register_all_envs()
-    available_samples = sorted(get_env_short_names())
+    available_env_ids = tuple(spec.id for spec in get_env_specs())
 
     # Parse command line arguments.
     parser = argparse.ArgumentParser(
         description="Run SuperDex Gym sample environments with different action sampling strategies."
     )
     parser.add_argument(
-        "sample",
+        "env_id",
         type=str,
-        choices=available_samples,
-        help="Name of the sample environment to run. One of: "
-        + ", ".join(available_samples),
+        help="Canonical environment ID to run. One of: " + ", ".join(available_env_ids),
     )
     parser.add_argument(
         "--action_sampler",
@@ -184,6 +228,17 @@ def main():
     )
     parser.add_argument(
         "--num_episodes", type=int, default=10, help="Number of episodes to run"
+    )
+    parser.add_argument(
+        "--render-mode",
+        dest="render_mode",
+        type=str,
+        default="auto",
+        choices=("auto", "human", "rgb_array", "none"),
+        help="Renderer mode. 'auto' (default) uses the viewer when available "
+        "('human', or 'rgb_array' with --video) and falls back to 'none' otherwise; "
+        "'none' runs headless (no display backend required); 'human'/'rgb_array' "
+        "require the viewer.",
     )
     parser.add_argument(
         "--video",
@@ -217,6 +272,11 @@ def main():
         help="Enable performance profiling during execution",
     )
     args = parser.parse_args()
+    if args.env_id not in available_env_ids:
+        parser.error(
+            f"unknown SuperDex environment ID {args.env_id!r}; choose one of: "
+            + ", ".join(available_env_ids)
+        )
 
     # Setup logging.
     configure_logger()
@@ -232,9 +292,10 @@ def main():
 
     # Run the sample.
     run_sample(
-        sample=args.sample,
+        env_id=args.env_id,
         action_sampler=args.action_sampler,
         num_episodes=args.num_episodes,
+        render_mode=args.render_mode,
         video_size=args.video_size,
         video_path=video_path,
         start_paused=args.start_paused,

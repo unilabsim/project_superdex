@@ -18,26 +18,26 @@
 
 // clang-format off
 
-#include <pybind11/pybind11.h>
+#include <limits>
+#include <nanobind/nanobind.h>
 #include "../pybind_include.h"
 
 using namespace mochi;
-namespace py = pybind11;
-using namespace pybind11::literals;
+namespace nb = nanobind;
 
 namespace mochi {
   // Forward declarations for the definitions below.
-  void DeclareMochiPhysics_MochiPhysicsScene(py::module_& m, PybindRegistry& registry);
-  void DefineMochiPhysics_MochiPhysicsScene(py::module_& m, PybindRegistry& registry);
+  void DeclareMochiPhysics_MochiPhysicsScene(nb::module_& m, PybindRegistry& registry);
+  void DefineMochiPhysics_MochiPhysicsScene(nb::module_& m, PybindRegistry& registry);
 } // namespace mochi
 
-void mochi::DeclareMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
-  registry.StoreClass(py::class_<mochi::Scene, std::unique_ptr<mochi::Scene, py::nodelete>>(m, "Scene", "Represents a simulation scene.\n\nNote:\n    Each scene manages the simulation of a series of actors.\n\nNote:\n    Actors from different scenes do not interact with each other.\n\nWarning:\n    Concurrent access to the scene and its actors and constraints is illegal."));
+void mochi::DeclareMochiPhysics_MochiPhysicsScene([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+  registry.StoreClass(nb::class_<mochi::Scene>(m, "Scene", "Represents a simulation scene.\n\nNote:\n    Each scene manages the simulation of a series of actors.\n\nNote:\n    Actors from different scenes do not interact with each other.\n\nWarning:\n    Concurrent access to the scene and its actors and constraints is illegal.", nb::never_destruct()));
 }
 
-void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
-  registry.GetClass<mochi::Scene, std::unique_ptr<mochi::Scene, py::nodelete>>()
-    .def_readonly_static("DEFAULT_CALLBACK_PRIORITY", &mochi::Scene::kDefaultCallbackPriority, "Default priority for callback ordering. Lower values execute earlier (higher\npriority).")
+void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+  registry.GetClass<mochi::Scene>()
+    .def_ro_static("DEFAULT_CALLBACK_PRIORITY", &mochi::Scene::kDefaultCallbackPriority, "Default priority for callback ordering. Lower values execute earlier (higher\npriority).")
     .def("get_handle", &mochi::Scene::GetHandle
       , "Get the scene handle.\n\nReturns:\n    Scene's handle.\n\nNote:\n    Handles are safe to store and remain valid throughout the scene lifespan.\n\nNote:\n    Call :func:`~superdex.physics.get_scene` to look up the scene's pointer from\n    the scene's handle.\n\nSee Also:\n    :func:`~superdex.physics.get_scene`"
     )
@@ -48,7 +48,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       , "Get the gravity vector in world frame.\n\nReturns:\n    Gravity vector [m/s^2] in world frame.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.set_gravity`"
     )
     .def("set_gravity", &mochi::Scene::SetGravity
-      , py::arg("gravity")
+      , nb::arg("gravity")
       , "Set the gravity vector in world frame.\n\nArgs:\n    gravity (Real3Like): Gravity vector [m/s^2] in world frame.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.get_gravity`"
     )
     .def("get_solver_params", &mochi::Scene::GetSolverParams
@@ -61,13 +61,13 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Set the solver parameters.\n\nArgs:\n    params (SolverParams): Solver parameters to set.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.get_solver_params`,\n    :class:`~superdex.physics.SolverParams`"
     )
     .def("step", &mochi::Scene::Step
-      , py::arg("time_step_sec")
+      , nb::arg("time_step_sec")
       , "Advance the simulation of the :class:`~superdex.physics.Scene` one step.\n\nSuperDex Physics uses fully-implicit time integration, enabling substantially\nlarger stable time steps than physics engines using explicit or semi-implicit\nmethods, particularly for stiff systems. Fewer steps per simulated second often\nimprove simulation performance and real-time factor.\n\nArgs:\n    time_step_sec (float): Time step size [s]. Must be non-negative.\n\nNote:\n    Time steps of 10–25 ms (40–100 physics steps per simulated second) run\n    robustly in most scenes, including complex contact-rich and deformable\n    simulations. This is a practical starting range, not a guarantee. Smaller\n    steps may still be required to resolve fast motion, accurately capture\n    short-duration contact dynamics without excessive numerical dissipation,\n    resolve dynamics associated with small geometric or discretization length\n    scales, or improve nonlinear-solver convergence.\n\nNote:\n    It is OK to use a different time step each time.\n\nNote:\n    If the time step is zero, then the state of the simulation will not change,\n    but pre-step and post-step callbacks will still be called, and queries will\n    be updated.\n\nNote:\n    If the time step is negative or NaN, no step is taken and an error is\n    logged.\n\nSee Also:\n    :class:`~superdex.physics.IntegrationMethod`"
-      , py::call_guard<py::gil_scoped_release>()
+      , nb::call_guard<nb::gil_scoped_release>()
     )
     .def("get_last_time_step", &mochi::Scene::GetLastTimeStep
       , "Returns the time step size [s] from the most recent positive call to\n:meth:`~superdex.physics.Scene.step`.\n\nReturns:\n    The time step size [s] from the most recent positive\n    :meth:`~superdex.physics.Scene.step` call.\n\nNote:\n    In a newly created scene, the return value is unspecified until the first\n    positive :meth:`~superdex.physics.Scene.step` call.\n\nNote:\n    :meth:`~superdex.physics.Scene.restore_state` and\n    :meth:`~superdex.physics.Scene.restore_state_from_bytes` restore this value\n    from the captured state.\n\nNote:\n    Calling :meth:`~superdex.physics.Scene.step` with a zero time step (e.g. to\n    refresh queries without advancing the simulation) does not update this value\n    (i.e. it retains the value from the last positive time step)."
@@ -82,7 +82,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       , "Get timing and profiling metrics from the last simulation step.\n\nReturns:\n    The :class:`~superdex.physics.PerformanceStats` from the last simulation\n    step.\n\nSee Also:\n    :class:`~superdex.physics.PerformanceStats`"
     )
     .def("set_force_single_island", &mochi::Scene::SetForceSingleIsland
-      , py::arg("force_single_island")
+      , nb::arg("force_single_island")
       , "Enables/disables forcing all actors in the scene to be in a single simulation\nisland.\n\nAn island is a group of actors and constraints that are solved together. Islands\nare managed automatically based on proximity and other factors. Islands can be\nsolved in parallel, which can greatly improve the performance of the scene.\nHowever, if you suspect that island partitioning might be causing a problem,\nthen you can use this function to force all actors in the scene to be simulated\nin a single island.\n\nArgs:\n    force_single_island (bool): Whether to force all actors to be in a single\n        simulation island.\n\nWarning:\n    Forcing single-island is a debugging feature. It will hurt performance.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.get_force_single_island`"
     )
     .def("get_force_single_island", &mochi::Scene::GetForceSingleIsland
@@ -105,8 +105,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("handle")
-      , py::arg("release_immediately")
+      , nb::arg("handle")
+      , nb::arg("release_immediately")
       , "Restore captured simulation state. Optionally release the\n:class:`~superdex.physics.StateHandle` at the same time.\n\nArgs:\n    handle (StateHandle): :class:`~superdex.physics.StateHandle` from a\n        successful call to :meth:`~superdex.physics.Scene.capture_state`.\n    release_immediately (bool): If true, release the state handle immediately\n        (as if :meth:`~superdex.physics.Scene.release_state` were called), even\n        if the restore fails.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The :class:`~superdex.physics.StateHandle` must have been captured from this\n    :class:`~superdex.physics.Scene`.\n\nNote:\n    The scene composition (actors, constraints) must be the same as when the\n    state was captured.\n\nWarning:\n    Does not create or destroy actors or constraints, or restore shapes,\n    materials, or scene parameters. Captured mutable state on existing actors,\n    including static actor transforms, is restored; if topology or persistent\n    configuration changes, simulation results may differ.\n\nWarning:\n    Restoration is not transactional. If restoration fails, the scene may be\n    partially modified. Restore a known-good checkpoint or recreate the scene\n    before continuing.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.capture_state`,\n    :meth:`~superdex.physics.Scene.release_state`,\n    :meth:`~superdex.physics.Scene.release_all_states`,\n    :meth:`~superdex.physics.Scene.restore_state_from_bytes`"
     )
     .def("capture_state_to_bytes", [](mochi::Scene& self, mochi::DynamicArray<uint8_t>& out_data) {
@@ -116,7 +116,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("out_data")
+      , nb::arg("out_data")
       , "Capture simulation state to a binary byte buffer.\n\nCaptures the same simulation state as\n:meth:`~superdex.physics.Scene.capture_state`, but writes the binary\nrepresentation to caller-owned memory instead of storing it internally. This is\nuseful for transferring state between processes or caching state outside the\nscene.\n\nArgs:\n    out_data (ArrayLikeUint8): Output byte buffer. Capture data is appended to\n        the buffer.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    On failure, the output buffer may contain a partial capture. Discard the\n    buffer or truncate it to its original size before reuse.\n\nWarning:\n    Has the same capture restrictions as\n    :meth:`~superdex.physics.Scene.capture_state`, including no support for\n    scenes with ROM actors.\n\nWarning:\n    The binary representation uses an internal capture format. It is intended\n    only for compatible scenes with the same actors and constraints created in\n    the same order and the same component layouts, using the same SuperDex\n    Physics build. It is not a stable long-term serialization or asset\n    interchange format.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.restore_state_from_bytes`,\n    :meth:`~superdex.physics.Scene.capture_state`,\n    :meth:`~superdex.physics.Scene.capture_state_to_file`"
     )
     .def("restore_state_from_bytes", [](mochi::Scene& self, mochi::Span<uint8_t const> data) {
@@ -126,19 +126,19 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("data")
+      , nb::arg("data")
       , "Restore simulation state from a binary byte buffer produced by\n:meth:`~superdex.physics.Scene.capture_state_to_bytes`.\n\nArgs:\n    data (ArrayLikeUint8): State data from a successful call to\n        :meth:`~superdex.physics.Scene.capture_state_to_bytes`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The byte buffer must have been captured from this or a compatible scene via\n    :meth:`~superdex.physics.Scene.capture_state_to_bytes`.\n\nNote:\n    The capture and restore scenes must use the same SuperDex Physics build.\n\nNote:\n    The restore requirements from :meth:`~superdex.physics.Scene.restore_state`\n    apply, including scene composition (actors, constraints) being the same as\n    when the state was captured.\n\nWarning:\n    Has the same restore scope and non-transactional failure behavior as\n    :meth:`~superdex.physics.Scene.restore_state`.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.capture_state_to_bytes`,\n    :meth:`~superdex.physics.Scene.restore_state`"
     )
     .def("release_state", &mochi::Scene::ReleaseState
-      , py::arg("handle")
+      , nb::arg("handle")
       , "Release a :class:`~superdex.physics.StateHandle` when you are done with it. This\nfrees up memory.\n\nArgs:\n    handle (StateHandle): :class:`~superdex.physics.StateHandle` to release.\n\nNote:\n    Redundant calls to ReleaseState will be ignored."
     )
     .def("release_all_states", &mochi::Scene::ReleaseAllStates
       , "Release memory for all captured state and invalidate all prior\n:class:`~superdex.physics.StateHandle` objects."
     )
     .def("is_equal_state", &mochi::Scene::IsEqualState
-      , py::arg("state_a")
-      , py::arg("state_b")
+      , nb::arg("state_a")
+      , nb::arg("state_b")
       , "Return true if both StateHandles are valid and refer to identical state\ninformation (full precision).\n\nArgs:\n    state_a (StateHandle): First StateHandle to compare\n    state_b (StateHandle): Second StateHandle to compare\n\nReturns:\n    True if both states are valid and identical."
     )
     .def("capture_state_to_file", [](mochi::Scene& self, std::string_view file_path) {
@@ -148,7 +148,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("file_path")
+      , nb::arg("file_path")
       , "Captures a snapshot of the state of a :class:`~superdex.physics.Scene`, similar\nto :meth:`~superdex.physics.Scene.capture_state`, then writes the data to a JSON\nfile for manual inspection.\n\nArgs:\n    file_path (str): Path of the output file to write/overwrite (case sensitive\n        on some filesystems).\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nWarning:\n    Not supported for scenes with ROM actors.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.capture_state`"
     )
     .def("create_rigid_actor", [](mochi::Scene& self, mochi::RigidActorParams const& params) {
@@ -159,28 +159,29 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Create a rigid body actor.\n\nArgs:\n    params (RigidActorParams): Parameters defining the rigid actor.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Actor`, or None on error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`~superdex.physics.RigidActorParams`,\n    :meth:`~superdex.physics.Scene.destroy_actor`"
+      , nb::rv_policy::reference
     )
-    .def("create_rigid_actor", [](mochi::Scene& self, py::object name, py::object layer, py::object shape, py::object world_from_local, py::object collider_type, py::object is_static, py::object contact, py::object sdf, py::object has_gravity, py::object density, py::object mass, py::object center_of_mass, py::object moment_of_inertia, py::object boundary_element_type, py::object boundary_subsampling, py::object linear_velocity, py::object angular_velocity) {
-      mochi::RigidActorParams params;
-      params.name = py::cast<mochi::DynamicString>(name);
-      params.layer = py::cast<mochi::DynamicString>(layer);
-      params.shape = py::cast<mochi::ShapeHandle>(shape);
-      params.worldFromLocal = py::cast<mochi::TransformRT>(world_from_local);
-      params.colliderType = py::cast<mochi::ColliderType>(collider_type);
-      params.isStatic = py::cast<bool>(is_static);
-      params.contact = py::cast<mochi::ContactParams>(contact);
-      params.sdf = py::cast<mochi::GridSdfParams>(sdf);
-      params.hasGravity = py::cast<bool>(has_gravity);
-      params.density = py::cast<std::optional<mochi::real>>(density);
-      params.mass = py::cast<std::optional<mochi::real>>(mass);
-      params.centerOfMass = py::cast<std::optional<mochi::Real3>>(center_of_mass);
-      params.momentOfInertia = py::cast<std::optional<mochi::Real6>>(moment_of_inertia);
-      params.boundaryElementType = py::cast<mochi::ActorBoundaryElementType>(boundary_element_type);
-      params.boundarySubsampling = py::cast<std::optional<mochi::BoundarySubsamplingParams>>(boundary_subsampling);
-      params.linearVelocity = py::cast<std::optional<mochi::Real3>>(linear_velocity);
-      params.angularVelocity = py::cast<std::optional<mochi::Real3>>(angular_velocity);
+    .def("create_rigid_actor", [](mochi::Scene& self, nb::object name, nb::object layer, nb::object shape, nb::object world_from_local, nb::object collider_type, nb::object is_static, nb::object contact, nb::object sdf, nb::object has_gravity, nb::object density, nb::object mass, nb::object center_of_mass, nb::object moment_of_inertia, nb::object boundary_element_type, nb::object boundary_subsampling, nb::object linear_velocity, nb::object angular_velocity) {
+      mochi::RigidActorParams params{};
+      params.name = nb::cast<mochi::DynamicString>(name);
+      params.layer = nb::cast<mochi::DynamicString>(layer);
+      params.shape = nb::cast<mochi::ShapeHandle>(shape);
+      params.worldFromLocal = nb::cast<mochi::TransformRT>(world_from_local);
+      params.colliderType = nb::cast<mochi::ColliderType>(collider_type);
+      params.isStatic = nb::cast<bool>(is_static);
+      params.contact = nb::cast<mochi::ContactParams>(contact);
+      params.sdf = nb::cast<mochi::GridSdfParams>(sdf);
+      params.hasGravity = nb::cast<bool>(has_gravity);
+      params.density = nb::cast<std::optional<mochi::real>>(density);
+      params.mass = nb::cast<std::optional<mochi::real>>(mass);
+      params.centerOfMass = nb::cast<std::optional<mochi::Real3>>(center_of_mass);
+      params.momentOfInertia = nb::cast<std::optional<mochi::Real6>>(moment_of_inertia);
+      params.boundaryElementType = nb::cast<mochi::ActorBoundaryElementType>(boundary_element_type);
+      params.boundarySubsampling = nb::cast<std::optional<mochi::BoundarySubsamplingParams>>(boundary_subsampling);
+      params.linearVelocity = nb::cast<std::optional<mochi::Real3>>(linear_velocity);
+      params.angularVelocity = nb::cast<std::optional<mochi::Real3>>(angular_velocity);
       mochi::Error error;
       auto result = self.CreateRigidActor(params, error);
       if (!error.IsOK()) {
@@ -188,25 +189,25 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("name") = mochi::RigidActorParams{}.name
-      , py::arg("layer") = mochi::RigidActorParams{}.layer
-      , py::arg("shape") = mochi::RigidActorParams{}.shape
-      , py::arg("world_from_local") = mochi::RigidActorParams{}.worldFromLocal
-      , py::arg("collider_type") = mochi::RigidActorParams{}.colliderType
-      , py::arg("is_static") = mochi::RigidActorParams{}.isStatic
-      , py::arg("contact") = mochi::RigidActorParams{}.contact
-      , py::arg("sdf") = mochi::RigidActorParams{}.sdf
-      , py::arg("has_gravity") = mochi::RigidActorParams{}.hasGravity
-      , py::arg("density") = mochi::RigidActorParams{}.density
-      , py::arg("mass") = mochi::RigidActorParams{}.mass
-      , py::arg("center_of_mass") = mochi::RigidActorParams{}.centerOfMass
-      , py::arg("moment_of_inertia") = mochi::RigidActorParams{}.momentOfInertia
-      , py::arg("boundary_element_type") = mochi::RigidActorParams{}.boundaryElementType
-      , py::arg("boundary_subsampling") = mochi::RigidActorParams{}.boundarySubsampling
-      , py::arg("linear_velocity") = mochi::RigidActorParams{}.linearVelocity
-      , py::arg("angular_velocity") = mochi::RigidActorParams{}.angularVelocity
-      , "Create a rigid body actor.\n\nArgs:\n    params (RigidActorParams): Parameters defining the rigid actor.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Actor`, or None on error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`~superdex.physics.RigidActorParams`,\n    :meth:`~superdex.physics.Scene.destroy_actor`")
+      , nb::kw_only()
+      , nb::arg("name") = mochi::RigidActorParams{}.name
+      , nb::arg("layer") = mochi::RigidActorParams{}.layer
+      , nb::arg("shape").sig("...") = mochi::RigidActorParams{}.shape
+      , nb::arg("world_from_local").sig("...") = mochi::RigidActorParams{}.worldFromLocal
+      , nb::arg("collider_type") = mochi::RigidActorParams{}.colliderType
+      , nb::arg("is_static") = mochi::RigidActorParams{}.isStatic
+      , nb::arg("contact").sig("...") = mochi::RigidActorParams{}.contact
+      , nb::arg("sdf").sig("...") = mochi::RigidActorParams{}.sdf
+      , nb::arg("has_gravity") = mochi::RigidActorParams{}.hasGravity
+      , nb::arg("density").sig("...") = mochi::RigidActorParams{}.density
+      , nb::arg("mass").sig("...") = mochi::RigidActorParams{}.mass
+      , nb::arg("center_of_mass").sig("...") = mochi::RigidActorParams{}.centerOfMass
+      , nb::arg("moment_of_inertia").sig("...") = mochi::RigidActorParams{}.momentOfInertia
+      , nb::arg("boundary_element_type") = mochi::RigidActorParams{}.boundaryElementType
+      , nb::arg("boundary_subsampling").sig("...") = mochi::RigidActorParams{}.boundarySubsampling
+      , nb::arg("linear_velocity").sig("...") = mochi::RigidActorParams{}.linearVelocity
+      , nb::arg("angular_velocity").sig("...") = mochi::RigidActorParams{}.angularVelocity
+      , "Create a rigid body actor.\n\nArgs:\n    params (RigidActorParams): Parameters defining the rigid actor.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Actor`, or None on error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`~superdex.physics.RigidActorParams`,\n    :meth:`~superdex.physics.Scene.destroy_actor`", nb::rv_policy::reference)
     .def("create_soft_actor", [](mochi::Scene& self, mochi::SoftActorParams const& params) {
       mochi::Error error;
       auto result = self.CreateSoftActor(params, error);
@@ -215,21 +216,22 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Create a soft deformable actor.\n\nArgs:\n    params (SoftActorParams): Parameters defining the soft actor.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Actor`, or None on error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`~superdex.physics.SoftActorParams`,\n    :meth:`~superdex.physics.Scene.destroy_actor`"
+      , nb::rv_policy::reference
     )
-    .def("create_soft_actor", [](mochi::Scene& self, py::object name, py::object layer, py::object world_from_local, py::object shape, py::object material, py::object contact, py::object has_gravity, py::object has_inertia, py::object has_stress, py::object boundary_element_type) {
-      mochi::SoftActorParams params;
-      params.name = py::cast<mochi::DynamicString>(name);
-      params.layer = py::cast<mochi::DynamicString>(layer);
-      params.worldFromLocal = py::cast<mochi::TransformRT>(world_from_local);
-      params.shape = py::cast<mochi::ShapeHandle>(shape);
-      params.material = py::cast<mochi::SoftMaterialParams>(material);
-      params.contact = py::cast<mochi::ContactParams>(contact);
-      params.hasGravity = py::cast<bool>(has_gravity);
-      params.hasInertia = py::cast<bool>(has_inertia);
-      params.hasStress = py::cast<bool>(has_stress);
-      params.boundaryElementType = py::cast<mochi::ActorBoundaryElementType>(boundary_element_type);
+    .def("create_soft_actor", [](mochi::Scene& self, nb::object name, nb::object layer, nb::object world_from_local, nb::object shape, nb::object material, nb::object contact, nb::object has_gravity, nb::object has_inertia, nb::object has_stress, nb::object boundary_element_type) {
+      mochi::SoftActorParams params{};
+      params.name = nb::cast<mochi::DynamicString>(name);
+      params.layer = nb::cast<mochi::DynamicString>(layer);
+      params.worldFromLocal = nb::cast<mochi::TransformRT>(world_from_local);
+      params.shape = nb::cast<mochi::ShapeHandle>(shape);
+      params.material = nb::cast<mochi::SoftMaterialParams>(material);
+      params.contact = nb::cast<mochi::ContactParams>(contact);
+      params.hasGravity = nb::cast<bool>(has_gravity);
+      params.hasInertia = nb::cast<bool>(has_inertia);
+      params.hasStress = nb::cast<bool>(has_stress);
+      params.boundaryElementType = nb::cast<mochi::ActorBoundaryElementType>(boundary_element_type);
       mochi::Error error;
       auto result = self.CreateSoftActor(params, error);
       if (!error.IsOK()) {
@@ -237,18 +239,18 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("name") = mochi::SoftActorParams{}.name
-      , py::arg("layer") = mochi::SoftActorParams{}.layer
-      , py::arg("world_from_local") = mochi::SoftActorParams{}.worldFromLocal
-      , py::arg("shape") = mochi::SoftActorParams{}.shape
-      , py::arg("material") = mochi::SoftActorParams{}.material
-      , py::arg("contact") = mochi::SoftActorParams{}.contact
-      , py::arg("has_gravity") = mochi::SoftActorParams{}.hasGravity
-      , py::arg("has_inertia") = mochi::SoftActorParams{}.hasInertia
-      , py::arg("has_stress") = mochi::SoftActorParams{}.hasStress
-      , py::arg("boundary_element_type") = mochi::SoftActorParams{}.boundaryElementType
-      , "Create a soft deformable actor.\n\nArgs:\n    params (SoftActorParams): Parameters defining the soft actor.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Actor`, or None on error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`~superdex.physics.SoftActorParams`,\n    :meth:`~superdex.physics.Scene.destroy_actor`")
+      , nb::kw_only()
+      , nb::arg("name") = mochi::SoftActorParams{}.name
+      , nb::arg("layer") = mochi::SoftActorParams{}.layer
+      , nb::arg("world_from_local").sig("...") = mochi::SoftActorParams{}.worldFromLocal
+      , nb::arg("shape").sig("...") = mochi::SoftActorParams{}.shape
+      , nb::arg("material").sig("...") = mochi::SoftActorParams{}.material
+      , nb::arg("contact").sig("...") = mochi::SoftActorParams{}.contact
+      , nb::arg("has_gravity") = mochi::SoftActorParams{}.hasGravity
+      , nb::arg("has_inertia") = mochi::SoftActorParams{}.hasInertia
+      , nb::arg("has_stress") = mochi::SoftActorParams{}.hasStress
+      , nb::arg("boundary_element_type") = mochi::SoftActorParams{}.boundaryElementType
+      , "Create a soft deformable actor.\n\nArgs:\n    params (SoftActorParams): Parameters defining the soft actor.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Actor`, or None on error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`~superdex.physics.SoftActorParams`,\n    :meth:`~superdex.physics.Scene.destroy_actor`", nb::rv_policy::reference)
     .def("create_articulated_actor", [](mochi::Scene& self, mochi::ArticulatedActorParams const& params) {
       mochi::Error error;
       auto result = self.CreateArticulatedActor(params, error);
@@ -257,18 +259,19 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Create an articulated actor.\n\nArgs:\n    params (ArticulatedActorParams): Parameters defining the articulated actor.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Actor`, or None on error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    To access nested link actors, use\n    :meth:`~superdex.physics.Actor.get_nested_link_actors`.\n\nWarning:\n    A zero-DOF skeleton (every joint is :class:`HARD\n    <superdex.physics.ArticulatedJointType>`) is a static welded structure and\n    cannot carry a skin (:attr:`~superdex.physics.ArticulatedActorParams.skin`).\n\nSee Also:\n    :class:`~superdex.physics.ArticulatedActorParams`,\n    :meth:`~superdex.physics.Scene.destroy_actor`"
+      , nb::rv_policy::reference
     )
-    .def("create_articulated_actor", [](mochi::Scene& self, py::object name, py::object world_from_root, py::object cycles, py::object joints, py::object links, py::object skin, py::object joint_velocities) {
-      mochi::ArticulatedActorParams params;
-      params.name = py::cast<mochi::DynamicString>(name);
-      params.worldFromRoot = py::cast<mochi::TransformRT>(world_from_root);
-      params.cycles = py::cast<mochi::DynamicArray<mochi::ArticulatedCycleJointParams>>(cycles);
-      params.joints = py::cast<mochi::DynamicArray<mochi::ArticulatedJointParams>>(joints);
-      params.links = py::cast<mochi::DynamicArray<mochi::ArticulatedLinkParams>>(links);
-      params.skin = py::cast<std::optional<mochi::ArticulatedSkinParams>>(skin);
-      params.jointVelocities = py::cast<std::optional<mochi::DynamicArray<mochi::real>>>(joint_velocities);
+    .def("create_articulated_actor", [](mochi::Scene& self, nb::object name, nb::object world_from_root, nb::object cycles, nb::object joints, nb::object links, nb::object skin, nb::object joint_velocities) {
+      mochi::ArticulatedActorParams params{};
+      params.name = nb::cast<mochi::DynamicString>(name);
+      params.worldFromRoot = nb::cast<mochi::TransformRT>(world_from_root);
+      params.cycles = nb::cast<mochi::DynamicArray<mochi::ArticulatedCycleJointParams>>(cycles);
+      params.joints = nb::cast<mochi::DynamicArray<mochi::ArticulatedJointParams>>(joints);
+      params.links = nb::cast<mochi::DynamicArray<mochi::ArticulatedLinkParams>>(links);
+      params.skin = nb::cast<std::optional<mochi::ArticulatedSkinParams>>(skin);
+      params.jointVelocities = nb::cast<std::optional<mochi::DynamicArray<mochi::real>>>(joint_velocities);
       mochi::Error error;
       auto result = self.CreateArticulatedActor(params, error);
       if (!error.IsOK()) {
@@ -276,15 +279,15 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("name") = mochi::ArticulatedActorParams{}.name
-      , py::arg("world_from_root") = mochi::ArticulatedActorParams{}.worldFromRoot
-      , py::arg("cycles") = mochi::ArticulatedActorParams{}.cycles
-      , py::arg("joints") = mochi::ArticulatedActorParams{}.joints
-      , py::arg("links") = mochi::ArticulatedActorParams{}.links
-      , py::arg("skin") = mochi::ArticulatedActorParams{}.skin
-      , py::arg("joint_velocities") = mochi::ArticulatedActorParams{}.jointVelocities
-      , "Create an articulated actor.\n\nArgs:\n    params (ArticulatedActorParams): Parameters defining the articulated actor.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Actor`, or None on error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    To access nested link actors, use\n    :meth:`~superdex.physics.Actor.get_nested_link_actors`.\n\nWarning:\n    A zero-DOF skeleton (every joint is :class:`HARD\n    <superdex.physics.ArticulatedJointType>`) is a static welded structure and\n    cannot carry a skin (:attr:`~superdex.physics.ArticulatedActorParams.skin`).\n\nSee Also:\n    :class:`~superdex.physics.ArticulatedActorParams`,\n    :meth:`~superdex.physics.Scene.destroy_actor`")
+      , nb::kw_only()
+      , nb::arg("name") = mochi::ArticulatedActorParams{}.name
+      , nb::arg("world_from_root").sig("...") = mochi::ArticulatedActorParams{}.worldFromRoot
+      , nb::arg("cycles").sig("...") = mochi::ArticulatedActorParams{}.cycles
+      , nb::arg("joints").sig("...") = mochi::ArticulatedActorParams{}.joints
+      , nb::arg("links").sig("...") = mochi::ArticulatedActorParams{}.links
+      , nb::arg("skin").sig("...") = mochi::ArticulatedActorParams{}.skin
+      , nb::arg("joint_velocities").sig("...") = mochi::ArticulatedActorParams{}.jointVelocities
+      , "Create an articulated actor.\n\nArgs:\n    params (ArticulatedActorParams): Parameters defining the articulated actor.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Actor`, or None on error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    To access nested link actors, use\n    :meth:`~superdex.physics.Actor.get_nested_link_actors`.\n\nWarning:\n    A zero-DOF skeleton (every joint is :class:`HARD\n    <superdex.physics.ArticulatedJointType>`) is a static welded structure and\n    cannot carry a skin (:attr:`~superdex.physics.ArticulatedActorParams.skin`).\n\nSee Also:\n    :class:`~superdex.physics.ArticulatedActorParams`,\n    :meth:`~superdex.physics.Scene.destroy_actor`", nb::rv_policy::reference)
     .def("create_soft_skinned_actor", [](mochi::Scene& self, mochi::SoftSkinnedActorParams const& params) {
       mochi::Error error;
       auto result = self.CreateSoftSkinnedActor(params, error);
@@ -293,18 +296,19 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Create a soft-skinned actor with an articulated skeleton.\n\nArgs:\n    params (SoftSkinnedActorParams): Parameters defining the soft-skinned actor.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Actor`, or None on error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    To access nested soft actors, use\n    :meth:`~superdex.physics.Actor.get_nested_soft_actors`.\n\nNote:\n    To access nested link actors, use\n    :meth:`~superdex.physics.Actor.get_nested_link_actors`.\n\nWarning:\n    The skeleton must have at least one non-Hard joint.\n\nSee Also:\n    :class:`~superdex.physics.SoftSkinnedActorParams`,\n    :meth:`~superdex.physics.Scene.destroy_actor`"
+      , nb::rv_policy::reference
     )
-    .def("create_soft_skinned_actor", [](mochi::Scene& self, py::object skeleton_params, py::object soft_params, py::object soft_attach_links, py::object enable_colliding_links, py::object has_gravity, py::object has_inertia, py::object has_stress) {
-      mochi::SoftSkinnedActorParams params;
-      params.skeletonParams = py::cast<mochi::ArticulatedActorParams>(skeleton_params);
-      params.softParams = py::cast<mochi::DynamicArray<mochi::SoftActorParams>>(soft_params);
-      params.softAttachLinks = py::cast<mochi::DynamicArray<mochi::DynamicString>>(soft_attach_links);
-      params.enableCollidingLinks = py::cast<bool>(enable_colliding_links);
-      params.hasGravity = py::cast<bool>(has_gravity);
-      params.hasInertia = py::cast<bool>(has_inertia);
-      params.hasStress = py::cast<bool>(has_stress);
+    .def("create_soft_skinned_actor", [](mochi::Scene& self, nb::object skeleton_params, nb::object soft_params, nb::object soft_attach_links, nb::object enable_colliding_links, nb::object has_gravity, nb::object has_inertia, nb::object has_stress) {
+      mochi::SoftSkinnedActorParams params{};
+      params.skeletonParams = nb::cast<mochi::ArticulatedActorParams>(skeleton_params);
+      params.softParams = nb::cast<mochi::DynamicArray<mochi::SoftActorParams>>(soft_params);
+      params.softAttachLinks = nb::cast<mochi::DynamicArray<mochi::DynamicString>>(soft_attach_links);
+      params.enableCollidingLinks = nb::cast<bool>(enable_colliding_links);
+      params.hasGravity = nb::cast<bool>(has_gravity);
+      params.hasInertia = nb::cast<bool>(has_inertia);
+      params.hasStress = nb::cast<bool>(has_stress);
       mochi::Error error;
       auto result = self.CreateSoftSkinnedActor(params, error);
       if (!error.IsOK()) {
@@ -312,32 +316,33 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("skeleton_params") = mochi::SoftSkinnedActorParams{}.skeletonParams
-      , py::arg("soft_params") = mochi::SoftSkinnedActorParams{}.softParams
-      , py::arg("soft_attach_links") = mochi::SoftSkinnedActorParams{}.softAttachLinks
-      , py::arg("enable_colliding_links") = mochi::SoftSkinnedActorParams{}.enableCollidingLinks
-      , py::arg("has_gravity") = mochi::SoftSkinnedActorParams{}.hasGravity
-      , py::arg("has_inertia") = mochi::SoftSkinnedActorParams{}.hasInertia
-      , py::arg("has_stress") = mochi::SoftSkinnedActorParams{}.hasStress
-      , "Create a soft-skinned actor with an articulated skeleton.\n\nArgs:\n    params (SoftSkinnedActorParams): Parameters defining the soft-skinned actor.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Actor`, or None on error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    To access nested soft actors, use\n    :meth:`~superdex.physics.Actor.get_nested_soft_actors`.\n\nNote:\n    To access nested link actors, use\n    :meth:`~superdex.physics.Actor.get_nested_link_actors`.\n\nWarning:\n    The skeleton must have at least one non-Hard joint.\n\nSee Also:\n    :class:`~superdex.physics.SoftSkinnedActorParams`,\n    :meth:`~superdex.physics.Scene.destroy_actor`")
-    .def("destroy_actor", py::overload_cast<mochi::Actor*>(&mochi::Scene::DestroyActor)
-      , py::arg("actor")
+      , nb::kw_only()
+      , nb::arg("skeleton_params").sig("...") = mochi::SoftSkinnedActorParams{}.skeletonParams
+      , nb::arg("soft_params").sig("...") = mochi::SoftSkinnedActorParams{}.softParams
+      , nb::arg("soft_attach_links").sig("...") = mochi::SoftSkinnedActorParams{}.softAttachLinks
+      , nb::arg("enable_colliding_links") = mochi::SoftSkinnedActorParams{}.enableCollidingLinks
+      , nb::arg("has_gravity") = mochi::SoftSkinnedActorParams{}.hasGravity
+      , nb::arg("has_inertia") = mochi::SoftSkinnedActorParams{}.hasInertia
+      , nb::arg("has_stress") = mochi::SoftSkinnedActorParams{}.hasStress
+      , "Create a soft-skinned actor with an articulated skeleton.\n\nArgs:\n    params (SoftSkinnedActorParams): Parameters defining the soft-skinned actor.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Actor`, or None on error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    To access nested soft actors, use\n    :meth:`~superdex.physics.Actor.get_nested_soft_actors`.\n\nNote:\n    To access nested link actors, use\n    :meth:`~superdex.physics.Actor.get_nested_link_actors`.\n\nWarning:\n    The skeleton must have at least one non-Hard joint.\n\nSee Also:\n    :class:`~superdex.physics.SoftSkinnedActorParams`,\n    :meth:`~superdex.physics.Scene.destroy_actor`", nb::rv_policy::reference)
+    .def("destroy_actor", nb::overload_cast<mochi::Actor*>(&mochi::Scene::DestroyActor)
+      , nb::arg("actor").none()
       , "Destroy an actor and remove it from the scene.\n\nArgs:\n    actor (Optional[Actor]): Pointer to the actor to destroy.\n\nNote:\n    Nested actors cannot be destroyed individually. When you destroy the parent\n    actor (e.g. an articulation), all the nested actors will be destroyed\n    automatically.\n\nNote:\n    Constraints attached to the actor are automatically destroyed.\n\nNote:\n    If ``actor`` is None, this function has no effect.\n\nNote:\n    After the actor is destroyed, do not use the pointer or its handle.\n\nWarning:\n    The pointer must be None or point to a live actor owned by this scene.\n    Passing a pointer to an actor that has been destroyed is undefined behavior.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.get_actor`,\n    :meth:`~superdex.physics.Actor.get_handle`"
     )
-    .def("destroy_actor", py::overload_cast<mochi::ActorHandle>(&mochi::Scene::DestroyActor)
-      , py::arg("actor")
+    .def("destroy_actor", nb::overload_cast<mochi::ActorHandle>(&mochi::Scene::DestroyActor)
+      , nb::arg("actor")
       , "Destroy an actor and remove it from the scene.\n\nArgs:\n    actor (ActorHandle): Handle of the actor to destroy. If valid, it must be\n        owned by this scene.\n\nNote:\n    Nested actors cannot be destroyed individually. When you destroy the parent\n    actor (e.g. an articulation), all the nested actors will be destroyed\n    automatically.\n\nNote:\n    Constraints attached to the actor are automatically destroyed.\n\nNote:\n    An invalid handle or one that does not currently identify an actor in the\n    scene has no effect.\n\nNote:\n    After the actor is destroyed, do not use its handle.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.get_actor`,\n    :meth:`~superdex.physics.Actor.get_handle`"
     )
-    .def("get_actor", py::overload_cast<mochi::ActorHandle>(&mochi::Scene::GetActor)
-      , py::arg("actor")
+    .def("get_actor", nb::overload_cast<mochi::ActorHandle>(&mochi::Scene::GetActor)
+      , nb::arg("actor")
       , "Get the :class:`~superdex.physics.Actor` pointer associated with an\n:class:`~superdex.physics.ActorHandle`.\n\nArgs:\n    actor (ActorHandle): Handle of the actor to retrieve. If valid, it must be\n        owned by this scene.\n\nReturns:\n    Pointer to the :class:`~superdex.physics.Actor`, or None if the handle does\n    not currently identify an actor in this scene.\n\nSee Also:\n    :class:`~superdex.physics.Actor`, :class:`~superdex.physics.ActorHandle`,\n    :meth:`~superdex.physics.Scene.destroy_actor`,\n    :meth:`~superdex.physics.Actor.get_handle`"
+      , nb::rv_policy::reference
     )
     .def("get_num_actors", &mochi::Scene::GetNumActors
       , "Get the number of actors in the scene, including nested link actors and nested\nsoft actors.\n\nReturns:\n    Number of actors in the scene.\n\nNote:\n    To count only top-level actors, iterate with\n    :meth:`~superdex.physics.Scene.for_each_actor` and skip actors for which\n    :meth:`~superdex.physics.Actor.is_nested_link_actor` or\n    :meth:`~superdex.physics.Actor.is_nested_soft_actor` returns true."
     )
-    .def("for_each_actor", py::overload_cast<std::function<void(mochi::Actor*)> const&>(&mochi::Scene::ForEachActor)
-      , py::arg("callback")
+    .def("for_each_actor", nb::overload_cast<std::function<void(mochi::Actor*)> const&>(&mochi::Scene::ForEachActor)
+      , nb::arg("callback").none()
       , "Iterate over all the actors in the scene using a callback. Includes nested link\nactors and nested soft actors.\n\nArgs:\n    callback (Callable[[Actor], None]): Function called once for each actor.\n\nNote:\n    To skip nested actors, check\n    :meth:`~superdex.physics.Actor.is_nested_link_actor` and\n    :meth:`~superdex.physics.Actor.is_nested_soft_actor` inside the callback.\n\nWarning:\n    Destroying other actors or constraints from within the callback is illegal."
     )
     .def("create_articulated_single_dof_range_constraint", [](mochi::Scene& self, mochi::ArticulatedSingleDofRangeConstraintParams const& params) {
@@ -348,19 +353,20 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Create a range constraint on a single articulated DoF.\n\nArgs:\n    params (ArticulatedSingleDofRangeConstraintParams): Parameters defining the\n        DoF range constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Use this API for runtime creation/deletion of joint limits. For static joint\n    limits, use the :meth:`~superdex.physics.Scene.create_articulated_actor` API\n    instead.\n\nSee Also:\n    :class:`ARTICULATED_SINGLE_DOF_RANGE <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.ArticulatedSingleDofRangeConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`"
+      , nb::rv_policy::reference
     )
-    .def("create_articulated_single_dof_range_constraint", [](mochi::Scene& self, py::object stiffness, py::object damping, py::object saturation, py::object actor, py::object joint_index, py::object dof_index, py::object min_value, py::object max_value) {
-      mochi::ArticulatedSingleDofRangeConstraintParams params;
-      params.stiffness = py::cast<mochi::real>(stiffness);
-      params.damping = py::cast<mochi::real>(damping);
-      params.saturation = py::cast<mochi::real>(saturation);
-      params.actor = py::cast<mochi::ActorHandle>(actor);
-      params.jointIndex = py::cast<int>(joint_index);
-      params.dofIndex = py::cast<int>(dof_index);
-      params.minValue = py::cast<mochi::real>(min_value);
-      params.maxValue = py::cast<mochi::real>(max_value);
+    .def("create_articulated_single_dof_range_constraint", [](mochi::Scene& self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object actor, nb::object joint_index, nb::object dof_index, nb::object min_value, nb::object max_value) {
+      mochi::ArticulatedSingleDofRangeConstraintParams params{};
+      params.stiffness = nb::cast<mochi::real>(stiffness);
+      params.damping = nb::cast<mochi::real>(damping);
+      params.saturation = nb::cast<mochi::real>(saturation);
+      params.actor = nb::cast<mochi::ActorHandle>(actor);
+      params.jointIndex = nb::cast<int>(joint_index);
+      params.dofIndex = nb::cast<int>(dof_index);
+      params.minValue = nb::cast<mochi::real>(min_value);
+      params.maxValue = nb::cast<mochi::real>(max_value);
       mochi::Error error;
       auto result = self.CreateArticulatedSingleDofRangeConstraint(params, error);
       if (!error.IsOK()) {
@@ -368,16 +374,16 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::ArticulatedSingleDofRangeConstraintParams{}.stiffness
-      , py::arg("damping") = mochi::ArticulatedSingleDofRangeConstraintParams{}.damping
-      , py::arg("saturation") = mochi::ArticulatedSingleDofRangeConstraintParams{}.saturation
-      , py::arg("actor") = mochi::ArticulatedSingleDofRangeConstraintParams{}.actor
-      , py::arg("joint_index") = mochi::ArticulatedSingleDofRangeConstraintParams{}.jointIndex
-      , py::arg("dof_index") = mochi::ArticulatedSingleDofRangeConstraintParams{}.dofIndex
-      , py::arg("min_value") = mochi::ArticulatedSingleDofRangeConstraintParams{}.minValue
-      , py::arg("max_value") = mochi::ArticulatedSingleDofRangeConstraintParams{}.maxValue
-      , "Create a range constraint on a single articulated DoF.\n\nArgs:\n    params (ArticulatedSingleDofRangeConstraintParams): Parameters defining the\n        DoF range constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Use this API for runtime creation/deletion of joint limits. For static joint\n    limits, use the :meth:`~superdex.physics.Scene.create_articulated_actor` API\n    instead.\n\nSee Also:\n    :class:`ARTICULATED_SINGLE_DOF_RANGE <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.ArticulatedSingleDofRangeConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`")
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::ArticulatedSingleDofRangeConstraintParams{}.stiffness
+      , nb::arg("damping") = mochi::ArticulatedSingleDofRangeConstraintParams{}.damping
+      , nb::arg("saturation") = mochi::ArticulatedSingleDofRangeConstraintParams{}.saturation
+      , nb::arg("actor").sig("...") = mochi::ArticulatedSingleDofRangeConstraintParams{}.actor
+      , nb::arg("joint_index") = mochi::ArticulatedSingleDofRangeConstraintParams{}.jointIndex
+      , nb::arg("dof_index") = mochi::ArticulatedSingleDofRangeConstraintParams{}.dofIndex
+      , nb::arg("min_value") = mochi::ArticulatedSingleDofRangeConstraintParams{}.minValue
+      , nb::arg("max_value") = mochi::ArticulatedSingleDofRangeConstraintParams{}.maxValue
+      , "Create a range constraint on a single articulated DoF.\n\nArgs:\n    params (ArticulatedSingleDofRangeConstraintParams): Parameters defining the\n        DoF range constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Use this API for runtime creation/deletion of joint limits. For static joint\n    limits, use the :meth:`~superdex.physics.Scene.create_articulated_actor` API\n    instead.\n\nSee Also:\n    :class:`ARTICULATED_SINGLE_DOF_RANGE <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.ArticulatedSingleDofRangeConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`", nb::rv_policy::reference)
     .def("create_articulated3d_rotation_range_constraint", [](mochi::Scene& self, mochi::Articulated3dRotationRangeConstraintParams const& params) {
       mochi::Error error;
       auto result = self.CreateArticulated3dRotationRangeConstraint(params, error);
@@ -386,18 +392,19 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Create a range constraint on the DoFs of a 3D rotation joint of an articulated\nactor.\n\nArgs:\n    params (Articulated3dRotationRangeConstraintParams): Parameters defining the\n        DoF range constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Use this API for runtime creation/deletion of joint limits. For static joint\n    limits, use the :meth:`~superdex.physics.Scene.create_articulated_actor` API\n    instead.\n\nSee Also:\n    :class:`ARTICULATED3D_ROTATION_RANGE <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.Articulated3dRotationRangeConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`"
+      , nb::rv_policy::reference
     )
-    .def("create_articulated3d_rotation_range_constraint", [](mochi::Scene& self, py::object stiffness, py::object damping, py::object saturation, py::object actor, py::object joint_index, py::object min_values, py::object max_values) {
-      mochi::Articulated3dRotationRangeConstraintParams params;
-      params.stiffness = py::cast<mochi::real>(stiffness);
-      params.damping = py::cast<mochi::real>(damping);
-      params.saturation = py::cast<mochi::real>(saturation);
-      params.actor = py::cast<mochi::ActorHandle>(actor);
-      params.jointIndex = py::cast<int>(joint_index);
-      params.minValues = py::cast<mochi::Real3>(min_values);
-      params.maxValues = py::cast<mochi::Real3>(max_values);
+    .def("create_articulated3d_rotation_range_constraint", [](mochi::Scene& self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object actor, nb::object joint_index, nb::object min_values, nb::object max_values) {
+      mochi::Articulated3dRotationRangeConstraintParams params{};
+      params.stiffness = nb::cast<mochi::real>(stiffness);
+      params.damping = nb::cast<mochi::real>(damping);
+      params.saturation = nb::cast<mochi::real>(saturation);
+      params.actor = nb::cast<mochi::ActorHandle>(actor);
+      params.jointIndex = nb::cast<int>(joint_index);
+      params.minValues = nb::cast<mochi::Real3>(min_values);
+      params.maxValues = nb::cast<mochi::Real3>(max_values);
       mochi::Error error;
       auto result = self.CreateArticulated3dRotationRangeConstraint(params, error);
       if (!error.IsOK()) {
@@ -405,15 +412,15 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::Articulated3dRotationRangeConstraintParams{}.stiffness
-      , py::arg("damping") = mochi::Articulated3dRotationRangeConstraintParams{}.damping
-      , py::arg("saturation") = mochi::Articulated3dRotationRangeConstraintParams{}.saturation
-      , py::arg("actor") = mochi::Articulated3dRotationRangeConstraintParams{}.actor
-      , py::arg("joint_index") = mochi::Articulated3dRotationRangeConstraintParams{}.jointIndex
-      , py::arg("min_values") = mochi::Articulated3dRotationRangeConstraintParams{}.minValues
-      , py::arg("max_values") = mochi::Articulated3dRotationRangeConstraintParams{}.maxValues
-      , "Create a range constraint on the DoFs of a 3D rotation joint of an articulated\nactor.\n\nArgs:\n    params (Articulated3dRotationRangeConstraintParams): Parameters defining the\n        DoF range constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Use this API for runtime creation/deletion of joint limits. For static joint\n    limits, use the :meth:`~superdex.physics.Scene.create_articulated_actor` API\n    instead.\n\nSee Also:\n    :class:`ARTICULATED3D_ROTATION_RANGE <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.Articulated3dRotationRangeConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`")
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::Articulated3dRotationRangeConstraintParams{}.stiffness
+      , nb::arg("damping") = mochi::Articulated3dRotationRangeConstraintParams{}.damping
+      , nb::arg("saturation") = mochi::Articulated3dRotationRangeConstraintParams{}.saturation
+      , nb::arg("actor").sig("...") = mochi::Articulated3dRotationRangeConstraintParams{}.actor
+      , nb::arg("joint_index") = mochi::Articulated3dRotationRangeConstraintParams{}.jointIndex
+      , nb::arg("min_values").sig("...") = mochi::Articulated3dRotationRangeConstraintParams{}.minValues
+      , nb::arg("max_values").sig("...") = mochi::Articulated3dRotationRangeConstraintParams{}.maxValues
+      , "Create a range constraint on the DoFs of a 3D rotation joint of an articulated\nactor.\n\nArgs:\n    params (Articulated3dRotationRangeConstraintParams): Parameters defining the\n        DoF range constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Use this API for runtime creation/deletion of joint limits. For static joint\n    limits, use the :meth:`~superdex.physics.Scene.create_articulated_actor` API\n    instead.\n\nSee Also:\n    :class:`ARTICULATED3D_ROTATION_RANGE <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.Articulated3dRotationRangeConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`", nb::rv_policy::reference)
     .def("create_articulated_single_dof_target_constraint", [](mochi::Scene& self, mochi::ArticulatedSingleDofTargetConstraintParams const& params) {
       mochi::Error error;
       auto result = self.CreateArticulatedSingleDofTargetConstraint(params, error);
@@ -422,18 +429,19 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Create a target constraint on a single articulated DoF.\n\nArgs:\n    params (ArticulatedSingleDofTargetConstraintParams): Parameters defining the\n        single DoF target constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`ARTICULATED_SINGLE_DOF_TARGET <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.ArticulatedSingleDofTargetConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`"
+      , nb::rv_policy::reference
     )
-    .def("create_articulated_single_dof_target_constraint", [](mochi::Scene& self, py::object stiffness, py::object damping, py::object saturation, py::object actor, py::object joint_index, py::object dof_index, py::object target_value) {
-      mochi::ArticulatedSingleDofTargetConstraintParams params;
-      params.stiffness = py::cast<mochi::real>(stiffness);
-      params.damping = py::cast<mochi::real>(damping);
-      params.saturation = py::cast<mochi::real>(saturation);
-      params.actor = py::cast<mochi::ActorHandle>(actor);
-      params.jointIndex = py::cast<int>(joint_index);
-      params.dofIndex = py::cast<int>(dof_index);
-      params.targetValue = py::cast<mochi::real>(target_value);
+    .def("create_articulated_single_dof_target_constraint", [](mochi::Scene& self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object actor, nb::object joint_index, nb::object dof_index, nb::object target_value) {
+      mochi::ArticulatedSingleDofTargetConstraintParams params{};
+      params.stiffness = nb::cast<mochi::real>(stiffness);
+      params.damping = nb::cast<mochi::real>(damping);
+      params.saturation = nb::cast<mochi::real>(saturation);
+      params.actor = nb::cast<mochi::ActorHandle>(actor);
+      params.jointIndex = nb::cast<int>(joint_index);
+      params.dofIndex = nb::cast<int>(dof_index);
+      params.targetValue = nb::cast<mochi::real>(target_value);
       mochi::Error error;
       auto result = self.CreateArticulatedSingleDofTargetConstraint(params, error);
       if (!error.IsOK()) {
@@ -441,15 +449,15 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::ArticulatedSingleDofTargetConstraintParams{}.stiffness
-      , py::arg("damping") = mochi::ArticulatedSingleDofTargetConstraintParams{}.damping
-      , py::arg("saturation") = mochi::ArticulatedSingleDofTargetConstraintParams{}.saturation
-      , py::arg("actor") = mochi::ArticulatedSingleDofTargetConstraintParams{}.actor
-      , py::arg("joint_index") = mochi::ArticulatedSingleDofTargetConstraintParams{}.jointIndex
-      , py::arg("dof_index") = mochi::ArticulatedSingleDofTargetConstraintParams{}.dofIndex
-      , py::arg("target_value") = mochi::ArticulatedSingleDofTargetConstraintParams{}.targetValue
-      , "Create a target constraint on a single articulated DoF.\n\nArgs:\n    params (ArticulatedSingleDofTargetConstraintParams): Parameters defining the\n        single DoF target constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`ARTICULATED_SINGLE_DOF_TARGET <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.ArticulatedSingleDofTargetConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`")
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::ArticulatedSingleDofTargetConstraintParams{}.stiffness
+      , nb::arg("damping") = mochi::ArticulatedSingleDofTargetConstraintParams{}.damping
+      , nb::arg("saturation") = mochi::ArticulatedSingleDofTargetConstraintParams{}.saturation
+      , nb::arg("actor").sig("...") = mochi::ArticulatedSingleDofTargetConstraintParams{}.actor
+      , nb::arg("joint_index") = mochi::ArticulatedSingleDofTargetConstraintParams{}.jointIndex
+      , nb::arg("dof_index") = mochi::ArticulatedSingleDofTargetConstraintParams{}.dofIndex
+      , nb::arg("target_value") = mochi::ArticulatedSingleDofTargetConstraintParams{}.targetValue
+      , "Create a target constraint on a single articulated DoF.\n\nArgs:\n    params (ArticulatedSingleDofTargetConstraintParams): Parameters defining the\n        single DoF target constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`ARTICULATED_SINGLE_DOF_TARGET <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.ArticulatedSingleDofTargetConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`", nb::rv_policy::reference)
     .def("create_articulated3d_rotation_target_constraint", [](mochi::Scene& self, mochi::Articulated3dRotationTargetConstraintParams const& params) {
       mochi::Error error;
       auto result = self.CreateArticulated3dRotationTargetConstraint(params, error);
@@ -458,17 +466,18 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Create a target constraint on an articulated 3D rotation.\n\nArgs:\n    params (Articulated3dRotationTargetConstraintParams): Parameters defining\n        the 3D rotation target constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`ARTICULATED3D_ROTATION_TARGET <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.Articulated3dRotationTargetConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`"
+      , nb::rv_policy::reference
     )
-    .def("create_articulated3d_rotation_target_constraint", [](mochi::Scene& self, py::object stiffness, py::object damping, py::object saturation, py::object actor, py::object joint_index, py::object target) {
-      mochi::Articulated3dRotationTargetConstraintParams params;
-      params.stiffness = py::cast<mochi::real>(stiffness);
-      params.damping = py::cast<mochi::real>(damping);
-      params.saturation = py::cast<mochi::real>(saturation);
-      params.actor = py::cast<mochi::ActorHandle>(actor);
-      params.jointIndex = py::cast<int>(joint_index);
-      params.target = py::cast<mochi::Quaternion>(target);
+    .def("create_articulated3d_rotation_target_constraint", [](mochi::Scene& self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object actor, nb::object joint_index, nb::object target) {
+      mochi::Articulated3dRotationTargetConstraintParams params{};
+      params.stiffness = nb::cast<mochi::real>(stiffness);
+      params.damping = nb::cast<mochi::real>(damping);
+      params.saturation = nb::cast<mochi::real>(saturation);
+      params.actor = nb::cast<mochi::ActorHandle>(actor);
+      params.jointIndex = nb::cast<int>(joint_index);
+      params.target = nb::cast<mochi::Quaternion>(target);
       mochi::Error error;
       auto result = self.CreateArticulated3dRotationTargetConstraint(params, error);
       if (!error.IsOK()) {
@@ -476,14 +485,14 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::Articulated3dRotationTargetConstraintParams{}.stiffness
-      , py::arg("damping") = mochi::Articulated3dRotationTargetConstraintParams{}.damping
-      , py::arg("saturation") = mochi::Articulated3dRotationTargetConstraintParams{}.saturation
-      , py::arg("actor") = mochi::Articulated3dRotationTargetConstraintParams{}.actor
-      , py::arg("joint_index") = mochi::Articulated3dRotationTargetConstraintParams{}.jointIndex
-      , py::arg("target") = mochi::Articulated3dRotationTargetConstraintParams{}.target
-      , "Create a target constraint on an articulated 3D rotation.\n\nArgs:\n    params (Articulated3dRotationTargetConstraintParams): Parameters defining\n        the 3D rotation target constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`ARTICULATED3D_ROTATION_TARGET <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.Articulated3dRotationTargetConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`")
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::Articulated3dRotationTargetConstraintParams{}.stiffness
+      , nb::arg("damping") = mochi::Articulated3dRotationTargetConstraintParams{}.damping
+      , nb::arg("saturation") = mochi::Articulated3dRotationTargetConstraintParams{}.saturation
+      , nb::arg("actor").sig("...") = mochi::Articulated3dRotationTargetConstraintParams{}.actor
+      , nb::arg("joint_index") = mochi::Articulated3dRotationTargetConstraintParams{}.jointIndex
+      , nb::arg("target").sig("...") = mochi::Articulated3dRotationTargetConstraintParams{}.target
+      , "Create a target constraint on an articulated 3D rotation.\n\nArgs:\n    params (Articulated3dRotationTargetConstraintParams): Parameters defining\n        the 3D rotation target constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`ARTICULATED3D_ROTATION_TARGET <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.Articulated3dRotationTargetConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`", nb::rv_policy::reference)
     .def("create_joint_rotation_range_constraint", [](mochi::Scene& self, mochi::JointRotationRangeConstraintParams const& params) {
       mochi::Error error;
       auto result = self.CreateJointRotationRangeConstraint(params, error);
@@ -492,21 +501,22 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Create a range constraint on joint rotation.\n\nArgs:\n    params (JointRotationRangeConstraintParams): Parameters defining the joint\n        rotation range constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`JOINT_ROTATION_RANGE <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.JointRotationRangeConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`"
+      , nb::rv_policy::reference
     )
-    .def("create_joint_rotation_range_constraint", [](mochi::Scene& self, py::object stiffness, py::object damping, py::object saturation, py::object ref_frame_rot_vec, py::object angle_range_x, py::object angle_range_y, py::object angle_range_z, py::object actor_a, py::object actor_b, py::object range_around_rest) {
-      mochi::JointRotationRangeConstraintParams params;
-      params.stiffness = py::cast<mochi::real>(stiffness);
-      params.damping = py::cast<mochi::real>(damping);
-      params.saturation = py::cast<mochi::real>(saturation);
-      params.refFrameRotVec = py::cast<mochi::Real3>(ref_frame_rot_vec);
-      params.angleRangeX = py::cast<mochi::Real2>(angle_range_x);
-      params.angleRangeY = py::cast<mochi::Real2>(angle_range_y);
-      params.angleRangeZ = py::cast<mochi::Real2>(angle_range_z);
-      params.actorA = py::cast<mochi::ActorHandle>(actor_a);
-      params.actorB = py::cast<mochi::ActorHandle>(actor_b);
-      params.rangeAroundRest = py::cast<bool>(range_around_rest);
+    .def("create_joint_rotation_range_constraint", [](mochi::Scene& self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object ref_frame_rot_vec, nb::object angle_range_x, nb::object angle_range_y, nb::object angle_range_z, nb::object actor_a, nb::object actor_b, nb::object range_around_rest) {
+      mochi::JointRotationRangeConstraintParams params{};
+      params.stiffness = nb::cast<mochi::real>(stiffness);
+      params.damping = nb::cast<mochi::real>(damping);
+      params.saturation = nb::cast<mochi::real>(saturation);
+      params.refFrameRotVec = nb::cast<mochi::Real3>(ref_frame_rot_vec);
+      params.angleRangeX = nb::cast<mochi::Real2>(angle_range_x);
+      params.angleRangeY = nb::cast<mochi::Real2>(angle_range_y);
+      params.angleRangeZ = nb::cast<mochi::Real2>(angle_range_z);
+      params.actorA = nb::cast<mochi::ActorHandle>(actor_a);
+      params.actorB = nb::cast<mochi::ActorHandle>(actor_b);
+      params.rangeAroundRest = nb::cast<bool>(range_around_rest);
       mochi::Error error;
       auto result = self.CreateJointRotationRangeConstraint(params, error);
       if (!error.IsOK()) {
@@ -514,18 +524,18 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::JointRotationRangeConstraintParams{}.stiffness
-      , py::arg("damping") = mochi::JointRotationRangeConstraintParams{}.damping
-      , py::arg("saturation") = mochi::JointRotationRangeConstraintParams{}.saturation
-      , py::arg("ref_frame_rot_vec") = mochi::JointRotationRangeConstraintParams{}.refFrameRotVec
-      , py::arg("angle_range_x") = mochi::JointRotationRangeConstraintParams{}.angleRangeX
-      , py::arg("angle_range_y") = mochi::JointRotationRangeConstraintParams{}.angleRangeY
-      , py::arg("angle_range_z") = mochi::JointRotationRangeConstraintParams{}.angleRangeZ
-      , py::arg("actor_a") = mochi::JointRotationRangeConstraintParams{}.actorA
-      , py::arg("actor_b") = mochi::JointRotationRangeConstraintParams{}.actorB
-      , py::arg("range_around_rest") = mochi::JointRotationRangeConstraintParams{}.rangeAroundRest
-      , "Create a range constraint on joint rotation.\n\nArgs:\n    params (JointRotationRangeConstraintParams): Parameters defining the joint\n        rotation range constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`JOINT_ROTATION_RANGE <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.JointRotationRangeConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`")
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::JointRotationRangeConstraintParams{}.stiffness
+      , nb::arg("damping") = mochi::JointRotationRangeConstraintParams{}.damping
+      , nb::arg("saturation") = mochi::JointRotationRangeConstraintParams{}.saturation
+      , nb::arg("ref_frame_rot_vec").sig("...") = mochi::JointRotationRangeConstraintParams{}.refFrameRotVec
+      , nb::arg("angle_range_x").sig("...") = mochi::JointRotationRangeConstraintParams{}.angleRangeX
+      , nb::arg("angle_range_y").sig("...") = mochi::JointRotationRangeConstraintParams{}.angleRangeY
+      , nb::arg("angle_range_z").sig("...") = mochi::JointRotationRangeConstraintParams{}.angleRangeZ
+      , nb::arg("actor_a").sig("...") = mochi::JointRotationRangeConstraintParams{}.actorA
+      , nb::arg("actor_b").sig("...") = mochi::JointRotationRangeConstraintParams{}.actorB
+      , nb::arg("range_around_rest") = mochi::JointRotationRangeConstraintParams{}.rangeAroundRest
+      , "Create a range constraint on joint rotation.\n\nArgs:\n    params (JointRotationRangeConstraintParams): Parameters defining the joint\n        rotation range constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`JOINT_ROTATION_RANGE <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.JointRotationRangeConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`", nb::rv_policy::reference)
     .def("create_joint_rotation_tracking_constraint", [](mochi::Scene& self, mochi::JointRotationTrackingConstraintParams const& params) {
       mochi::Error error;
       auto result = self.CreateJointRotationTrackingConstraint(params, error);
@@ -534,17 +544,18 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Create a tracking constraint on joint rotation.\n\nArgs:\n    params (JointRotationTrackingConstraintParams): Parameters defining the\n        joint rotation tracking constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`JOINT_ROTATION_TRACKING <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.JointRotationTrackingConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`"
+      , nb::rv_policy::reference
     )
-    .def("create_joint_rotation_tracking_constraint", [](mochi::Scene& self, py::object stiffness, py::object damping, py::object saturation, py::object ref_frame_rot_vec, py::object actor_a, py::object actor_b) {
-      mochi::JointRotationTrackingConstraintParams params;
-      params.stiffness = py::cast<mochi::real>(stiffness);
-      params.damping = py::cast<mochi::real>(damping);
-      params.saturation = py::cast<mochi::real>(saturation);
-      params.refFrameRotVec = py::cast<mochi::Real3>(ref_frame_rot_vec);
-      params.actorA = py::cast<mochi::ActorHandle>(actor_a);
-      params.actorB = py::cast<mochi::ActorHandle>(actor_b);
+    .def("create_joint_rotation_tracking_constraint", [](mochi::Scene& self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object ref_frame_rot_vec, nb::object actor_a, nb::object actor_b) {
+      mochi::JointRotationTrackingConstraintParams params{};
+      params.stiffness = nb::cast<mochi::real>(stiffness);
+      params.damping = nb::cast<mochi::real>(damping);
+      params.saturation = nb::cast<mochi::real>(saturation);
+      params.refFrameRotVec = nb::cast<mochi::Real3>(ref_frame_rot_vec);
+      params.actorA = nb::cast<mochi::ActorHandle>(actor_a);
+      params.actorB = nb::cast<mochi::ActorHandle>(actor_b);
       mochi::Error error;
       auto result = self.CreateJointRotationTrackingConstraint(params, error);
       if (!error.IsOK()) {
@@ -552,14 +563,14 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::JointRotationTrackingConstraintParams{}.stiffness
-      , py::arg("damping") = mochi::JointRotationTrackingConstraintParams{}.damping
-      , py::arg("saturation") = mochi::JointRotationTrackingConstraintParams{}.saturation
-      , py::arg("ref_frame_rot_vec") = mochi::JointRotationTrackingConstraintParams{}.refFrameRotVec
-      , py::arg("actor_a") = mochi::JointRotationTrackingConstraintParams{}.actorA
-      , py::arg("actor_b") = mochi::JointRotationTrackingConstraintParams{}.actorB
-      , "Create a tracking constraint on joint rotation.\n\nArgs:\n    params (JointRotationTrackingConstraintParams): Parameters defining the\n        joint rotation tracking constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`JOINT_ROTATION_TRACKING <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.JointRotationTrackingConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`")
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::JointRotationTrackingConstraintParams{}.stiffness
+      , nb::arg("damping") = mochi::JointRotationTrackingConstraintParams{}.damping
+      , nb::arg("saturation") = mochi::JointRotationTrackingConstraintParams{}.saturation
+      , nb::arg("ref_frame_rot_vec").sig("...") = mochi::JointRotationTrackingConstraintParams{}.refFrameRotVec
+      , nb::arg("actor_a").sig("...") = mochi::JointRotationTrackingConstraintParams{}.actorA
+      , nb::arg("actor_b").sig("...") = mochi::JointRotationTrackingConstraintParams{}.actorB
+      , "Create a tracking constraint on joint rotation.\n\nArgs:\n    params (JointRotationTrackingConstraintParams): Parameters defining the\n        joint rotation tracking constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`JOINT_ROTATION_TRACKING <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.JointRotationTrackingConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`", nb::rv_policy::reference)
     .def("create_rod_element_rotation_to_rigid_constraint", [](mochi::Scene& self, mochi::RodElementRotationToRigidConstraintParams const& params) {
       mochi::Error error;
       auto result = self.CreateRodElementRotationToRigidConstraint(params, error);
@@ -568,18 +579,19 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Create a rotation constraint between a rigid actor and a rod element.\n\nArgs:\n    params (RodElementRotationToRigidConstraintParams): Parameters defining the\n        rod element rotation constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`ROD_ELEMENT_ROTATION_TO_RIGID <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.RodElementRotationToRigidConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`"
+      , nb::rv_policy::reference
     )
-    .def("create_rod_element_rotation_to_rigid_constraint", [](mochi::Scene& self, py::object stiffness, py::object damping, py::object saturation, py::object ref_frame_rot_vec, py::object rigid_actor, py::object rod_actor, py::object element_index) {
-      mochi::RodElementRotationToRigidConstraintParams params;
-      params.stiffness = py::cast<mochi::real>(stiffness);
-      params.damping = py::cast<mochi::real>(damping);
-      params.saturation = py::cast<mochi::real>(saturation);
-      params.refFrameRotVec = py::cast<mochi::Real3>(ref_frame_rot_vec);
-      params.rigidActor = py::cast<mochi::ActorHandle>(rigid_actor);
-      params.rodActor = py::cast<mochi::ActorHandle>(rod_actor);
-      params.elementIndex = py::cast<int>(element_index);
+    .def("create_rod_element_rotation_to_rigid_constraint", [](mochi::Scene& self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object ref_frame_rot_vec, nb::object rigid_actor, nb::object rod_actor, nb::object element_index) {
+      mochi::RodElementRotationToRigidConstraintParams params{};
+      params.stiffness = nb::cast<mochi::real>(stiffness);
+      params.damping = nb::cast<mochi::real>(damping);
+      params.saturation = nb::cast<mochi::real>(saturation);
+      params.refFrameRotVec = nb::cast<mochi::Real3>(ref_frame_rot_vec);
+      params.rigidActor = nb::cast<mochi::ActorHandle>(rigid_actor);
+      params.rodActor = nb::cast<mochi::ActorHandle>(rod_actor);
+      params.elementIndex = nb::cast<int>(element_index);
       mochi::Error error;
       auto result = self.CreateRodElementRotationToRigidConstraint(params, error);
       if (!error.IsOK()) {
@@ -587,15 +599,15 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::RodElementRotationToRigidConstraintParams{}.stiffness
-      , py::arg("damping") = mochi::RodElementRotationToRigidConstraintParams{}.damping
-      , py::arg("saturation") = mochi::RodElementRotationToRigidConstraintParams{}.saturation
-      , py::arg("ref_frame_rot_vec") = mochi::RodElementRotationToRigidConstraintParams{}.refFrameRotVec
-      , py::arg("rigid_actor") = mochi::RodElementRotationToRigidConstraintParams{}.rigidActor
-      , py::arg("rod_actor") = mochi::RodElementRotationToRigidConstraintParams{}.rodActor
-      , py::arg("element_index") = mochi::RodElementRotationToRigidConstraintParams{}.elementIndex
-      , "Create a rotation constraint between a rigid actor and a rod element.\n\nArgs:\n    params (RodElementRotationToRigidConstraintParams): Parameters defining the\n        rod element rotation constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`ROD_ELEMENT_ROTATION_TO_RIGID <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.RodElementRotationToRigidConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`")
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::RodElementRotationToRigidConstraintParams{}.stiffness
+      , nb::arg("damping") = mochi::RodElementRotationToRigidConstraintParams{}.damping
+      , nb::arg("saturation") = mochi::RodElementRotationToRigidConstraintParams{}.saturation
+      , nb::arg("ref_frame_rot_vec").sig("...") = mochi::RodElementRotationToRigidConstraintParams{}.refFrameRotVec
+      , nb::arg("rigid_actor").sig("...") = mochi::RodElementRotationToRigidConstraintParams{}.rigidActor
+      , nb::arg("rod_actor").sig("...") = mochi::RodElementRotationToRigidConstraintParams{}.rodActor
+      , nb::arg("element_index") = mochi::RodElementRotationToRigidConstraintParams{}.elementIndex
+      , "Create a rotation constraint between a rigid actor and a rod element.\n\nArgs:\n    params (RodElementRotationToRigidConstraintParams): Parameters defining the\n        rod element rotation constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`ROD_ELEMENT_ROTATION_TO_RIGID <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.RodElementRotationToRigidConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`", nb::rv_policy::reference)
     .def("create_rigid_pivot_position_constraint", [](mochi::Scene& self, mochi::RigidPivotPositionConstraintParams const& params) {
       mochi::Error error;
       auto result = self.CreateRigidPivotPositionConstraint(params, error);
@@ -604,17 +616,18 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Create a position constraint on a rigid actor's pivot point.\n\nArgs:\n    params (RigidPivotPositionConstraintParams): Parameters defining the rigid\n        pivot position constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`RIGID_PIVOT_POSITION <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.RigidPivotPositionConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`"
+      , nb::rv_policy::reference
     )
-    .def("create_rigid_pivot_position_constraint", [](mochi::Scene& self, py::object stiffness, py::object damping, py::object saturation, py::object target_position, py::object local_position, py::object actor) {
-      mochi::RigidPivotPositionConstraintParams params;
-      params.stiffness = py::cast<mochi::real>(stiffness);
-      params.damping = py::cast<mochi::real>(damping);
-      params.saturation = py::cast<mochi::real>(saturation);
-      params.targetPosition = py::cast<mochi::Real3>(target_position);
-      params.localPosition = py::cast<mochi::Real3>(local_position);
-      params.actor = py::cast<mochi::ActorHandle>(actor);
+    .def("create_rigid_pivot_position_constraint", [](mochi::Scene& self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object target_position, nb::object local_position, nb::object actor) {
+      mochi::RigidPivotPositionConstraintParams params{};
+      params.stiffness = nb::cast<mochi::real>(stiffness);
+      params.damping = nb::cast<mochi::real>(damping);
+      params.saturation = nb::cast<mochi::real>(saturation);
+      params.targetPosition = nb::cast<mochi::Real3>(target_position);
+      params.localPosition = nb::cast<mochi::Real3>(local_position);
+      params.actor = nb::cast<mochi::ActorHandle>(actor);
       mochi::Error error;
       auto result = self.CreateRigidPivotPositionConstraint(params, error);
       if (!error.IsOK()) {
@@ -622,14 +635,14 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::RigidPivotPositionConstraintParams{}.stiffness
-      , py::arg("damping") = mochi::RigidPivotPositionConstraintParams{}.damping
-      , py::arg("saturation") = mochi::RigidPivotPositionConstraintParams{}.saturation
-      , py::arg("target_position") = mochi::RigidPivotPositionConstraintParams{}.targetPosition
-      , py::arg("local_position") = mochi::RigidPivotPositionConstraintParams{}.localPosition
-      , py::arg("actor") = mochi::RigidPivotPositionConstraintParams{}.actor
-      , "Create a position constraint on a rigid actor's pivot point.\n\nArgs:\n    params (RigidPivotPositionConstraintParams): Parameters defining the rigid\n        pivot position constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`RIGID_PIVOT_POSITION <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.RigidPivotPositionConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`")
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::RigidPivotPositionConstraintParams{}.stiffness
+      , nb::arg("damping") = mochi::RigidPivotPositionConstraintParams{}.damping
+      , nb::arg("saturation") = mochi::RigidPivotPositionConstraintParams{}.saturation
+      , nb::arg("target_position").sig("...") = mochi::RigidPivotPositionConstraintParams{}.targetPosition
+      , nb::arg("local_position").sig("...") = mochi::RigidPivotPositionConstraintParams{}.localPosition
+      , nb::arg("actor").sig("...") = mochi::RigidPivotPositionConstraintParams{}.actor
+      , "Create a position constraint on a rigid actor's pivot point.\n\nArgs:\n    params (RigidPivotPositionConstraintParams): Parameters defining the rigid\n        pivot position constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`RIGID_PIVOT_POSITION <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.RigidPivotPositionConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`", nb::rv_policy::reference)
     .def("create_rigid_pivot_to_rigid_target_constraint", [](mochi::Scene& self, mochi::RigidPivotToRigidTargetConstraintParams const& params) {
       mochi::Error error;
       auto result = self.CreateRigidPivotToRigidTargetConstraint(params, error);
@@ -638,17 +651,18 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Create a position constraint between a rigid actor's pivot point and the world\nposition of that pivot under a target center-of-mass transform.\n\nArgs:\n    params (RigidPivotToRigidTargetConstraintParams): Parameters defining the\n        rigid pivot to rigid target constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`RIGID_PIVOT_TO_RIGID_TARGET <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.RigidPivotToRigidTargetConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`"
+      , nb::rv_policy::reference
     )
-    .def("create_rigid_pivot_to_rigid_target_constraint", [](mochi::Scene& self, py::object stiffness, py::object damping, py::object saturation, py::object target_transform, py::object local_position, py::object actor) {
-      mochi::RigidPivotToRigidTargetConstraintParams params;
-      params.stiffness = py::cast<mochi::real>(stiffness);
-      params.damping = py::cast<mochi::real>(damping);
-      params.saturation = py::cast<mochi::real>(saturation);
-      params.targetTransform = py::cast<mochi::TransformRT>(target_transform);
-      params.localPosition = py::cast<mochi::Real3>(local_position);
-      params.actor = py::cast<mochi::ActorHandle>(actor);
+    .def("create_rigid_pivot_to_rigid_target_constraint", [](mochi::Scene& self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object target_transform, nb::object local_position, nb::object actor) {
+      mochi::RigidPivotToRigidTargetConstraintParams params{};
+      params.stiffness = nb::cast<mochi::real>(stiffness);
+      params.damping = nb::cast<mochi::real>(damping);
+      params.saturation = nb::cast<mochi::real>(saturation);
+      params.targetTransform = nb::cast<mochi::TransformRT>(target_transform);
+      params.localPosition = nb::cast<mochi::Real3>(local_position);
+      params.actor = nb::cast<mochi::ActorHandle>(actor);
       mochi::Error error;
       auto result = self.CreateRigidPivotToRigidTargetConstraint(params, error);
       if (!error.IsOK()) {
@@ -656,14 +670,14 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::RigidPivotToRigidTargetConstraintParams{}.stiffness
-      , py::arg("damping") = mochi::RigidPivotToRigidTargetConstraintParams{}.damping
-      , py::arg("saturation") = mochi::RigidPivotToRigidTargetConstraintParams{}.saturation
-      , py::arg("target_transform") = mochi::RigidPivotToRigidTargetConstraintParams{}.targetTransform
-      , py::arg("local_position") = mochi::RigidPivotToRigidTargetConstraintParams{}.localPosition
-      , py::arg("actor") = mochi::RigidPivotToRigidTargetConstraintParams{}.actor
-      , "Create a position constraint between a rigid actor's pivot point and the world\nposition of that pivot under a target center-of-mass transform.\n\nArgs:\n    params (RigidPivotToRigidTargetConstraintParams): Parameters defining the\n        rigid pivot to rigid target constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`RIGID_PIVOT_TO_RIGID_TARGET <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.RigidPivotToRigidTargetConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`")
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::RigidPivotToRigidTargetConstraintParams{}.stiffness
+      , nb::arg("damping") = mochi::RigidPivotToRigidTargetConstraintParams{}.damping
+      , nb::arg("saturation") = mochi::RigidPivotToRigidTargetConstraintParams{}.saturation
+      , nb::arg("target_transform").sig("...") = mochi::RigidPivotToRigidTargetConstraintParams{}.targetTransform
+      , nb::arg("local_position").sig("...") = mochi::RigidPivotToRigidTargetConstraintParams{}.localPosition
+      , nb::arg("actor").sig("...") = mochi::RigidPivotToRigidTargetConstraintParams{}.actor
+      , "Create a position constraint between a rigid actor's pivot point and the world\nposition of that pivot under a target center-of-mass transform.\n\nArgs:\n    params (RigidPivotToRigidTargetConstraintParams): Parameters defining the\n        rigid pivot to rigid target constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`RIGID_PIVOT_TO_RIGID_TARGET <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.RigidPivotToRigidTargetConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`", nb::rv_policy::reference)
     .def("create_rigid_pivot_rotation_constraint", [](mochi::Scene& self, mochi::RigidPivotRotationConstraintParams const& params) {
       mochi::Error error;
       auto result = self.CreateRigidPivotRotationConstraint(params, error);
@@ -672,17 +686,18 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Create a rotation constraint on a rigid actor's pivot frame.\n\nArgs:\n    params (RigidPivotRotationConstraintParams): Parameters defining the rigid\n        pivot rotation constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`RIGID_PIVOT_ROTATION <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.RigidPivotRotationConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`"
+      , nb::rv_policy::reference
     )
-    .def("create_rigid_pivot_rotation_constraint", [](mochi::Scene& self, py::object stiffness, py::object damping, py::object saturation, py::object target_rotation, py::object local_rotation, py::object actor) {
-      mochi::RigidPivotRotationConstraintParams params;
-      params.stiffness = py::cast<mochi::real>(stiffness);
-      params.damping = py::cast<mochi::real>(damping);
-      params.saturation = py::cast<mochi::real>(saturation);
-      params.targetRotation = py::cast<mochi::Real3>(target_rotation);
-      params.localRotation = py::cast<mochi::Real3>(local_rotation);
-      params.actor = py::cast<mochi::ActorHandle>(actor);
+    .def("create_rigid_pivot_rotation_constraint", [](mochi::Scene& self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object target_rotation, nb::object local_rotation, nb::object actor) {
+      mochi::RigidPivotRotationConstraintParams params{};
+      params.stiffness = nb::cast<mochi::real>(stiffness);
+      params.damping = nb::cast<mochi::real>(damping);
+      params.saturation = nb::cast<mochi::real>(saturation);
+      params.targetRotation = nb::cast<mochi::Real3>(target_rotation);
+      params.localRotation = nb::cast<mochi::Real3>(local_rotation);
+      params.actor = nb::cast<mochi::ActorHandle>(actor);
       mochi::Error error;
       auto result = self.CreateRigidPivotRotationConstraint(params, error);
       if (!error.IsOK()) {
@@ -690,14 +705,14 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::RigidPivotRotationConstraintParams{}.stiffness
-      , py::arg("damping") = mochi::RigidPivotRotationConstraintParams{}.damping
-      , py::arg("saturation") = mochi::RigidPivotRotationConstraintParams{}.saturation
-      , py::arg("target_rotation") = mochi::RigidPivotRotationConstraintParams{}.targetRotation
-      , py::arg("local_rotation") = mochi::RigidPivotRotationConstraintParams{}.localRotation
-      , py::arg("actor") = mochi::RigidPivotRotationConstraintParams{}.actor
-      , "Create a rotation constraint on a rigid actor's pivot frame.\n\nArgs:\n    params (RigidPivotRotationConstraintParams): Parameters defining the rigid\n        pivot rotation constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`RIGID_PIVOT_ROTATION <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.RigidPivotRotationConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`")
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::RigidPivotRotationConstraintParams{}.stiffness
+      , nb::arg("damping") = mochi::RigidPivotRotationConstraintParams{}.damping
+      , nb::arg("saturation") = mochi::RigidPivotRotationConstraintParams{}.saturation
+      , nb::arg("target_rotation").sig("...") = mochi::RigidPivotRotationConstraintParams{}.targetRotation
+      , nb::arg("local_rotation").sig("...") = mochi::RigidPivotRotationConstraintParams{}.localRotation
+      , nb::arg("actor").sig("...") = mochi::RigidPivotRotationConstraintParams{}.actor
+      , "Create a rotation constraint on a rigid actor's pivot frame.\n\nArgs:\n    params (RigidPivotRotationConstraintParams): Parameters defining the rigid\n        pivot rotation constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`RIGID_PIVOT_ROTATION <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.RigidPivotRotationConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`", nb::rv_policy::reference)
     .def("create_rigid_prismatic_joint_constraint", [](mochi::Scene& self, mochi::RigidPrismaticJointConstraintParams const& params) {
       mochi::Error error;
       auto result = self.CreateRigidPrismaticJointConstraint(params, error);
@@ -706,19 +721,20 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Create a prismatic joint constraint between two rigid actors.\n\nArgs:\n    params (RigidPrismaticJointConstraintParams): Parameters defining the\n        prismatic joint constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`RIGID_PRISMATIC_JOINT <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.RigidPrismaticJointConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`"
+      , nb::rv_policy::reference
     )
-    .def("create_rigid_prismatic_joint_constraint", [](mochi::Scene& self, py::object stiffness, py::object damping, py::object saturation, py::object free_axis, py::object actor_a, py::object actor_b, py::object max, py::object min) {
-      mochi::RigidPrismaticJointConstraintParams params;
-      params.stiffness = py::cast<mochi::real>(stiffness);
-      params.damping = py::cast<mochi::real>(damping);
-      params.saturation = py::cast<mochi::real>(saturation);
-      params.freeAxis = py::cast<mochi::Real3>(free_axis);
-      params.actorA = py::cast<mochi::ActorHandle>(actor_a);
-      params.actorB = py::cast<mochi::ActorHandle>(actor_b);
-      params.max = py::cast<std::optional<mochi::real>>(max);
-      params.min = py::cast<std::optional<mochi::real>>(min);
+    .def("create_rigid_prismatic_joint_constraint", [](mochi::Scene& self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object free_axis, nb::object actor_a, nb::object actor_b, nb::object max, nb::object min) {
+      mochi::RigidPrismaticJointConstraintParams params{};
+      params.stiffness = nb::cast<mochi::real>(stiffness);
+      params.damping = nb::cast<mochi::real>(damping);
+      params.saturation = nb::cast<mochi::real>(saturation);
+      params.freeAxis = nb::cast<mochi::Real3>(free_axis);
+      params.actorA = nb::cast<mochi::ActorHandle>(actor_a);
+      params.actorB = nb::cast<mochi::ActorHandle>(actor_b);
+      params.max = nb::cast<std::optional<mochi::real>>(max);
+      params.min = nb::cast<std::optional<mochi::real>>(min);
       mochi::Error error;
       auto result = self.CreateRigidPrismaticJointConstraint(params, error);
       if (!error.IsOK()) {
@@ -726,16 +742,16 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::RigidPrismaticJointConstraintParams{}.stiffness
-      , py::arg("damping") = mochi::RigidPrismaticJointConstraintParams{}.damping
-      , py::arg("saturation") = mochi::RigidPrismaticJointConstraintParams{}.saturation
-      , py::arg("free_axis") = mochi::RigidPrismaticJointConstraintParams{}.freeAxis
-      , py::arg("actor_a") = mochi::RigidPrismaticJointConstraintParams{}.actorA
-      , py::arg("actor_b") = mochi::RigidPrismaticJointConstraintParams{}.actorB
-      , py::arg("max") = mochi::RigidPrismaticJointConstraintParams{}.max
-      , py::arg("min") = mochi::RigidPrismaticJointConstraintParams{}.min
-      , "Create a prismatic joint constraint between two rigid actors.\n\nArgs:\n    params (RigidPrismaticJointConstraintParams): Parameters defining the\n        prismatic joint constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`RIGID_PRISMATIC_JOINT <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.RigidPrismaticJointConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`")
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::RigidPrismaticJointConstraintParams{}.stiffness
+      , nb::arg("damping") = mochi::RigidPrismaticJointConstraintParams{}.damping
+      , nb::arg("saturation") = mochi::RigidPrismaticJointConstraintParams{}.saturation
+      , nb::arg("free_axis").sig("...") = mochi::RigidPrismaticJointConstraintParams{}.freeAxis
+      , nb::arg("actor_a").sig("...") = mochi::RigidPrismaticJointConstraintParams{}.actorA
+      , nb::arg("actor_b").sig("...") = mochi::RigidPrismaticJointConstraintParams{}.actorB
+      , nb::arg("max").sig("...") = mochi::RigidPrismaticJointConstraintParams{}.max
+      , nb::arg("min").sig("...") = mochi::RigidPrismaticJointConstraintParams{}.min
+      , "Create a prismatic joint constraint between two rigid actors.\n\nArgs:\n    params (RigidPrismaticJointConstraintParams): Parameters defining the\n        prismatic joint constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`RIGID_PRISMATIC_JOINT <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.RigidPrismaticJointConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`", nb::rv_policy::reference)
     .def("create_rigid_spherical_joint_constraint", [](mochi::Scene& self, mochi::RigidSphericalJointConstraintParams const& params) {
       mochi::Error error;
       auto result = self.CreateRigidSphericalJointConstraint(params, error);
@@ -744,18 +760,19 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Create a spherical joint constraint between two rigid actors.\n\nArgs:\n    params (RigidSphericalJointConstraintParams): Parameters defining the\n        spherical joint constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`RIGID_SPHERICAL_JOINT <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.RigidSphericalJointConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`"
+      , nb::rv_policy::reference
     )
-    .def("create_rigid_spherical_joint_constraint", [](mochi::Scene& self, py::object stiffness, py::object damping, py::object saturation, py::object local_pos_a, py::object local_pos_b, py::object actor_a, py::object actor_b) {
-      mochi::RigidSphericalJointConstraintParams params;
-      params.stiffness = py::cast<mochi::real>(stiffness);
-      params.damping = py::cast<mochi::real>(damping);
-      params.saturation = py::cast<mochi::real>(saturation);
-      params.localPosA = py::cast<mochi::Real3>(local_pos_a);
-      params.localPosB = py::cast<mochi::Real3>(local_pos_b);
-      params.actorA = py::cast<mochi::ActorHandle>(actor_a);
-      params.actorB = py::cast<mochi::ActorHandle>(actor_b);
+    .def("create_rigid_spherical_joint_constraint", [](mochi::Scene& self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object local_pos_a, nb::object local_pos_b, nb::object actor_a, nb::object actor_b) {
+      mochi::RigidSphericalJointConstraintParams params{};
+      params.stiffness = nb::cast<mochi::real>(stiffness);
+      params.damping = nb::cast<mochi::real>(damping);
+      params.saturation = nb::cast<mochi::real>(saturation);
+      params.localPosA = nb::cast<mochi::Real3>(local_pos_a);
+      params.localPosB = nb::cast<mochi::Real3>(local_pos_b);
+      params.actorA = nb::cast<mochi::ActorHandle>(actor_a);
+      params.actorB = nb::cast<mochi::ActorHandle>(actor_b);
       mochi::Error error;
       auto result = self.CreateRigidSphericalJointConstraint(params, error);
       if (!error.IsOK()) {
@@ -763,15 +780,15 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::RigidSphericalJointConstraintParams{}.stiffness
-      , py::arg("damping") = mochi::RigidSphericalJointConstraintParams{}.damping
-      , py::arg("saturation") = mochi::RigidSphericalJointConstraintParams{}.saturation
-      , py::arg("local_pos_a") = mochi::RigidSphericalJointConstraintParams{}.localPosA
-      , py::arg("local_pos_b") = mochi::RigidSphericalJointConstraintParams{}.localPosB
-      , py::arg("actor_a") = mochi::RigidSphericalJointConstraintParams{}.actorA
-      , py::arg("actor_b") = mochi::RigidSphericalJointConstraintParams{}.actorB
-      , "Create a spherical joint constraint between two rigid actors.\n\nArgs:\n    params (RigidSphericalJointConstraintParams): Parameters defining the\n        spherical joint constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`RIGID_SPHERICAL_JOINT <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.RigidSphericalJointConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`")
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::RigidSphericalJointConstraintParams{}.stiffness
+      , nb::arg("damping") = mochi::RigidSphericalJointConstraintParams{}.damping
+      , nb::arg("saturation") = mochi::RigidSphericalJointConstraintParams{}.saturation
+      , nb::arg("local_pos_a").sig("...") = mochi::RigidSphericalJointConstraintParams{}.localPosA
+      , nb::arg("local_pos_b").sig("...") = mochi::RigidSphericalJointConstraintParams{}.localPosB
+      , nb::arg("actor_a").sig("...") = mochi::RigidSphericalJointConstraintParams{}.actorA
+      , nb::arg("actor_b").sig("...") = mochi::RigidSphericalJointConstraintParams{}.actorB
+      , "Create a spherical joint constraint between two rigid actors.\n\nArgs:\n    params (RigidSphericalJointConstraintParams): Parameters defining the\n        spherical joint constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`RIGID_SPHERICAL_JOINT <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.RigidSphericalJointConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`", nb::rv_policy::reference)
     .def("create_deformable_node_position_constraint", [](mochi::Scene& self, mochi::DeformableNodePositionConstraintParams const& params) {
       mochi::Error error;
       auto result = self.CreateDeformableNodePositionConstraint(params, error);
@@ -780,17 +797,18 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Create a position constraint on a deformable actor node.\n\nArgs:\n    params (DeformableNodePositionConstraintParams): Parameters defining the\n        deformable node position constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`DEFORMABLE_NODE_POSITION <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.DeformableNodePositionConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`"
+      , nb::rv_policy::reference
     )
-    .def("create_deformable_node_position_constraint", [](mochi::Scene& self, py::object stiffness, py::object damping, py::object saturation, py::object node_index, py::object position, py::object actor) {
-      mochi::DeformableNodePositionConstraintParams params;
-      params.stiffness = py::cast<mochi::real>(stiffness);
-      params.damping = py::cast<mochi::real>(damping);
-      params.saturation = py::cast<mochi::real>(saturation);
-      params.nodeIndex = py::cast<int>(node_index);
-      params.position = py::cast<mochi::Real3>(position);
-      params.actor = py::cast<mochi::ActorHandle>(actor);
+    .def("create_deformable_node_position_constraint", [](mochi::Scene& self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object node_index, nb::object position, nb::object actor) {
+      mochi::DeformableNodePositionConstraintParams params{};
+      params.stiffness = nb::cast<mochi::real>(stiffness);
+      params.damping = nb::cast<mochi::real>(damping);
+      params.saturation = nb::cast<mochi::real>(saturation);
+      params.nodeIndex = nb::cast<int>(node_index);
+      params.position = nb::cast<mochi::Real3>(position);
+      params.actor = nb::cast<mochi::ActorHandle>(actor);
       mochi::Error error;
       auto result = self.CreateDeformableNodePositionConstraint(params, error);
       if (!error.IsOK()) {
@@ -798,14 +816,14 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::DeformableNodePositionConstraintParams{}.stiffness
-      , py::arg("damping") = mochi::DeformableNodePositionConstraintParams{}.damping
-      , py::arg("saturation") = mochi::DeformableNodePositionConstraintParams{}.saturation
-      , py::arg("node_index") = mochi::DeformableNodePositionConstraintParams{}.nodeIndex
-      , py::arg("position") = mochi::DeformableNodePositionConstraintParams{}.position
-      , py::arg("actor") = mochi::DeformableNodePositionConstraintParams{}.actor
-      , "Create a position constraint on a deformable actor node.\n\nArgs:\n    params (DeformableNodePositionConstraintParams): Parameters defining the\n        deformable node position constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`DEFORMABLE_NODE_POSITION <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.DeformableNodePositionConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`")
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::DeformableNodePositionConstraintParams{}.stiffness
+      , nb::arg("damping") = mochi::DeformableNodePositionConstraintParams{}.damping
+      , nb::arg("saturation") = mochi::DeformableNodePositionConstraintParams{}.saturation
+      , nb::arg("node_index") = mochi::DeformableNodePositionConstraintParams{}.nodeIndex
+      , nb::arg("position").sig("...") = mochi::DeformableNodePositionConstraintParams{}.position
+      , nb::arg("actor").sig("...") = mochi::DeformableNodePositionConstraintParams{}.actor
+      , "Create a position constraint on a deformable actor node.\n\nArgs:\n    params (DeformableNodePositionConstraintParams): Parameters defining the\n        deformable node position constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`DEFORMABLE_NODE_POSITION <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.DeformableNodePositionConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`", nb::rv_policy::reference)
     .def("create_deformable_node_to_deformable_node_constraint", [](mochi::Scene& self, mochi::DeformableNodeToDeformableNodeConstraintParams const& params) {
       mochi::Error error;
       auto result = self.CreateDeformableNodeToDeformableNodeConstraint(params, error);
@@ -814,19 +832,20 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Create a constraint connecting two deformable actor nodes.\n\nArgs:\n    params (DeformableNodeToDeformableNodeConstraintParams): Parameters defining\n        the deformable-node-to-deformable-node constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`DEFORMABLE_NODE_TO_DEFORMABLE_NODE\n    <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.DeformableNodeToDeformableNodeConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`"
+      , nb::rv_policy::reference
     )
-    .def("create_deformable_node_to_deformable_node_constraint", [](mochi::Scene& self, py::object stiffness, py::object damping, py::object saturation, py::object node_index_a, py::object node_index_b, py::object actor_a, py::object actor_b, py::object find_closest) {
-      mochi::DeformableNodeToDeformableNodeConstraintParams params;
-      params.stiffness = py::cast<mochi::real>(stiffness);
-      params.damping = py::cast<mochi::real>(damping);
-      params.saturation = py::cast<mochi::real>(saturation);
-      params.nodeIndexA = py::cast<int>(node_index_a);
-      params.nodeIndexB = py::cast<int>(node_index_b);
-      params.actorA = py::cast<mochi::ActorHandle>(actor_a);
-      params.actorB = py::cast<mochi::ActorHandle>(actor_b);
-      params.findClosest = py::cast<bool>(find_closest);
+    .def("create_deformable_node_to_deformable_node_constraint", [](mochi::Scene& self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object node_index_a, nb::object node_index_b, nb::object actor_a, nb::object actor_b, nb::object find_closest) {
+      mochi::DeformableNodeToDeformableNodeConstraintParams params{};
+      params.stiffness = nb::cast<mochi::real>(stiffness);
+      params.damping = nb::cast<mochi::real>(damping);
+      params.saturation = nb::cast<mochi::real>(saturation);
+      params.nodeIndexA = nb::cast<int>(node_index_a);
+      params.nodeIndexB = nb::cast<int>(node_index_b);
+      params.actorA = nb::cast<mochi::ActorHandle>(actor_a);
+      params.actorB = nb::cast<mochi::ActorHandle>(actor_b);
+      params.findClosest = nb::cast<bool>(find_closest);
       mochi::Error error;
       auto result = self.CreateDeformableNodeToDeformableNodeConstraint(params, error);
       if (!error.IsOK()) {
@@ -834,16 +853,16 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::DeformableNodeToDeformableNodeConstraintParams{}.stiffness
-      , py::arg("damping") = mochi::DeformableNodeToDeformableNodeConstraintParams{}.damping
-      , py::arg("saturation") = mochi::DeformableNodeToDeformableNodeConstraintParams{}.saturation
-      , py::arg("node_index_a") = mochi::DeformableNodeToDeformableNodeConstraintParams{}.nodeIndexA
-      , py::arg("node_index_b") = mochi::DeformableNodeToDeformableNodeConstraintParams{}.nodeIndexB
-      , py::arg("actor_a") = mochi::DeformableNodeToDeformableNodeConstraintParams{}.actorA
-      , py::arg("actor_b") = mochi::DeformableNodeToDeformableNodeConstraintParams{}.actorB
-      , py::arg("find_closest") = mochi::DeformableNodeToDeformableNodeConstraintParams{}.findClosest
-      , "Create a constraint connecting two deformable actor nodes.\n\nArgs:\n    params (DeformableNodeToDeformableNodeConstraintParams): Parameters defining\n        the deformable-node-to-deformable-node constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`DEFORMABLE_NODE_TO_DEFORMABLE_NODE\n    <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.DeformableNodeToDeformableNodeConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`")
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::DeformableNodeToDeformableNodeConstraintParams{}.stiffness
+      , nb::arg("damping") = mochi::DeformableNodeToDeformableNodeConstraintParams{}.damping
+      , nb::arg("saturation") = mochi::DeformableNodeToDeformableNodeConstraintParams{}.saturation
+      , nb::arg("node_index_a") = mochi::DeformableNodeToDeformableNodeConstraintParams{}.nodeIndexA
+      , nb::arg("node_index_b") = mochi::DeformableNodeToDeformableNodeConstraintParams{}.nodeIndexB
+      , nb::arg("actor_a").sig("...") = mochi::DeformableNodeToDeformableNodeConstraintParams{}.actorA
+      , nb::arg("actor_b").sig("...") = mochi::DeformableNodeToDeformableNodeConstraintParams{}.actorB
+      , nb::arg("find_closest") = mochi::DeformableNodeToDeformableNodeConstraintParams{}.findClosest
+      , "Create a constraint connecting two deformable actor nodes.\n\nArgs:\n    params (DeformableNodeToDeformableNodeConstraintParams): Parameters defining\n        the deformable-node-to-deformable-node constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`DEFORMABLE_NODE_TO_DEFORMABLE_NODE\n    <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.DeformableNodeToDeformableNodeConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`", nb::rv_policy::reference)
     .def("create_deformable_node_to_rigid_constraint", [](mochi::Scene& self, mochi::DeformableNodeToRigidConstraintParams const& params) {
       mochi::Error error;
       auto result = self.CreateDeformableNodeToRigidConstraint(params, error);
@@ -852,20 +871,21 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Create a constraint connecting a deformable node to a rigid actor.\n\nArgs:\n    params (DeformableNodeToRigidConstraintParams): Parameters defining the\n        deformable-node-to-rigid constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`DEFORMABLE_NODE_TO_RIGID <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.DeformableNodeToRigidConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`"
+      , nb::rv_policy::reference
     )
-    .def("create_deformable_node_to_rigid_constraint", [](mochi::Scene& self, py::object stiffness, py::object damping, py::object saturation, py::object rigid_local_pos, py::object deformable_node_index, py::object rigid_actor, py::object deformable_actor, py::object find_closest, py::object fix_to_deformable_pos) {
-      mochi::DeformableNodeToRigidConstraintParams params;
-      params.stiffness = py::cast<mochi::real>(stiffness);
-      params.damping = py::cast<mochi::real>(damping);
-      params.saturation = py::cast<mochi::real>(saturation);
-      params.rigidLocalPos = py::cast<mochi::Real3>(rigid_local_pos);
-      params.deformableNodeIndex = py::cast<int>(deformable_node_index);
-      params.rigidActor = py::cast<mochi::ActorHandle>(rigid_actor);
-      params.deformableActor = py::cast<mochi::ActorHandle>(deformable_actor);
-      params.findClosest = py::cast<bool>(find_closest);
-      params.fixToDeformablePos = py::cast<bool>(fix_to_deformable_pos);
+    .def("create_deformable_node_to_rigid_constraint", [](mochi::Scene& self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object rigid_local_pos, nb::object deformable_node_index, nb::object rigid_actor, nb::object deformable_actor, nb::object find_closest, nb::object fix_to_deformable_pos) {
+      mochi::DeformableNodeToRigidConstraintParams params{};
+      params.stiffness = nb::cast<mochi::real>(stiffness);
+      params.damping = nb::cast<mochi::real>(damping);
+      params.saturation = nb::cast<mochi::real>(saturation);
+      params.rigidLocalPos = nb::cast<mochi::Real3>(rigid_local_pos);
+      params.deformableNodeIndex = nb::cast<int>(deformable_node_index);
+      params.rigidActor = nb::cast<mochi::ActorHandle>(rigid_actor);
+      params.deformableActor = nb::cast<mochi::ActorHandle>(deformable_actor);
+      params.findClosest = nb::cast<bool>(find_closest);
+      params.fixToDeformablePos = nb::cast<bool>(fix_to_deformable_pos);
       mochi::Error error;
       auto result = self.CreateDeformableNodeToRigidConstraint(params, error);
       if (!error.IsOK()) {
@@ -873,39 +893,40 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::DeformableNodeToRigidConstraintParams{}.stiffness
-      , py::arg("damping") = mochi::DeformableNodeToRigidConstraintParams{}.damping
-      , py::arg("saturation") = mochi::DeformableNodeToRigidConstraintParams{}.saturation
-      , py::arg("rigid_local_pos") = mochi::DeformableNodeToRigidConstraintParams{}.rigidLocalPos
-      , py::arg("deformable_node_index") = mochi::DeformableNodeToRigidConstraintParams{}.deformableNodeIndex
-      , py::arg("rigid_actor") = mochi::DeformableNodeToRigidConstraintParams{}.rigidActor
-      , py::arg("deformable_actor") = mochi::DeformableNodeToRigidConstraintParams{}.deformableActor
-      , py::arg("find_closest") = mochi::DeformableNodeToRigidConstraintParams{}.findClosest
-      , py::arg("fix_to_deformable_pos") = mochi::DeformableNodeToRigidConstraintParams{}.fixToDeformablePos
-      , "Create a constraint connecting a deformable node to a rigid actor.\n\nArgs:\n    params (DeformableNodeToRigidConstraintParams): Parameters defining the\n        deformable-node-to-rigid constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`DEFORMABLE_NODE_TO_RIGID <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.DeformableNodeToRigidConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`")
-    .def("get_constraint", py::overload_cast<mochi::ConstraintHandle>(&mochi::Scene::GetConstraint)
-      , py::arg("constraint")
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::DeformableNodeToRigidConstraintParams{}.stiffness
+      , nb::arg("damping") = mochi::DeformableNodeToRigidConstraintParams{}.damping
+      , nb::arg("saturation") = mochi::DeformableNodeToRigidConstraintParams{}.saturation
+      , nb::arg("rigid_local_pos").sig("...") = mochi::DeformableNodeToRigidConstraintParams{}.rigidLocalPos
+      , nb::arg("deformable_node_index") = mochi::DeformableNodeToRigidConstraintParams{}.deformableNodeIndex
+      , nb::arg("rigid_actor").sig("...") = mochi::DeformableNodeToRigidConstraintParams{}.rigidActor
+      , nb::arg("deformable_actor").sig("...") = mochi::DeformableNodeToRigidConstraintParams{}.deformableActor
+      , nb::arg("find_closest") = mochi::DeformableNodeToRigidConstraintParams{}.findClosest
+      , nb::arg("fix_to_deformable_pos") = mochi::DeformableNodeToRigidConstraintParams{}.fixToDeformablePos
+      , "Create a constraint connecting a deformable node to a rigid actor.\n\nArgs:\n    params (DeformableNodeToRigidConstraintParams): Parameters defining the\n        deformable-node-to-rigid constraint.\n\nReturns:\n    Pointer to the created :class:`~superdex.physics.Constraint`, or None on\n    error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :class:`DEFORMABLE_NODE_TO_RIGID <superdex.physics.ConstraintType>`,\n    :class:`~superdex.physics.DeformableNodeToRigidConstraintParams`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`", nb::rv_policy::reference)
+    .def("get_constraint", nb::overload_cast<mochi::ConstraintHandle>(&mochi::Scene::GetConstraint)
+      , nb::arg("constraint")
       , "Get the :class:`~superdex.physics.Constraint` pointer associated with a\n:class:`~superdex.physics.ConstraintHandle`.\n\nArgs:\n    constraint (ConstraintHandle): Handle of the constraint to retrieve. If\n        valid, it must be owned by this scene.\n\nReturns:\n    Pointer to the :class:`~superdex.physics.Constraint`, or None if the handle\n    does not currently identify a constraint in this scene.\n\nSee Also:\n    :class:`~superdex.physics.Constraint`,\n    :class:`~superdex.physics.ConstraintHandle`,\n    :meth:`~superdex.physics.Scene.destroy_constraint`,\n    :meth:`~superdex.physics.Constraint.get_handle`"
+      , nb::rv_policy::reference
     )
-    .def("destroy_constraint", py::overload_cast<mochi::Constraint*>(&mochi::Scene::DestroyConstraint)
-      , py::arg("constraint")
+    .def("destroy_constraint", nb::overload_cast<mochi::Constraint*>(&mochi::Scene::DestroyConstraint)
+      , nb::arg("constraint").none()
       , "Destroy a constraint and remove it from the scene.\n\nArgs:\n    constraint (Optional[Constraint]): Pointer to the constraint to destroy.\n\nNote:\n    If ``constraint`` is None, this function has no effect.\n\nNote:\n    Use this function to destroy constraints created through the scene's\n    constraint-creation APIs. It has no effect on constraints created\n    automatically while creating or configuring an actor, such as joint-limit,\n    cycle-joint, or pose-controller constraints. To remove such a constraint,\n    remove the corresponding actor feature, if supported, or destroy the actor.\n\nNote:\n    After the constraint is destroyed, do not use the pointer or its handle.\n\nWarning:\n    The pointer must be None or point to a live constraint owned by this scene.\n    Passing a pointer to a constraint that has been destroyed is undefined\n    behavior.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.get_constraint`,\n    :meth:`~superdex.physics.Constraint.get_handle`"
     )
-    .def("destroy_constraint", py::overload_cast<mochi::ConstraintHandle>(&mochi::Scene::DestroyConstraint)
-      , py::arg("constraint")
+    .def("destroy_constraint", nb::overload_cast<mochi::ConstraintHandle>(&mochi::Scene::DestroyConstraint)
+      , nb::arg("constraint")
       , "Destroy a constraint and remove it from the scene.\n\nArgs:\n    constraint (ConstraintHandle): Handle of the constraint to destroy. If\n        valid, it must be owned by this scene.\n\nNote:\n    An invalid handle or one that does not currently identify a constraint in\n    the scene has no effect.\n\nNote:\n    Use this function to destroy constraints created through the scene's\n    constraint-creation APIs. It has no effect on constraints created\n    automatically while creating or configuring an actor, such as joint-limit,\n    cycle-joint, or pose-controller constraints. To remove such a constraint,\n    remove the corresponding actor feature, if supported, or destroy the actor.\n\nNote:\n    After the constraint is destroyed, do not use its handle.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.get_constraint`,\n    :meth:`~superdex.physics.Constraint.get_handle`"
     )
     .def("get_num_constraints", &mochi::Scene::GetNumConstraints
       , "Get the number of constraints in the scene.\n\nReturns:\n    Number of constraints in the scene.\n\nNote:\n    Includes constraints created implicitly by\n    :meth:`~superdex.physics.Scene.create_articulated_actor` (e.g. articulated\n    joint limits)."
     )
-    .def("for_each_constraint", py::overload_cast<std::function<void(mochi::Constraint*)> const&>(&mochi::Scene::ForEachConstraint)
-      , py::arg("callback")
+    .def("for_each_constraint", nb::overload_cast<std::function<void(mochi::Constraint*)> const&>(&mochi::Scene::ForEachConstraint)
+      , nb::arg("callback").none()
       , "Iterate over all the constraints in the scene using a callback.\n\nArgs:\n    callback (Callable[[Constraint], None]): Function called once for each\n        constraint.\n\nNote:\n    Includes constraints created implicitly by\n    :meth:`~superdex.physics.Scene.create_articulated_actor` (e.g. articulated\n    joint limits).\n\nWarning:\n    Destroying other constraints or actors from within the callback is illegal."
     )
-    .def("get_debug_draw", py::overload_cast<>(&mochi::Scene::GetDebugDraw)
+    .def("get_debug_draw", nb::overload_cast<>(&mochi::Scene::GetDebugDraw)
       , "Get the debug draw interface for this scene.\n\nReturns:\n    Reference to the :class:`~superdex.physics.DebugDraw` interface.\n\nSee Also:\n    :class:`~superdex.physics.DebugDraw`"
-      , py::return_value_policy::reference
+      , nb::rv_policy::reference
     )
     .def("update_debugger", &mochi::Scene::UpdateDebugger
       , "This gives the debugger a chance to process messages that require reading or\nwriting scene state.\n\nPlease call this periodically if you are not actively stepping the scene. If\nthis function is never called and the scene is never stepped, then some debugger\nfeatures will not work.\n\nNote:\n    Must be called on the scene's owning thread (like other\n    :class:`~superdex.physics.Scene` methods)."
@@ -920,8 +941,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("file_path")
-      , py::arg("params")
+      , nb::arg("file_path")
+      , nb::arg("params")
       , "Create or replace the specified file and start recording the scene to an HDF5\nfile.\n\nArgs:\n    file_path (str): Path to the output recording file (case sensitive on some\n        filesystems). File will be created or replaced.\n    params (RecordingParams): Parameters controlling what data to record.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Enabling additional recording features will generally increase the recording\n    file size and degrade performance.\n\nNote:\n    If the scene is already recording, the previous recording is stopped before\n    starting the new one.\n\nWarning:\n    Requires a build with HDF5 support.\n\nWarning:\n    The recording system may undergo a substantial refactor to expand its\n    capabilities. Its API and recorded file format may change in future\n    releases.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.stop_recording`,\n    :meth:`~superdex.physics.Scene.is_recording`,\n    :class:`~superdex.physics.RecordingParams`"
     )
     .def("stop_recording", &mochi::Scene::StopRecording
@@ -934,9 +955,9 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("layer_a")
-      , py::arg("layer_b")
-      , py::arg("enable")
+      , nb::arg("layer_a")
+      , nb::arg("layer_b")
+      , nb::arg("enable")
       , "Enable or disable collision detection for an ordered pair of contact layer\nnames. Order matters: controls only the specified direction (actors in layerA\nchecking against actors in layerB).\n\nArgs:\n    layer_a (str): Name of the layer of the \"colliding\" actor (the one checking\n        for contact). Must be non-empty.\n    layer_b (str): Name of the layer of the \"collider\" actor (the one with a\n        :class:`~superdex.physics.ColliderType` being tested). Must be\n        non-empty.\n    enable (bool): True to enable contact, false to disable it.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Contact is enabled by default. You only need to call this method if you wish\n    to disable (or re-enable) contact for a specific layer pair.\n\nNote:\n    Both layer-to-layer and actor-to-actor contact must be enabled for contact\n    to occur.\n\nNote:\n    Call twice with swapped arguments or use\n    :meth:`~superdex.physics.Scene.enable_layer_contact_symmetric` to affect\n    collision checks in both directions.\n\nNote:\n    Calling this method with a layer name not previously seen in the scene\n    registers it as a new contact layer, increasing\n    :meth:`~superdex.physics.Scene.get_num_contact_layers` and adding the name\n    to :meth:`~superdex.physics.Scene.enumerate_contact_layer_names`.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.enable_layer_contact_symmetric`,\n    :meth:`~superdex.physics.Scene.enable_actor_contact_asymmetric`,\n    :meth:`~superdex.physics.Scene.is_layer_contact_enabled`"
     )
     .def("enable_layer_contact_symmetric", [](mochi::Scene& self, std::string_view layer_a, std::string_view layer_b, bool enable) {
@@ -946,21 +967,21 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("layer_a")
-      , py::arg("layer_b")
-      , py::arg("enable")
+      , nb::arg("layer_a")
+      , nb::arg("layer_b")
+      , nb::arg("enable")
       , "Equivalent to calling\n:meth:`~superdex.physics.Scene.enable_layer_contact_asymmetric` with ``layer_a``\nand ``layer_b`` in both orders.\n\nArgs:\n    layer_a (str): Name of the first contact layer. Must be non-empty.\n    layer_b (str): Name of the second contact layer. Must be non-empty.\n    enable (bool): True to enable contact, false to disable it.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.enable_layer_contact_asymmetric`,\n    :meth:`~superdex.physics.Scene.enable_actor_contact_symmetric`,\n    :meth:`~superdex.physics.Scene.is_layer_contact_enabled`"
     )
     .def("is_layer_contact_enabled", &mochi::Scene::IsLayerContactEnabled
-      , py::arg("layer_a")
-      , py::arg("layer_b")
+      , nb::arg("layer_a")
+      , nb::arg("layer_b")
       , "Check if collision detection is enabled for an ordered pair of contact layer\nnames. Order matters: refers only to the specified direction (actors in layerA\nchecking against actors in layerB).\n\nArgs:\n    layer_a (str): Name of the layer of the \"colliding\" actor (the one checking\n        for contact).\n    layer_b (str): Name of the layer of the \"collider\" actor (the one with a\n        :class:`~superdex.physics.ColliderType` being tested).\n\nReturns:\n    True if layer-to-layer contact is enabled, false if layer-to-layer contact\n    is disabled.\n\nNote:\n    Contact is enabled by default, so you will get true for any pair of layers\n    unless overridden via\n    :meth:`~superdex.physics.Scene.enable_layer_contact_asymmetric` or\n    :meth:`~superdex.physics.Scene.enable_layer_contact_symmetric`.\n\nNote:\n    This only checks the layer filter. Actor-to-actor contact can still be\n    disabled with\n    :meth:`~superdex.physics.Scene.enable_actor_contact_asymmetric` or\n    :meth:`~superdex.physics.Scene.enable_actor_contact_symmetric`.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.enable_layer_contact_asymmetric`,\n    :meth:`~superdex.physics.Scene.enable_layer_contact_symmetric`"
     )
     .def("get_num_contact_layers", &mochi::Scene::GetNumContactLayers
       , "Get the number of unique contact layer names in the scene.\n\nReturns:\n    Number of unique layer names in the scene.\n\nNote:\n    The count may include layer names not currently assigned to an actor.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.enumerate_contact_layer_names`"
     )
     .def("enumerate_contact_layer_names", &mochi::Scene::EnumerateContactLayerNames
-      , py::arg("callback")
+      , nb::arg("callback").none()
       , "Enumerate all unique contact layer names in the scene.\n\nArgs:\n    callback (Callable[[str], None]): Function called once for each layer name.\n\nNote:\n    The callback fires :meth:`~superdex.physics.Scene.get_num_contact_layers`\n    times.\n\nNote:\n    Enumeration order is unspecified.\n\nWarning:\n    Do not register new contact layers from inside the callback. Doing so may\n    invalidate the enumeration and cause undefined behavior.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.get_num_contact_layers`"
     )
     .def("enable_actor_contact_asymmetric", [](mochi::Scene& self, mochi::ActorHandle colliding, mochi::ActorHandle collider, bool enable, mochi::IncludeNestedActors include_nested_actors) {
@@ -970,10 +991,10 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("colliding")
-      , py::arg("collider")
-      , py::arg("enable")
-      , py::arg("include_nested_actors")
+      , nb::arg("colliding")
+      , nb::arg("collider")
+      , nb::arg("enable")
+      , nb::arg("include_nested_actors")
       , "Enable or disable collision detection between two actors. Order matters:\ncontrols only the specified direction (colliding actor checking against collider\nactor).\n\nArgs:\n    colliding (ActorHandle): Handle of the colliding actor.\n    collider (ActorHandle): Handle of the collider actor.\n    enable (bool): True to enable contact, false to disable it.\n    include_nested_actors (IncludeNestedActors | int): Whether nested actors\n        should be affected by this contact setting. With :class:`NO\n        <superdex.physics.IncludeNestedActors>`, only the exact handles are\n        affected. With :class:`YES <superdex.physics.IncludeNestedActors>`,\n        parent actors with nested actors resolve to the parent plus nested\n        actors. The setting is applied to every ordered pair in the\n        cross-product of the two resolved handle sets; no pairs outside that\n        cross-product are affected. If the resolved sets overlap, pairs in the\n        overlap, including self-pairs, are affected.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Contact is enabled by default. You only need to call this method if you wish\n    to disable (or re-enable) contact for a specific actor pair.\n\nNote:\n    Both layer-to-layer and actor-to-actor contact must be enabled for contact\n    to occur.\n\nNote:\n    Contact between adjacent links is automatically disabled when an articulated\n    or soft-skinned actor is created. A later actor-contact setting can override\n    that automatic disable for any pair included in the resolved actor sets. In\n    particular, enabling contact between a parent actor and itself with\n    :class:`YES <superdex.physics.IncludeNestedActors>` enables contact between\n    that parent's nested actors, including adjacent links, unless a later\n    actor-contact setting disables those pairs again.\n\nNote:\n    Call twice with swapped arguments or use\n    :meth:`~superdex.physics.Scene.enable_actor_contact_symmetric` to affect\n    collision checks in both directions.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.enable_actor_contact_symmetric`,\n    :meth:`~superdex.physics.Scene.enable_layer_contact_asymmetric`"
     )
     .def("enable_actor_contact_symmetric", [](mochi::Scene& self, mochi::ActorHandle actor_a, mochi::ActorHandle actor_b, bool enable, mochi::IncludeNestedActors include_nested_actors) {
@@ -983,10 +1004,10 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("actor_a")
-      , py::arg("actor_b")
-      , py::arg("enable")
-      , py::arg("include_nested_actors")
+      , nb::arg("actor_a")
+      , nb::arg("actor_b")
+      , nb::arg("enable")
+      , nb::arg("include_nested_actors")
       , "Equivalent to calling\n:meth:`~superdex.physics.Scene.enable_actor_contact_asymmetric` with ``actor_a``\nand ``actor_b`` in both orders using the same ``include_nested_actors``.\n\nArgs:\n    actor_a (ActorHandle): Handle of the first actor.\n    actor_b (ActorHandle): Handle of the second actor.\n    enable (bool): True to enable contact, false to disable it.\n    include_nested_actors (IncludeNestedActors | int): Whether nested actors\n        should be affected by this contact setting. See\n        :meth:`~superdex.physics.Scene.enable_actor_contact_asymmetric` for\n        details.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.enable_actor_contact_asymmetric`,\n    :meth:`~superdex.physics.Scene.enable_layer_contact_symmetric`"
     )
     .def("set_contact_pair_params_override", [](mochi::Scene& self, mochi::ActorHandle actor_a, mochi::ActorHandle actor_b, mochi::ContactPairParamsOverride const& params_override) {
@@ -996,9 +1017,9 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("actor_a")
-      , py::arg("actor_b")
-      , py::arg("params_override")
+      , nb::arg("actor_a")
+      , nb::arg("actor_b")
+      , nb::arg("params_override")
       , "Set contact parameter overrides for an unordered actor pair.\n\nArgs:\n    actor_a (ActorHandle): Handle of the first actor.\n    actor_b (ActorHandle): Handle of the second actor.\n    params_override (ContactPairParamsOverride): Parameter override with at\n        least one present field. This replaces any existing override for the\n        pair; absent fields use the normal actor-parameter combination.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Both actors must have contact parameters.\n\nNote:\n    The exact actors are used; nested actors are not included automatically.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.clear_contact_pair_params_override`,\n    :meth:`~superdex.physics.Scene.has_contact_pair_params_override`,\n    :meth:`~superdex.physics.Scene.get_contact_pair_params_override`"
     )
     .def("clear_contact_pair_params_override", [](mochi::Scene& self, mochi::ActorHandle actor_a, mochi::ActorHandle actor_b) {
@@ -1008,8 +1029,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("actor_a")
-      , py::arg("actor_b")
+      , nb::arg("actor_a")
+      , nb::arg("actor_b")
       , "Clear contact parameter overrides for an unordered actor pair.\n\nArgs:\n    actor_a (ActorHandle): Handle of the first actor.\n    actor_b (ActorHandle): Handle of the second actor.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Clearing a valid pair without an override succeeds without changing the\n    scene.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.set_contact_pair_params_override`"
     )
     .def("has_contact_pair_params_override", [](mochi::Scene& self, mochi::ActorHandle actor_a, mochi::ActorHandle actor_b) {
@@ -1020,8 +1041,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("actor_a")
-      , py::arg("actor_b")
+      , nb::arg("actor_a")
+      , nb::arg("actor_b")
       , "Check whether the exact unordered actor pair has a parameter override.\n\nArgs:\n    actor_a (ActorHandle): Handle of the first actor.\n    actor_b (ActorHandle): Handle of the second actor.\n\nReturns:\n    True if the exact pair has a stored override.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.get_contact_pair_params_override`"
     )
     .def("get_contact_pair_params_override", [](mochi::Scene& self, mochi::ActorHandle actor_a, mochi::ActorHandle actor_b) {
@@ -1032,29 +1053,29 @@ void mochi::DefineMochiPhysics_MochiPhysicsScene([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("actor_a")
-      , py::arg("actor_b")
+      , nb::arg("actor_a")
+      , nb::arg("actor_b")
       , "Get the parameter override for the exact unordered actor pair.\n\nArgs:\n    actor_a (ActorHandle): Handle of the first actor.\n    actor_b (ActorHandle): Handle of the second actor.\n\nReturns:\n    The complete stored override.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Reports an error when a valid pair has no stored override.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.set_contact_pair_params_override`,\n    :meth:`~superdex.physics.Scene.has_contact_pair_params_override`"
     )
     .def("register_pre_step_callback", &mochi::Scene::RegisterPreStepCallback
-      , py::arg("debug_name")
-      , py::arg("callback")
-      , py::arg("priority") = mochi::Scene::kDefaultCallbackPriority
+      , nb::arg("debug_name")
+      , nb::arg("callback").none()
+      , nb::arg("priority") = mochi::Scene::kDefaultCallbackPriority
       , "Register a callback to execute before each simulation step.\n\nArgs:\n    debug_name (str): Descriptive name for debugging and profiling.\n    callback (Callable[[StepInfo], None]): Callback function receiving\n        :class:`~superdex.physics.StepInfo`.\n    priority (int): Execution order. Lower values execute first (higher\n        priority).\n\nReturns:\n    :class:`~superdex.physics.CallbackHandle` for the registered callback.\n\nNote:\n    Callbacks run sequentially on the thread that calls\n    :meth:`~superdex.physics.Scene.step`, in increasing priority order (lower\n    values first).\n\nNote:\n    The relative order of callbacks registered with equal priority is\n    unspecified. Assign distinct priorities when ordering matters.\n\nNote:\n    Callbacks must be thread-safe if they access shared state.\n\nNote:\n    Callbacks should not modify scene structure (add/remove actors/constraints).\n\nSee Also:\n    :meth:`~superdex.physics.Scene.cancel_callback`,\n    :meth:`~superdex.physics.Scene.register_post_step_callback`"
     )
     .def("register_post_step_callback", &mochi::Scene::RegisterPostStepCallback
-      , py::arg("debug_name")
-      , py::arg("callback")
-      , py::arg("priority") = mochi::Scene::kDefaultCallbackPriority
+      , nb::arg("debug_name")
+      , nb::arg("callback").none()
+      , nb::arg("priority") = mochi::Scene::kDefaultCallbackPriority
       , "Register a callback to execute after each simulation step.\n\nArgs:\n    debug_name (str): Descriptive name for debugging and profiling.\n    callback (Callable[[StepInfo], None]): Callback function receiving\n        :class:`~superdex.physics.StepInfo`.\n    priority (int): Execution order. Lower values execute first (higher\n        priority).\n\nReturns:\n    :class:`~superdex.physics.CallbackHandle` for the registered callback.\n\nNote:\n    Callbacks run sequentially on the thread that calls\n    :meth:`~superdex.physics.Scene.step`, in increasing priority order (lower\n    values first).\n\nNote:\n    The relative order of callbacks registered with equal priority is\n    unspecified. Assign distinct priorities when ordering matters.\n\nNote:\n    Callbacks must be thread-safe if they access shared state.\n\nNote:\n    Callbacks should not modify scene structure (add/remove actors/constraints).\n\nSee Also:\n    :meth:`~superdex.physics.Scene.cancel_callback`,\n    :meth:`~superdex.physics.Scene.register_pre_step_callback`"
     )
     .def("cancel_callback", &mochi::Scene::CancelCallback
-      , py::arg("handle")
+      , nb::arg("handle")
       , "Cancel a previously registered callback.\n\nArgs:\n    handle (CallbackHandle): :class:`~superdex.physics.CallbackHandle` from\n        :meth:`~superdex.physics.Scene.register_pre_step_callback` or\n        :meth:`~superdex.physics.Scene.register_post_step_callback`. Must be\n        owned by this scene.\n\nNote:\n    Invalid and already-cancelled handles are ignored.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.register_pre_step_callback`,\n    :meth:`~superdex.physics.Scene.register_post_step_callback`"
     )
   ;
 
-    m.attr("DEFAULT_GRAVITY") = py::cast(mochi::kDefaultGravity);
+    m.attr("DEFAULT_GRAVITY") = nb::cast(mochi::kDefaultGravity);
 
 }
 // clang-format on

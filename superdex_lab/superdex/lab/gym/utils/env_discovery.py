@@ -19,24 +19,16 @@ and collecting the :class:`~superdex.lab.gym.envs.mochi_env.MochiEnv` subclass e
 The Gymnasium id is derived from the class name (``CartPoleEnv`` ->
 ``superdex_gym/CartPole-v0``), and its config class is the sibling ``<Name>EnvCfg``.
 
-Every JSON file next to an env module is one of two things:
+Every JSON file next to an env module is a ``<module>_<variant>.json`` gym config
+*variant* -- the only place env config may live (e.g.
+``cartpole_env_actuate_on_pole.json``). Its schema is::
 
-- ``<module>_<variant>.json`` -- a gym config *variant*, the only place env config may
-  live (e.g. ``cartpole_env_actuate_on_pole.json``). Its schema is::
-
-      {"description": "...optional...", "env_cfg": {<EnvCfg field>: value, ...}}
-
-- ``<module>[_<variant>].<kind>.json`` -- a usage *recipe* for the base env or for one
-  variant, where ``<kind>`` is ``train`` or ``benchmark``. A ``train`` recipe holds only
-  training settings and may not configure the environment, so every configuration that
-  gets trained is also a named, discoverable env. (A ``benchmark`` recipe does carry a
-  measurement setup in an ``env_cfg`` section: it is a harness baseline that the benchmark
-  scripts sweep permutations over, not a task anyone runs or trains.)
+    {"description": "...optional...", "env_cfg": {<EnvCfg field>: value, ...}}
 
 ``<variant>`` is a snake_case token, with three rules on its segments (see
 :func:`_is_valid_variant_name`): ``env`` is forbidden, which is what keeps a longer
 sibling module's files unambiguous; ``train`` and ``benchmark`` are forbidden, so a
-variant cannot be confused with a recipe; and a ``test`` segment marks the variant
+variant cannot be confused with a usage recipe; and a ``test`` segment marks the variant
 test-only -- discovered and smoke-tested, but never registered with Gymnasium nor listed
 in a CLI.
 
@@ -57,8 +49,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Sequence
 
-import gymnasium as gym
+from gymnasium.envs.registration import EnvSpec
 from superdex.lab.gym.envs.mochi_env import MochiEnv
+from superdex.lab.gym.registration import _FACTORY_ENTRY_POINT, register_env_spec
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -286,8 +279,8 @@ def invalidate_env_entries() -> None:
 def register_all_envs() -> list[EnvEntry]:
     """Register every discovered environment (and public variant) with Gymnasium.
 
-    Idempotent: ids already present in the Gymnasium registry are left untouched. Returns
-    every discovered entry, including the test-only ones that were not registered.
+    Idempotent for equivalent specs; incompatible existing registrations are rejected.
+    Returns every discovered entry, including the test-only ones that were not registered.
 
     Test-only variants are skipped, which is also what keeps them out of the Ray Tune
     registry, since that is populated by fanning out the Gymnasium registry.
@@ -305,12 +298,17 @@ def register_all_envs() -> list[EnvEntry]:
     entries = get_env_entries()
 
     for entry in entries:
-        if entry.test_only or entry.env_id in gym.registry:
+        if entry.test_only:
             continue
-        gym.register(
-            entry.env_id,
-            entry_point=entry.env_cls,
-            kwargs={"cfg": dict(entry.cfg_kwargs)},
+        register_env_spec(
+            EnvSpec(
+                id=entry.env_id,
+                entry_point=_FACTORY_ENTRY_POINT,
+                kwargs={
+                    "env_cls": f"{entry.env_cls.__module__}:{entry.env_cls.__name__}",
+                    "cfg": dict(entry.cfg_kwargs),
+                },
+            )
         )
 
     return entries
@@ -328,41 +326,6 @@ def get_env_short_names(include_test_only: bool = False) -> dict[str, EnvEntry]:
         for entry in get_env_entries()
         if include_test_only or not entry.test_only
     }
-
-
-def load_entry_config(entry: EnvEntry, kind: str) -> dict[str, Any]:
-    """Load the ``<kind>`` usage recipe for ``entry``, or ``{}`` when it has none.
-
-    A base entry reads ``<module>.<kind>.json``; a variant reads
-    ``<module>_<variant>.<kind>.json``. A variant deliberately does *not* fall back to the
-    base recipe: a recipe is written for one configuration, so inheriting (say) a base
-    env's ``stop_criteria`` into a different configuration would silently train against
-    the wrong target.
-    """
-    module_file = Path(inspect.getfile(entry.env_cls))
-    stem = module_file.stem
-    if entry.variant is not None:
-        stem = f"{stem}_{entry.variant}"
-    return _load_json(module_file.with_name(f"{stem}.{kind}.json"))
-
-
-def load_env_config(env_cls: type, kind: str) -> dict[str, Any]:
-    """Load the ``<env_module>.<kind>.json`` usage recipe sitting next to ``env_cls``.
-
-    Unlike the gym config *variants* (``<module>_<variant>.json``), these dot-separated
-    files hold non-gym usage configs (e.g. ``benchmark`` or ``train`` settings) and are
-    deliberately never registered as gym environments nor picked up by discovery. Returns
-    the parsed JSON, or an empty dict when the file is absent.
-
-    This is the module-level recipe, i.e. the one belonging to the base env. Use
-    :func:`load_entry_config` when the recipe should follow a specific entry's variant.
-    """
-    module_file = Path(inspect.getfile(env_cls))
-    return _load_json(module_file.with_name(f"{module_file.stem}.{kind}.json"))
-
-
-def _load_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text()) if path.exists() else {}
 
 
 ########################################################################################

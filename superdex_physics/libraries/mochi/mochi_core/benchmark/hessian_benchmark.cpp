@@ -185,17 +185,12 @@ static void JacobianVectorContractFast(benchmark::State& state) {
   ColumnVector<real> contractedVector(bundle.props.numLinks * RigidSize::kDAll);
   ColumnVector<real> gradientContracted(bundle.props.reducedDofsDim);
   for (auto x : state) {
-    HessianContract(
+    JacobianTransposeContract(
         bundle.dofInfo,
-        bundle.jointAxes,
         bundle.parents,
-        bundle.restTransforms,
-        bundle.worldFromRoot,
-        bundle.jointTransforms,
         bundle.linkTransforms,
         contractedVector,
         jacobian,
-        RowMatrixView<real>(),
         gradientContracted);
     MOCHI_NO_DISCARD_IN_LOOP(gradientContracted);
   }

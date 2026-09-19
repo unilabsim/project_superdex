@@ -22,7 +22,6 @@
 #include "mochi_pose_controller.h"
 #include "mochi_rigid.h"
 #include "mochi_shape.h"
-#include "mochi_skinning.h"
 #include "mochi_snle.h"
 
 #include <mochi_physics/cpp_api/mochi_structs.h> // ArticulatedActorParams, ArticulatedSkinParams
@@ -30,6 +29,7 @@
 #include <mochi_core/articulated_body/articulated_body.h>
 #include <mochi_core/articulated_body/transmission.h>
 #include <mochi_core/integration/integration_utils.h>
+#include <mochi_core/utils/dskinning.h>
 #include <mochi_core/utils/graph.h>
 
 #include <memory>
@@ -124,6 +124,13 @@ struct CArticulatedJointVels : public ArticulatedJointVelocities, NoCopy {
   MOCHI_ATTRIBUTE_IF(kRelTime == TimeStep::Current, CaptureState);
   MOCHI_BASE_CLASS(ArticulatedJointVelocities);
   MOCHI_TEMPLATE_END();
+};
+
+// World-space link velocities in [vcom.xyz, omega.xyz] order, without SIMD padding or vsym.
+struct CArticulatedFullVel : public NoCopy {
+  explicit CArticulatedFullVel(int size) : value(ColumnVector<real>::Zero(size)) {}
+
+  ColumnVector<real> value;
 };
 
 /// @brief Component for time integration of articulated reduced pose.
@@ -429,14 +436,12 @@ void UpdateJacobianState(
 }
 
 /*
- * System to update the displacements of the skinning. Templatized according to time step type.
+ * Pipeline to resolve current skinning displacements for all nodes, including inactive nodes when
+ * subsampling is enabled.
  */
-template <TimeStep kStep, bool kForceUseAllNodes = false>
-void ResolveSkinning(
-    CArticulatedLinkTransforms<kStep> const& linkTransforms,
-    CArticulatedSkinningData const& skinningData,
-    CActiveUniqueNodes const* activeNodes,
-    CDisplacementSlice<real, kStep, DisplacementLayer::Skinned>& outDisplacements);
+void ResolveAllNodeSkinningDisplacementsPipeline(
+    entt::registry& reg,
+    Span<entt::entity const> entities);
 
 /*
  * Function to update the Jacobian of some skinned data w.r.t. the bone dofs (if one exists).
@@ -461,6 +466,30 @@ void ResolveSkinningJacobianDJoints(
     CArticulatedJacobian const& articulatedJacobian,
     CActiveUniqueNodes const* activeNodes,
     CArticulatedSkinningData& skinningData);
+
+// Copy current rigid-link velocities to contiguous [vcom.xyz, omega.xyz] storage.
+void UpdateFullVelocity(
+    ecs::PartialRegistry<CRigidVel<TimeStep::Current> const> reg,
+    CGroupMembers const& groupMembers,
+    CArticulatedFullVel& outVelFull);
+
+// Compute world-space velocity produced by skeletal skinning.
+void ComputeSkinningVelocityFromSkeleton(
+    CArticulatedLinkTransforms<TimeStep::Current> const& linkTransforms,
+    CArticulatedFullVel const& velFull,
+    CArticulatedSkinningData const& skinningData,
+    ColumnVectorView<real const> unposedCoords,
+    ColumnVectorView<real> outVelocity);
+
+// Compute world-space skinning velocity.
+inline void UpdateSkinningVelocity(
+    CArticulatedLinkTransforms<TimeStep::Current> const& linkTransforms,
+    CArticulatedFullVel const& velFull,
+    CArticulatedSkinningData const& skinningData,
+    CVelocitySlice<real, TimeStep::Current, DisplacementLayer::Skinned>& outVelocity) {
+  ComputeSkinningVelocityFromSkeleton(
+      linkTransforms, velFull, skinningData, skinningData.restCoords, outVelocity.value);
+}
 
 /*
  * System to compute contact Jacobians as colliding actor. It is called after the collision
@@ -741,12 +770,6 @@ void UpdateVSym(
     ecs::Included<TagArticulatedActor>,
     ecs::CtxGlobal<CSceneTime const> time,
     CArticulatedJointVels<TimeStep::Current>& outJointVels);
-
-/*
- * Helper function to produce a SkinningParams data structure for an articulated body
- */
-SkinningParams
-CreateSkinningParams(entt::registry& reg, entt::entity e, bool allowUnusedBones, Error& error);
 
 /*
  * [Differentiability] System to project a derived state gradient to a state gradient.

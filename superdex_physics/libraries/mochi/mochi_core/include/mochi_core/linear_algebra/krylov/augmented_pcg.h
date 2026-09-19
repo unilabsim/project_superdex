@@ -46,7 +46,7 @@ namespace mochi::krylov {
  * @param[in] b The right-hand side vector of \f$ A x = b\f$.
  * @param[in,out] x Vector containing the initial guess at input and the solution at output.
  * @param[in] prec The preconditioner application functor.
- * @param[in] maxIter Maximum number of iterations.
+ * @param[in] maxIter Maximum number of iterations. Must be positive.
  * @param[in,out] stopCriterion A functor called every iteration to check the stop criteria. The
  * norm used in the stop criteria is determined by this object.
  * @param[in] recyclingParams The recycling parameters.
@@ -119,14 +119,16 @@ LinearSolverStatus AugmentedPCG(
       "Stop criterion not supported with augmented PCG");
   static_assert(
       std::is_same_v<typename RecyclingStatusType::Scalar, Scalar>, "Inconsistent scalar types");
+  MOCHI_ASSERT_VERBOSE(maxIter > 0, "Maximum number of iterations must be positive.");
   MOCHI_ASSERT_VERBOSE(A.Rows() == A.Cols(), "Input matrix must be square.");
   MOCHI_ASSERT_VERBOSE(
       (A.Cols() == GetNumRows(x)) && (GetNumRows(x) == GetNumRows(b)), "Inconsistent sizes.");
+  MOCHI_ASSERT_VERBOSE(
+      recyclingStatus.subspaceSize >= 0, "Recycling subspace size must not be negative.");
 
   int recyclingSubspaceSize = recyclingStatus.subspaceSize;
   int const targetNumColsV = recyclingParams.maxSubspaceSize + recyclingParams.incrDirections;
   int const targetNumColsAV = targetNumColsV;
-  MOCHI_ASSERT_VERBOSE(recyclingSubspaceSize >= 0, "Recycling subspace size must not be negative.");
 
   LinearSolverStatus status;
   if (recyclingSubspaceSize == 0) {

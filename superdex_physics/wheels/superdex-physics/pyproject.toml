@@ -19,7 +19,7 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "superdex-physics"
 version = "1.0.0"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12"
 authors = [{name = "SuperDex Team"}]
 description = "Physics runtime for SuperDex"
 readme = "README.md"
@@ -45,6 +45,8 @@ classifiers = [
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering",
 ]
 
@@ -64,6 +66,7 @@ build-dir = "../../../build-fp32/{wheel_tag}"
 wheel.packages = ["superdex"]
 wheel.exclude = ["superdex/physics/internal", "superdex/physics/utils/testing/internal"]
 wheel.install-dir = "superdex/physics/_native"
+wheel.py-api = "cp312"
 build.targets = ["mochi_physics_pybind"]
 install.components = ["mochi_physics_pybind"]
 
@@ -72,6 +75,7 @@ CC = { env = "CC" }
 CXX = { env = "CXX" }
 
 [tool.scikit-build.cmake]
+version = ">=3.26"
 source-dir = "../../.."
 args = [
     "-GNinja",

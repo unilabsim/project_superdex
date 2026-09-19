@@ -17,18 +17,23 @@ import json
 import logging
 import math
 import pathlib
-from copy import deepcopy
 
 import numpy as np
-from checkpoint_policy import CheckpointPolicy, restore_policy
 from gymnasium.vector import AsyncVectorEnv, AutoresetMode
 from gymnasium.wrappers.vector import DictInfoToList
 from ray.rllib.utils.spaces.space_utils import batch, unbatch
 from ray.train import Checkpoint
-from ray.tune import Callback, registry
+from ray.tune import Callback
 from ray.tune.experiment import Trial
 from superdex.physics.viewer.utils import AnimationWriter
 from tensorboardX import SummaryWriter
+
+try:
+    from ..checkpoint_env import prepare_checkpoint_env_config
+    from ..checkpoint_policy import CheckpointPolicy, restore_policy
+except ImportError:
+    from checkpoint_env import prepare_checkpoint_env_config
+    from checkpoint_policy import CheckpointPolicy, restore_policy
 
 logger = logging.getLogger(__name__)
 
@@ -172,12 +177,12 @@ class CheckpointVideoGeneratorCallback(Callback):
         # (either build an Algorithm object with the trial description, or generate an
         # EnvRunnerGroup with the remote workers, and manually load & sync RLmodule from
         # checkpoints, etc.).
-        env_name = trial.config["env"]
-        env_cfg = deepcopy(trial.config["env_config"])
-        env_cfg["render_mode"] = "rgb_array"
-
-        # NOTE: Low-level access to Tune's registry.
-        env_creator = registry._global_registry.get(registry.ENV_CREATOR, env_name)
+        env_id = trial.config["env"]
+        env_spec, env_cfg = prepare_checkpoint_env_config(
+            env_id,
+            trial.config.get("env_config", {}),
+            render_mode="rgb_array",
+        )
         # Tune calls this again when a trial is restarted. Reset all per-trial state
         # best-effort so stale resources cannot block or distort the recovered run.
         self._cleanup_trial(trial_id, terminate=True)
@@ -185,7 +190,7 @@ class CheckpointVideoGeneratorCallback(Callback):
         # multi-threaded (Ray + torch); forking it and then initializing the OpenGL/EGL
         # renderer in the child segfaults. Spawned children start clean.
         vector_env = AsyncVectorEnv(
-            [lambda: env_creator(env_cfg)],
+            [lambda: env_spec.make(**env_cfg)],
             daemon=True,
             context="spawn",
             autoreset_mode=AutoresetMode.DISABLED,

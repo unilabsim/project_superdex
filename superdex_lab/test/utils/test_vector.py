@@ -23,6 +23,7 @@ sys.path.insert(0, str(TEST_ROOT_PATH))
 
 import unittest
 
+from gymnasium.vector import AutoresetMode
 from superdex.lab.gym.utils.vector import HybridVectorEnv
 from test.mock_environments import BasicMockEnv
 
@@ -54,6 +55,11 @@ class TestHybridVectorEnv(unittest.TestCase):
             for v in result.info.values():
                 assert len(v) == 8
 
+    def test_call_flattens_results_from_every_worker(self) -> None:
+        env_fns = [lambda local_idx=idx: BasicMockEnv(local_idx) for idx in range(8)]
+        with HybridVectorEnv(env_fns, num_envs_per_worker=2) as env:
+            self.assertEqual(tuple(range(8)), env.call("get_env_id"))
+
     def test_reset_seeds(self):
         # Test reset providing no seeds, a single seed, or per-environment seed.
         env_fns = [lambda local_idx=idx: BasicMockEnv(local_idx) for idx in range(4)]
@@ -63,6 +69,28 @@ class TestHybridVectorEnv(unittest.TestCase):
             env.reset(seed=[42, 43, 44, 45])  # List of seeds - ok
             with self.assertRaises(ValueError):
                 env.reset(seed=[42, 43])  # Wrong length
+
+    def test_scalar_seed_expands_to_globally_unique_streams(self):
+        # A scalar seed must expand to distinct per-env seeds across every worker, not
+        # overlap between adjacent workers (outer + inner double offset).
+        env_fns = [lambda local_idx=idx: BasicMockEnv(local_idx) for idx in range(6)]
+        with HybridVectorEnv(env_fns, num_envs_per_worker=2) as env:
+            env.reset(seed=100)
+            seeds = env.call("get_last_seed")
+            self.assertEqual(len(seeds), 6)
+            self.assertNotIn(None, seeds)
+            self.assertEqual(len(set(seeds)), 6)
+
+    def test_published_autoreset_mode_matches_inner_mode(self):
+        # The wrapper must advertise the inner autoreset mode, not the outer env's
+        # DISABLED mode used to hand autoreset to the inner SyncVectorEnvs.
+        env_fns = [lambda local_idx=idx: BasicMockEnv(local_idx) for idx in range(4)]
+        with HybridVectorEnv(env_fns, num_envs_per_worker=2) as env:
+            self.assertEqual(env.metadata["autoreset_mode"], AutoresetMode.NEXT_STEP)
+        with HybridVectorEnv(
+            env_fns, num_envs_per_worker=2, autoreset_mode=AutoresetMode.SAME_STEP
+        ) as env:
+            self.assertEqual(env.metadata["autoreset_mode"], AutoresetMode.SAME_STEP)
 
     def test_reset_mask_not_supported(self):
         # Test that reset_mask option raises an error.

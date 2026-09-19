@@ -30,7 +30,6 @@
 #include <mochi_physics/src/mochi_constraint.h>
 #include <mochi_physics/src/mochi_group.h>
 #include <mochi_physics/src/mochi_rod.h>
-#include <mochi_physics/src/mochi_skinning.h>
 
 #include <algorithm>
 #include <array>

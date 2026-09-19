@@ -83,6 +83,15 @@ struct CRodVisualMeshEmbedding : public NoCopy {
   std::shared_ptr<RodSurfaceEmbeddingData const> data;
 };
 
+// ECS component holding the nonlinear embedding for the rod's authored surface mesh.
+struct CRodSurfaceMeshEmbedding : public NoCopy {
+  explicit CRodSurfaceMeshEmbedding(std::shared_ptr<RodSurfaceEmbeddingData const> dataIn)
+      : data(std::move(dataIn)) {
+    MOCHI_ASSERT(data != nullptr);
+  }
+  std::shared_ptr<RodSurfaceEmbeddingData const> data;
+};
+
 // Owns the triangular mesh and rod embedding selected for surface contact. These may alias the
 // rod shape's visual data or describe a dedicated contact skin.
 struct CRodContactSkin : public NoCopy {
@@ -388,6 +397,15 @@ void UpdateQueryVisualNodePositionsAndNormals(
     CQueryVisualNodePositions& outVisPosQuery,
     CQueryVisualNodeNormals* outVisNormQuery);
 
+// Compute deformed authored surface-mesh node positions for a rod actor in compact active-node
+// ordering.
+void UpdateQuerySurfaceNodePositions(
+    CSurfaceMesh const& surfaceMesh,
+    CRodSurfaceMeshEmbedding const& rodEmbedding,
+    CPolylineMesh const& polylineMesh,
+    CRodPose<TimeStep::Current> const& rodPose,
+    CQuerySurfaceNodePositions& outSurfacePosQuery);
+
 // Builds the CSR sparsity pattern of the contact-skin Jacobian ∂x_skin/∂(rod DoFs). The sparsity
 // depends only on topology-invariant embedding data, so this runs once during actor setup. The
 // resulting matrix has the correct structure and zero values.
@@ -428,8 +446,9 @@ void SetupSurfaceCollidingJacobians(
     CRodContactSkinningData const& skinningData,
     CCollJacs<CollRole::Colliding>& outJacobians);
 
-// Updates the bounding volume from deformed surface-contact positions, reusing the pre-allocated
-// deformed-node buffer to avoid per-frame allocations.
+// Updates the shared bounding volume from the deformed contact skin and, when present, the
+// point-cloud centerline and radius. Reuses the deformed-node buffer to avoid per-frame
+// allocations.
 template <TimeStep kStep>
 void UpdateSurfaceContactBounds(
     ecs::Included<TagRodActor>,
@@ -438,6 +457,7 @@ void UpdateSurfaceContactBounds(
     CPolylineMesh const& polylineMesh,
     CRodPose<kStep> const& rodPose,
     CRodDeformedContactSkinNodes& deformedNodes,
+    CPointCloudColliderParams const* pointCloudColliderParams,
     CBoundingVolume<TimeStep::Current>& outBounds);
 
 // Get the mass of a rod actor.
@@ -465,7 +485,7 @@ void ComputeRodNodeCurvatureBinormals(
 // Note: Rods have 4 DoFs per node (3 displacement + 1 twist), so we extract just the displacement
 // components (stride of 4) to compute the bounding volume.
 // Excluded<CFemSurfaceDiscretization> ensures this only runs for centerline contact rods;
-// contact-skin rods use UpdateSurfaceContactBounds instead.
+// contact-skin rods use UpdateSurfaceContactBounds to bound both collision roles.
 template <TimeStep kStep>
 void UpdateBounds(
     ecs::Excluded<CFemSurfaceDiscretization>,
@@ -475,24 +495,11 @@ void UpdateBounds(
     CBoundingVolume<TimeStep::Current>& outBounds) {
   static_assert(kStep == TimeStep::Current || kStep == TimeStep::StageStart);
   MOCHI_PROFILE_SCOPE();
-  auto const& sol = solComponent.value;
-  int const numNodes = isize(mesh.nodes);
-
-  // Compute AABB from deformed node positions
-  // Rod DoFs are laid out as [dx0, dy0, dz0, twist0, dx1, dy1, dz1, twist1, ...]
-  Vec4r min = ToSimd(mesh.nodes[0], 0_r) + Load<Vec4r>(&sol[0]);
-  Vec4r max = min;
-  for (int i = 1; i < numNodes; ++i) {
-    int const offset = i * fem::kNumRodFields;
-    Vec4r const pos = ToSimd(mesh.nodes[i], 0_r) + Load<Vec4r>(&sol[offset]);
-    min = Min(min, pos);
-    max = Max(max, pos);
-  }
-  Obb bounds = GetObb(Aabb{Set(min, 3, 0_r), Set(max, 3, 0_r)});
+  Aabb bounds = CalcDeformedRodCenterlineAabb(mesh.nodes, solComponent.value);
   if (pointCloudColliderParams) {
     bounds = ExpandShape(bounds, pointCloudColliderParams->radius);
   }
-  outBounds.localShape = bounds;
+  outBounds.localShape = GetObb(bounds);
 }
 
 } // namespace rod

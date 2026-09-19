@@ -178,7 +178,7 @@ class Constraint [no_init, no_destruct, use_scene] {
   // target position.
   //
   // @see SetTargetRotation, SetTargetDof
-  fn SetTargetPosition(Real3 const& position [units(m)]) -> void [pure, virtual, mochi_error];
+  fn SetTargetPosition(Real3 const& position [units("m")]) -> void [pure, virtual, mochi_error];
 
   // @brief Set the constraint's target rotation.
   //

@@ -14,8 +14,12 @@
 
 # The CMake target is named mochi_physics_pybind (mirroring superdex_robotics_pybind) to
 # avoid colliding with the mochi_physics *library* target created in
-# ../CMakeLists.txt. The extension is still emitted as mochi_physics.{so,pyd} via OUTPUT_NAME.
-pybind11_add_module(mochi_physics_pybind)
+# ../CMakeLists.txt. OUTPUT_NAME selects its import name; nanobind selects the ABI suffix.
+if (SKBUILD_SABI_VERSION)
+    nanobind_add_module(mochi_physics_pybind STABLE_ABI NB_DOMAIN mochi)
+else ()
+    nanobind_add_module(mochi_physics_pybind NB_DOMAIN mochi)
+endif ()
 file(GLOB_RECURSE mochi_physics_srcs src/*.cpp)
 # Drop all internal-only sources (hand-written src/internal/ and generated src/generated/internal/).
 list(FILTER mochi_physics_srcs EXCLUDE REGEX "/internal/")
@@ -29,7 +33,14 @@ target_sources(mochi_physics_pybind PRIVATE ${mochi_physics_srcs})
 # single shared instance.
 add_library(mochi_pybind_core SHARED core/pybind_core.cpp)
 mochi_set_hidden_symbol_visibility(mochi_pybind_core)
-target_link_libraries(mochi_pybind_core PUBLIC mochi_physics pybind11::module)
+# The nanobind runtime also supplies its public headers and matching Python import-library
+# dependency.
+target_link_libraries(mochi_pybind_core PUBLIC mochi_physics)
+if (SKBUILD_SABI_VERSION)
+    target_link_libraries(mochi_pybind_core PUBLIC nanobind-static-abi3)
+else ()
+    target_link_libraries(mochi_pybind_core PUBLIC nanobind-static)
+endif ()
 target_include_directories(mochi_pybind_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core)
 mochi_set_compiler_options(mochi_pybind_core)
 mochi_set_output_directories(mochi_pybind_core)
@@ -73,11 +84,11 @@ set_target_properties(mochi_physics_pybind PROPERTIES
     # symbols. Only the PDB is renamed; the wheel repair exclusions match on OUTPUT_NAME.
     PDB_NAME "${mochi_physics_pybind_output_name}.pyd"
 )
-if(WIN32)
+if (WIN32)
     set_target_properties(mochi_physics_pybind PROPERTIES SUFFIX ".pyd")
-else()
+elseif (NOT SKBUILD_SABI_VERSION)
     set_target_properties(mochi_physics_pybind PROPERTIES SUFFIX ".so")
-endif()
+endif ()
 
 # Bundle the extension's own shared libs (mochi_physics, mochi_pybind_core, marl) plus any
 # genuinely external runtime deps (HDF5, zlib) so the wheel is self-contained.

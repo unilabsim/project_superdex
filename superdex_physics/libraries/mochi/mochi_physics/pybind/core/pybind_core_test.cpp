@@ -18,9 +18,11 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace mochi {
@@ -51,6 +53,24 @@ TEST(PybindContextTeardownRegistry, ThrowingTeardownDoesNotBlockOthers) {
   RunContextDependentTeardowns();
 
   EXPECT_EQ(*events, (std::vector<std::string>{"ok"}));
+}
+
+TEST(PybindContextTeardownRegistry, ConcurrentRegistrationPreservesEveryCallback) {
+  constexpr int kThreadCount = 8;
+  auto teardownCount = std::make_shared<std::atomic<int>>(0);
+  std::vector<std::thread> threads;
+  threads.reserve(kThreadCount);
+  for (int i = 0; i < kThreadCount; ++i) {
+    threads.emplace_back(
+        [teardownCount]() { RegisterContextDependent([teardownCount]() { ++*teardownCount; }); });
+  }
+  for (auto& thread : threads) {
+    thread.join();
+  }
+
+  RunContextDependentTeardowns();
+
+  EXPECT_EQ(*teardownCount, kThreadCount);
 }
 
 } // namespace

@@ -67,7 +67,7 @@ std::tuple<int, double, double, IterationStatus> CudaGMRes_impl(
  * @param[in] b The right-hand side vector b of \f$ A x = b\f$.
  * @param[in,out] x Vector containing the initial guess at input and the solution at output.
  * @param[in] P The preconditioner application functor.
- * @param[in] iterMax Maximum number of iterations.
+ * @param[in] iterMax Maximum number of iterations. Must be positive.
  * @param[in] aTol Absolute tolerance
  * @param[in] rTol Relative tolerance
  * @param[in] dTol Divergence tolerance
@@ -103,6 +103,9 @@ LinearSolverStatus CudaGMRes(
     [[maybe_unused]] VerbosityLevel verbosity = VerbosityLevel::Warning) {
   using Scalar = std::remove_pointer_t<decltype(b.Data())>;
   using NonConstScalar = std::remove_const_t<Scalar>;
+  MOCHI_ASSERT_VERBOSE(iterMax > 0, "Maximum number of iterations must be positive.");
+  MOCHI_ASSERT(((b.Cols() == x.Cols()) && (x.Cols() == 1)), "Incompatible number of columns");
+
   //--- Represent the operator A with a function to "hide the type" of A.
   auto Afunc = [&](mochi::CudaVectorView<NonConstScalar> const& v,
                    mochi::CudaVectorView<NonConstScalar>& Av) { Apply(A, v, Av); };
@@ -112,7 +115,6 @@ LinearSolverStatus CudaGMRes(
   restartSize = mochi::Min<int>(b.Rows(), (restartSize <= 0) ? iterMax : restartSize, iterMax);
 
   //--- Convert to CudaVectorView
-  MOCHI_ASSERT(((b.Cols() == x.Cols()) && (x.Cols() == 1)), "Incompatible number of columns");
   mochi::CudaVectorView<Scalar> bv(b.Data(), b.Rows());
   mochi::CudaVectorView<NonConstScalar> xv(x.Data(), x.Rows());
   //--- Check whether the right hand side is the zero vector.

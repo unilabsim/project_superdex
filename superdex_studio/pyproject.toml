@@ -19,7 +19,7 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "superdex-studio"
 version = "1.0.0"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12"
 authors = [{name = "SuperDex Team"}]
 description = "Interactive scene and mesh authoring application for SuperDex"
 readme = "README.md"
@@ -32,6 +32,8 @@ classifiers = [
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Multimedia :: Graphics :: 3D Modeling",
     "Topic :: Scientific/Engineering",
 ]
@@ -50,6 +52,7 @@ managed = false
 build-dir = "../build-fp32/{wheel_tag}"
 wheel.packages = ["superdex_studio"]
 wheel.install-dir = "superdex_studio/_native"
+wheel.py-api = "py3"
 build.targets = ["superdex_studio"]
 install.components = ["superdex_studio"]
 

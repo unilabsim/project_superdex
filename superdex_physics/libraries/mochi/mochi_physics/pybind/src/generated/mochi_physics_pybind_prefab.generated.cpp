@@ -18,1208 +18,1208 @@
 
 // clang-format off
 
-#include <pybind11/pybind11.h>
+#include <limits>
+#include <nanobind/nanobind.h>
 #include "../pybind_include.h"
 
 using namespace mochi;
-namespace py = pybind11;
-using namespace pybind11::literals;
+namespace nb = nanobind;
 
 namespace mochi {
   // Forward declarations for the definitions below.
-  void DeclareMochiPhysics_MochiPhysicsPrefab(py::module_& m, PybindRegistry& registry);
-  void DefineMochiPhysics_MochiPhysicsPrefab(py::module_& m, PybindRegistry& registry);
+  void DeclareMochiPhysics_MochiPhysicsPrefab(nb::module_& m, PybindRegistry& registry);
+  void DefineMochiPhysics_MochiPhysicsPrefab(nb::module_& m, PybindRegistry& registry);
 } // namespace mochi
 
-void mochi::DeclareMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+void mochi::DeclareMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
   auto m_prefab = m.def_submodule("prefab");
 
-  registry.StoreClass(py::class_<mochi::prefab::SceneParams>(m_prefab, "SceneParams", "Parameters that are global to the :class:`~superdex.physics.Scene` in which this\nprefab will be instantiated.\n\nNote:\n    If prefabs are nested, then only the top-level prefab will use these\n    parameters."));
-  registry.StoreClass(py::class_<mochi::prefab::RigidActorPrefab, mochi::RigidActorParams>(m_prefab, "RigidActorPrefab", "Prefab parameters for a rigid actor.\n\nExtends :class:`~superdex.physics.RigidActorParams`. The inherited\n:attr:`~superdex.physics.RigidActorParams.world_from_local` is replaced by the\nprefab-relative :attr:`rotation` and :attr:`translation` fields, and the\ninherited :attr:`~superdex.physics.RigidActorParams.shape` (a runtime\n:class:`~superdex.physics.ShapeHandle`) is replaced by :attr:`shape_file` (a\npath serialized to JSON. The shape is loaded at instantiation time).\n\nNote:\n    The inherited :attr:`~superdex.physics.RigidActorParams.name` field need not\n    be unique, but a name shared by more than one actor cannot be used by\n    name-based prefab references."));
-  registry.StoreClass(py::class_<mochi::prefab::SoftActorPrefab, mochi::SoftActorParams>(m_prefab, "SoftActorPrefab", "Prefab parameters for a soft actor.\n\nExtends :class:`~superdex.physics.SoftActorParams`. The inherited\n:attr:`~superdex.physics.SoftActorParams.world_from_local` is replaced by the\nprefab-relative :attr:`rotation` and :attr:`translation` fields, and the\ninherited :attr:`~superdex.physics.SoftActorParams.shape` (a runtime\n:class:`~superdex.physics.ShapeHandle`) is replaced by :attr:`shape_file` (a\npath serialized to JSON. The shape is loaded at instantiation time).\n\nNote:\n    When used as a standalone soft actor prefab, the inherited\n    :attr:`~superdex.physics.SoftActorParams.name` field need not be unique, but\n    a name shared by more than one actor cannot be used by name-based prefab\n    references."));
-  registry.StoreClass(py::class_<mochi::prefab::ArticulatedJointPrefab, mochi::ArticulatedJointParams>(m_prefab, "ArticulatedJointPrefab", "Joint parameters for an articulated actor prefab."));
-  registry.StoreClass(py::class_<mochi::prefab::ArticulatedLinkPrefab, mochi::ArticulatedLinkParams>(m_prefab, "ArticulatedLinkPrefab", "Link parameters for an articulated actor prefab.\n\nExtends :class:`~superdex.physics.ArticulatedLinkParams`. The inherited\n:attr:`~superdex.physics.ArticulatedLinkParams.shape` (a runtime\n:class:`~superdex.physics.ShapeHandle`) is replaced by :attr:`shape_file` (a\npath serialized to JSON. The shape is loaded at instantiation time). Inherited\nlink local-name requirements apply: names must not contain forward slash,\nbackslash, or embedded NUL characters, and must be unique within the parent\narticulated actor's nested actor namespace after default-name assignment."));
-  registry.StoreClass(py::class_<mochi::prefab::ArticulatedSkinPrefab, mochi::ArticulatedSkinParams>(m_prefab, "ArticulatedSkinPrefab", "Skin parameters for an articulated actor prefab.\n\nExtends :class:`~superdex.physics.ArticulatedSkinParams`. The inherited\n:attr:`~superdex.physics.ArticulatedSkinParams.shape` (a runtime\n:class:`~superdex.physics.ShapeHandle`) is replaced by :attr:`shape_file` (a\npath serialized to JSON. The shape is loaded at instantiation time)."));
-  registry.StoreClass(py::class_<mochi::prefab::ArticulatedActorPrefab>(m_prefab, "ArticulatedActorPrefab", "Prefab parameters for an articulated actor."));
-  registry.StoreClass(py::class_<mochi::prefab::SoftSkinnedActorPrefab>(m_prefab, "SoftSkinnedActorPrefab", "Prefab parameters for a soft-skinned actor.\n\nA soft-skinned actor consists of an articulated skeleton with one or more\nattached soft bodies."));
-  registry.StoreClass(py::class_<mochi::prefab::ActorLists>(m_prefab, "ActorLists", "Lists of actors grouped by type."));
-  registry.StoreClass(py::class_<mochi::prefab::RigidSphericalJointConstraintPrefab, mochi::RigidSphericalJointConstraintParams>(m_prefab, "RigidSphericalJointConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.RigidSphericalJointConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
-  registry.StoreClass(py::class_<mochi::prefab::RigidPrismaticJointConstraintPrefab, mochi::RigidPrismaticJointConstraintParams>(m_prefab, "RigidPrismaticJointConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.RigidPrismaticJointConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
-  registry.StoreClass(py::class_<mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab, mochi::DeformableNodeToDeformableNodeConstraintParams>(m_prefab, "DeformableNodeToDeformableNodeConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.DeformableNodeToDeformableNodeConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
-  registry.StoreClass(py::class_<mochi::prefab::DeformableNodeToRigidConstraintPrefab, mochi::DeformableNodeToRigidConstraintParams>(m_prefab, "DeformableNodeToRigidConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.DeformableNodeToRigidConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
-  registry.StoreClass(py::class_<mochi::prefab::JointRotationRangeConstraintPrefab, mochi::JointRotationRangeConstraintParams>(m_prefab, "JointRotationRangeConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.JointRotationRangeConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
-  registry.StoreClass(py::class_<mochi::prefab::RigidPivotPositionConstraintPrefab, mochi::RigidPivotPositionConstraintParams>(m_prefab, "RigidPivotPositionConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.RigidPivotPositionConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
-  registry.StoreClass(py::class_<mochi::prefab::RigidPivotToRigidTargetConstraintPrefab, mochi::RigidPivotToRigidTargetConstraintParams>(m_prefab, "RigidPivotToRigidTargetConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.RigidPivotToRigidTargetConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
-  registry.StoreClass(py::class_<mochi::prefab::RigidPivotRotationConstraintPrefab, mochi::RigidPivotRotationConstraintParams>(m_prefab, "RigidPivotRotationConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.RigidPivotRotationConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
-  registry.StoreClass(py::class_<mochi::prefab::DeformableNodePositionConstraintPrefab, mochi::DeformableNodePositionConstraintParams>(m_prefab, "DeformableNodePositionConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.DeformableNodePositionConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
-  registry.StoreClass(py::class_<mochi::prefab::JointRotationTrackingConstraintPrefab, mochi::JointRotationTrackingConstraintParams>(m_prefab, "JointRotationTrackingConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.JointRotationTrackingConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
-  registry.StoreClass(py::class_<mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab, mochi::ArticulatedSingleDofTargetConstraintParams>(m_prefab, "ArticulatedSingleDofTargetConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.ArticulatedSingleDofTargetConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
-  registry.StoreClass(py::class_<mochi::prefab::Articulated3dRotationTargetConstraintPrefab, mochi::Articulated3dRotationTargetConstraintParams>(m_prefab, "Articulated3dRotationTargetConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.Articulated3dRotationTargetConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
-  registry.StoreClass(py::class_<mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab, mochi::ArticulatedSingleDofRangeConstraintParams>(m_prefab, "ArticulatedSingleDofRangeConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.ArticulatedSingleDofRangeConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
-  registry.StoreClass(py::class_<mochi::prefab::Articulated3dRotationRangeConstraintPrefab, mochi::Articulated3dRotationRangeConstraintParams>(m_prefab, "Articulated3dRotationRangeConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.Articulated3dRotationRangeConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
-  registry.StoreClass(py::class_<mochi::prefab::ConstraintLists>(m_prefab, "ConstraintLists", "Lists of constraints grouped by type."));
-  registry.StoreClass(py::class_<mochi::prefab::PoseControllerPrefab>(m_prefab, "PoseControllerPrefab", "Prefab parameters for an articulated pose controller."));
-  registry.StoreClass(py::class_<mochi::prefab::PrefabReference>(m_prefab, "PrefabReference", "Reference to another prefab (scene or actor) for prefab nesting."));
-  registry.StoreClass(py::class_<mochi::prefab::ActorContactEntry>(m_prefab, "ActorContactEntry", "Used by :class:`~superdex.physics.prefab.ContactFilter` to enable or disable\ncontact for a pair of actors.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.enable_actor_contact_asymmetric`,\n    :meth:`~superdex.physics.Scene.enable_actor_contact_symmetric`"));
-  registry.StoreClass(py::class_<mochi::prefab::ContactPairParamsOverrideEntry>(m_prefab, "ContactPairParamsOverrideEntry", "Overrides selected contact parameters for an unordered actor pair.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.set_contact_pair_params_override`,\n    :class:`~superdex.physics.ContactPairParamsOverride`"));
-  registry.StoreClass(py::class_<mochi::prefab::LayerContactEntry>(m_prefab, "LayerContactEntry", "Used by :class:`~superdex.physics.prefab.ContactFilter` to enable or disable\ncontact for a pair of layers.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.enable_layer_contact_asymmetric`,\n    :meth:`~superdex.physics.Scene.enable_layer_contact_symmetric`"));
-  registry.StoreClass(py::class_<mochi::prefab::ContactFilter>(m_prefab, "ContactFilter", "Contact filtering parameters for a prefab.\n\nNote:\n    By default, all actor pairs can potentially collide with each other, except\n    that automatic contact filtering disables adjacent links in articulated and\n    soft-skinned actors. To prevent additional contact, use this contact filter\n    in one of two ways (or both): 1) Use :attr:`actor_contact_asymmetric` or\n    :attr:`actor_contact_symmetric` to disable contact for a specific pair of\n    actors, or 2) use :attr:`layer_contact_asymmetric` or\n    :attr:`layer_contact_symmetric` to disable contact for a specific pair of\n    contact layer names. This applies to all actors in those layers.\n\nNote:\n    Contact only occurs if it is allowed by both the actor-vs-actor contact\n    filter and the layer-vs-layer contact filter. Either can prevent contact.\n\nNote:\n    You can also explicitly enable contact for a pair of actors or layers to\n    override a setting applied earlier. Actor entries can also override\n    automatic adjacent-link exclusions.\n\nNote:\n    Contact filters are applied after all actors in the prefab have been\n    created. Nested child prefab contact filters are applied before parent\n    prefab contact filters, so parent settings can override child settings in\n    the same actor-vs-actor or layer-vs-layer filter table.\n\nNote:\n    Settings are applied in this fixed order: :attr:`layer_contact_asymmetric`,\n    :attr:`layer_contact_symmetric`, :attr:`actor_contact_asymmetric`, then\n    :attr:`actor_contact_symmetric`. Within each list, entries are applied in\n    array order, so later entries can override earlier entries in the same\n    actor-vs-actor or layer-vs-layer filter table.\n\nNote:\n    Contact filter settings are not necessarily symmetric.\n\nNote:\n    Exporting a scene stores disabled pairs from the effective contact-filter\n    state, not the exact JSON representation originally used to author it.\n    Exporting may emit a canonical representation whose contact-filter category\n    differs from the original JSON. For example, self-contact may be emitted as\n    :attr:`actor_contact_symmetric` because the forward and reverse resolved\n    actor pair are the same. Entry order and duplicate, redundant, or overridden\n    entries from the source prefab are not preserved.\n\nWarning:\n    Scene export does not record explicit settings that enable contact between\n    actor pairs. If such a setting enables contact between adjacent links of an\n    articulated or soft-skinned actor, adding the exported prefab to a scene\n    applies automatic adjacent-link filtering and disables contact for that pair\n    again. To preserve this behavior, add an equivalent enabling entry to the\n    exported prefab or re-enable the pair after adding the prefab to a scene.\n\nSee Also:\n    :class:`~superdex.physics.prefab.ActorContactEntry`,\n    :meth:`~superdex.physics.Scene.enable_actor_contact_asymmetric`,\n    :meth:`~superdex.physics.Scene.enable_actor_contact_symmetric`,\n    :class:`~superdex.physics.prefab.LayerContactEntry`,\n    :meth:`~superdex.physics.Scene.enable_layer_contact_asymmetric`,\n    :meth:`~superdex.physics.Scene.enable_layer_contact_symmetric`"));
-  registry.StoreClass(py::class_<mochi::prefab::ScenePrefab>(m_prefab, "ScenePrefab", "Top-level prefab describing a complete or partial physics scene (possibly just\none actor)."));
-  registry.StoreClass(py::class_<mochi::prefab::PrefabParams>(m_prefab, "PrefabParams", "Parameters for instantiating a :class:`~superdex.physics.prefab.ScenePrefab`\ninto a :class:`~superdex.physics.Scene`."));
-  registry.StoreClass(py::class_<mochi::prefab::AddToSceneResult>(m_prefab, "AddToSceneResult", "Struct used to return all created actors and constraints from\n:func:`~superdex.physics.prefab.add_to_scene`.\n\nNote:\n    The returned pointers are non-owning. They remain valid as long as the\n    :class:`~superdex.physics.Scene` is alive and the actors/constraints have\n    not been destroyed."));
+  registry.StoreClass(nb::class_<mochi::prefab::SceneParams>(m_prefab, "SceneParams", "Parameters that are global to the :class:`~superdex.physics.Scene` in which this\nprefab will be instantiated.\n\nNote:\n    If prefabs are nested, then only the top-level prefab will use these\n    parameters."));
+  registry.StoreClass(nb::class_<mochi::prefab::RigidActorPrefab, mochi::RigidActorParams>(m_prefab, "RigidActorPrefab", "Prefab parameters for a rigid actor.\n\nExtends :class:`~superdex.physics.RigidActorParams`. The inherited\n:attr:`~superdex.physics.RigidActorParams.world_from_local` is replaced by the\nprefab-relative :attr:`rotation` and :attr:`translation` fields, and the\ninherited :attr:`~superdex.physics.RigidActorParams.shape` (a runtime\n:class:`~superdex.physics.ShapeHandle`) is replaced by :attr:`shape_file` (a\npath serialized to JSON. The shape is loaded at instantiation time).\n\nNote:\n    The inherited :attr:`~superdex.physics.RigidActorParams.name` field need not\n    be unique, but a name shared by more than one actor cannot be used by\n    name-based prefab references."));
+  registry.StoreClass(nb::class_<mochi::prefab::SoftActorPrefab, mochi::SoftActorParams>(m_prefab, "SoftActorPrefab", "Prefab parameters for a soft actor.\n\nExtends :class:`~superdex.physics.SoftActorParams`. The inherited\n:attr:`~superdex.physics.SoftActorParams.world_from_local` is replaced by the\nprefab-relative :attr:`rotation` and :attr:`translation` fields, and the\ninherited :attr:`~superdex.physics.SoftActorParams.shape` (a runtime\n:class:`~superdex.physics.ShapeHandle`) is replaced by :attr:`shape_file` (a\npath serialized to JSON. The shape is loaded at instantiation time).\n\nNote:\n    When used as a standalone soft actor prefab, the inherited\n    :attr:`~superdex.physics.SoftActorParams.name` field need not be unique, but\n    a name shared by more than one actor cannot be used by name-based prefab\n    references."));
+  registry.StoreClass(nb::class_<mochi::prefab::ArticulatedJointPrefab, mochi::ArticulatedJointParams>(m_prefab, "ArticulatedJointPrefab", "Joint parameters for an articulated actor prefab."));
+  registry.StoreClass(nb::class_<mochi::prefab::ArticulatedLinkPrefab, mochi::ArticulatedLinkParams>(m_prefab, "ArticulatedLinkPrefab", "Link parameters for an articulated actor prefab.\n\nExtends :class:`~superdex.physics.ArticulatedLinkParams`. The inherited\n:attr:`~superdex.physics.ArticulatedLinkParams.shape` (a runtime\n:class:`~superdex.physics.ShapeHandle`) is replaced by :attr:`shape_file` (a\npath serialized to JSON. The shape is loaded at instantiation time). Inherited\nlink local-name requirements apply: names must not contain forward slash,\nbackslash, or embedded NUL characters, and must be unique within the parent\narticulated actor's nested actor namespace after default-name assignment."));
+  registry.StoreClass(nb::class_<mochi::prefab::ArticulatedSkinPrefab, mochi::ArticulatedSkinParams>(m_prefab, "ArticulatedSkinPrefab", "Skin parameters for an articulated actor prefab.\n\nExtends :class:`~superdex.physics.ArticulatedSkinParams`. The inherited\n:attr:`~superdex.physics.ArticulatedSkinParams.shape` (a runtime\n:class:`~superdex.physics.ShapeHandle`) is replaced by :attr:`shape_file` (a\npath serialized to JSON. The shape is loaded at instantiation time)."));
+  registry.StoreClass(nb::class_<mochi::prefab::ArticulatedActorPrefab>(m_prefab, "ArticulatedActorPrefab", "Prefab parameters for an articulated actor."));
+  registry.StoreClass(nb::class_<mochi::prefab::SoftSkinnedActorPrefab>(m_prefab, "SoftSkinnedActorPrefab", "Prefab parameters for a soft-skinned actor.\n\nA soft-skinned actor consists of an articulated skeleton with one or more\nattached soft bodies."));
+  registry.StoreClass(nb::class_<mochi::prefab::ActorLists>(m_prefab, "ActorLists", "Lists of actors grouped by type."));
+  registry.StoreClass(nb::class_<mochi::prefab::RigidSphericalJointConstraintPrefab, mochi::RigidSphericalJointConstraintParams>(m_prefab, "RigidSphericalJointConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.RigidSphericalJointConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
+  registry.StoreClass(nb::class_<mochi::prefab::RigidPrismaticJointConstraintPrefab, mochi::RigidPrismaticJointConstraintParams>(m_prefab, "RigidPrismaticJointConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.RigidPrismaticJointConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
+  registry.StoreClass(nb::class_<mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab, mochi::DeformableNodeToDeformableNodeConstraintParams>(m_prefab, "DeformableNodeToDeformableNodeConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.DeformableNodeToDeformableNodeConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
+  registry.StoreClass(nb::class_<mochi::prefab::DeformableNodeToRigidConstraintPrefab, mochi::DeformableNodeToRigidConstraintParams>(m_prefab, "DeformableNodeToRigidConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.DeformableNodeToRigidConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
+  registry.StoreClass(nb::class_<mochi::prefab::JointRotationRangeConstraintPrefab, mochi::JointRotationRangeConstraintParams>(m_prefab, "JointRotationRangeConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.JointRotationRangeConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
+  registry.StoreClass(nb::class_<mochi::prefab::RigidPivotPositionConstraintPrefab, mochi::RigidPivotPositionConstraintParams>(m_prefab, "RigidPivotPositionConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.RigidPivotPositionConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
+  registry.StoreClass(nb::class_<mochi::prefab::RigidPivotToRigidTargetConstraintPrefab, mochi::RigidPivotToRigidTargetConstraintParams>(m_prefab, "RigidPivotToRigidTargetConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.RigidPivotToRigidTargetConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
+  registry.StoreClass(nb::class_<mochi::prefab::RigidPivotRotationConstraintPrefab, mochi::RigidPivotRotationConstraintParams>(m_prefab, "RigidPivotRotationConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.RigidPivotRotationConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
+  registry.StoreClass(nb::class_<mochi::prefab::DeformableNodePositionConstraintPrefab, mochi::DeformableNodePositionConstraintParams>(m_prefab, "DeformableNodePositionConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.DeformableNodePositionConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
+  registry.StoreClass(nb::class_<mochi::prefab::JointRotationTrackingConstraintPrefab, mochi::JointRotationTrackingConstraintParams>(m_prefab, "JointRotationTrackingConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.JointRotationTrackingConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
+  registry.StoreClass(nb::class_<mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab, mochi::ArticulatedSingleDofTargetConstraintParams>(m_prefab, "ArticulatedSingleDofTargetConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.ArticulatedSingleDofTargetConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
+  registry.StoreClass(nb::class_<mochi::prefab::Articulated3dRotationTargetConstraintPrefab, mochi::Articulated3dRotationTargetConstraintParams>(m_prefab, "Articulated3dRotationTargetConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.Articulated3dRotationTargetConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
+  registry.StoreClass(nb::class_<mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab, mochi::ArticulatedSingleDofRangeConstraintParams>(m_prefab, "ArticulatedSingleDofRangeConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.ArticulatedSingleDofRangeConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
+  registry.StoreClass(nb::class_<mochi::prefab::Articulated3dRotationRangeConstraintPrefab, mochi::Articulated3dRotationRangeConstraintParams>(m_prefab, "Articulated3dRotationRangeConstraintPrefab", "Prefab parameters for a\n:class:`~superdex.physics.Articulated3dRotationRangeConstraintParams`.\n\nNote:\n    Actor name fields use the same naming convention as\n    :class:`~superdex.physics.prefab.PoseControllerPrefab`. \"myActor\" refers to\n    an actor in this prefab. \"myPrefab/myActor\" refers to an actor in a nested\n    prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`."));
+  registry.StoreClass(nb::class_<mochi::prefab::ConstraintLists>(m_prefab, "ConstraintLists", "Lists of constraints grouped by type."));
+  registry.StoreClass(nb::class_<mochi::prefab::PoseControllerPrefab>(m_prefab, "PoseControllerPrefab", "Prefab parameters for an articulated pose controller."));
+  registry.StoreClass(nb::class_<mochi::prefab::PrefabReference>(m_prefab, "PrefabReference", "Reference to another prefab (scene or actor) for prefab nesting."));
+  registry.StoreClass(nb::class_<mochi::prefab::ActorContactEntry>(m_prefab, "ActorContactEntry", "Used by :class:`~superdex.physics.prefab.ContactFilter` to enable or disable\ncontact for a pair of actors.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.enable_actor_contact_asymmetric`,\n    :meth:`~superdex.physics.Scene.enable_actor_contact_symmetric`"));
+  registry.StoreClass(nb::class_<mochi::prefab::ContactPairParamsOverrideEntry>(m_prefab, "ContactPairParamsOverrideEntry", "Overrides selected contact parameters for an unordered actor pair.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.set_contact_pair_params_override`,\n    :class:`~superdex.physics.ContactPairParamsOverride`"));
+  registry.StoreClass(nb::class_<mochi::prefab::LayerContactEntry>(m_prefab, "LayerContactEntry", "Used by :class:`~superdex.physics.prefab.ContactFilter` to enable or disable\ncontact for a pair of layers.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.enable_layer_contact_asymmetric`,\n    :meth:`~superdex.physics.Scene.enable_layer_contact_symmetric`"));
+  registry.StoreClass(nb::class_<mochi::prefab::ContactFilter>(m_prefab, "ContactFilter", "Contact filtering parameters for a prefab.\n\nNote:\n    By default, all actor pairs can potentially collide with each other, except\n    that automatic contact filtering disables adjacent links in articulated and\n    soft-skinned actors. To prevent additional contact, use this contact filter\n    in one of two ways (or both): 1) Use :attr:`actor_contact_asymmetric` or\n    :attr:`actor_contact_symmetric` to disable contact for a specific pair of\n    actors, or 2) use :attr:`layer_contact_asymmetric` or\n    :attr:`layer_contact_symmetric` to disable contact for a specific pair of\n    contact layer names. This applies to all actors in those layers.\n\nNote:\n    Contact only occurs if it is allowed by both the actor-vs-actor contact\n    filter and the layer-vs-layer contact filter. Either can prevent contact.\n\nNote:\n    You can also explicitly enable contact for a pair of actors or layers to\n    override a setting applied earlier. Actor entries can also override\n    automatic adjacent-link exclusions.\n\nNote:\n    Contact filters are applied after all actors in the prefab have been\n    created. Nested child prefab contact filters are applied before parent\n    prefab contact filters, so parent settings can override child settings in\n    the same actor-vs-actor or layer-vs-layer filter table.\n\nNote:\n    Settings are applied in this fixed order: :attr:`layer_contact_asymmetric`,\n    :attr:`layer_contact_symmetric`, :attr:`actor_contact_asymmetric`, then\n    :attr:`actor_contact_symmetric`. Within each list, entries are applied in\n    array order, so later entries can override earlier entries in the same\n    actor-vs-actor or layer-vs-layer filter table.\n\nNote:\n    Contact filter settings are not necessarily symmetric.\n\nNote:\n    Exporting a scene stores disabled pairs from the effective contact-filter\n    state, not the exact JSON representation originally used to author it.\n    Exporting may emit a canonical representation whose contact-filter category\n    differs from the original JSON. For example, self-contact may be emitted as\n    :attr:`actor_contact_symmetric` because the forward and reverse resolved\n    actor pair are the same. Entry order and duplicate, redundant, or overridden\n    entries from the source prefab are not preserved.\n\nWarning:\n    Scene export does not record explicit settings that enable contact between\n    actor pairs. If such a setting enables contact between adjacent links of an\n    articulated or soft-skinned actor, adding the exported prefab to a scene\n    applies automatic adjacent-link filtering and disables contact for that pair\n    again. To preserve this behavior, add an equivalent enabling entry to the\n    exported prefab or re-enable the pair after adding the prefab to a scene.\n\nSee Also:\n    :class:`~superdex.physics.prefab.ActorContactEntry`,\n    :meth:`~superdex.physics.Scene.enable_actor_contact_asymmetric`,\n    :meth:`~superdex.physics.Scene.enable_actor_contact_symmetric`,\n    :class:`~superdex.physics.prefab.LayerContactEntry`,\n    :meth:`~superdex.physics.Scene.enable_layer_contact_asymmetric`,\n    :meth:`~superdex.physics.Scene.enable_layer_contact_symmetric`"));
+  registry.StoreClass(nb::class_<mochi::prefab::ScenePrefab>(m_prefab, "ScenePrefab", "Top-level prefab describing a complete or partial physics scene (possibly just\none actor)."));
+  registry.StoreClass(nb::class_<mochi::prefab::PrefabParams>(m_prefab, "PrefabParams", "Parameters for instantiating a :class:`~superdex.physics.prefab.ScenePrefab`\ninto a :class:`~superdex.physics.Scene`."));
+  registry.StoreClass(nb::class_<mochi::prefab::AddToSceneResult>(m_prefab, "AddToSceneResult", "Struct used to return all created actors and constraints from\n:func:`~superdex.physics.prefab.add_to_scene`.\n\nNote:\n    The returned pointers are non-owning. They remain valid as long as the\n    :class:`~superdex.physics.Scene` is alive and the actors/constraints have\n    not been destroyed."));
 }
 
-void mochi::DefineMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+void mochi::DefineMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
   auto m_prefab = m.def_submodule("prefab");
 
   registry.GetClass<mochi::prefab::SceneParams>()
-    .def(py::init([](py::object comment, py::object description, py::object gravity, py::object solver) {
-      mochi::prefab::SceneParams result;
-      result.comment = py::cast<std::optional<mochi::DynamicString>>(comment);
-      result.description = py::cast<mochi::DynamicString>(description);
-      result.gravity = py::cast<std::optional<mochi::Real3>>(gravity);
-      result.solver = py::cast<std::optional<mochi::SolverParams>>(solver);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("comment") = mochi::prefab::SceneParams{}.comment
-      , py::arg("description") = mochi::prefab::SceneParams{}.description
-      , py::arg("gravity") = mochi::prefab::SceneParams{}.gravity
-      , py::arg("solver") = mochi::prefab::SceneParams{}.solver
+    .def("__init__", [](mochi::prefab::SceneParams* self, nb::object comment, nb::object description, nb::object gravity, nb::object solver) {
+      mochi::prefab::SceneParams result{};
+      result.comment = nb::cast<std::optional<mochi::DynamicString>>(comment);
+      result.description = nb::cast<mochi::DynamicString>(description);
+      result.gravity = nb::cast<std::optional<mochi::Real3>>(gravity);
+      result.solver = nb::cast<std::optional<mochi::SolverParams>>(solver);
+      new (self) mochi::prefab::SceneParams(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("comment").sig("...") = mochi::prefab::SceneParams{}.comment
+      , nb::arg("description") = mochi::prefab::SceneParams{}.description
+      , nb::arg("gravity").sig("...") = mochi::prefab::SceneParams{}.gravity
+      , nb::arg("solver").sig("...") = mochi::prefab::SceneParams{}.solver
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::SceneParams const& self) { return mochi::prefab::SceneParams(self); })
-    .def("__deepcopy__", [](mochi::prefab::SceneParams const& self, py::dict) { return mochi::prefab::SceneParams(self); })
-    .def_readwrite("comment", &mochi::prefab::SceneParams::comment, "Optional serialized comment.")
-    .def_readwrite("description", &mochi::prefab::SceneParams::description, "Human-readable description of the scene.")
-    .def_property("gravity", [](mochi::prefab::SceneParams& self) -> std::optional<mochi::Real3>& { return self.gravity; }, [](mochi::prefab::SceneParams& self, py::object val) { self.gravity = py::cast<std::optional<mochi::Real3>>(val); }, py::return_value_policy::reference_internal, "Optional gravity vector [m/s^2] in world frame.\n\n:func:`~superdex.physics.prefab.add_to_scene` replaces the scene's gravity only\nwhen this value is provided by the top-level prefab and\n:attr:`~superdex.physics.prefab.PrefabParams.apply_scene_settings` is true.\nOtherwise, the existing scene gravity is preserved.")
-    .def_readwrite("solver", &mochi::prefab::SceneParams::solver, "Optional solver parameters.\n\n:func:`~superdex.physics.prefab.add_to_scene` replaces the scene's complete\nsolver parameters only when this value is provided by the top-level prefab and\n:attr:`~superdex.physics.prefab.PrefabParams.apply_scene_settings` is true. In\nall other cases, the existing scene solver parameters are preserved. When\nreplacement occurs, fields omitted from the solver object use their default\nvalues, e.g. `\"solver\": {}` resets all solver parameters to their defaults.")
+    .def("__deepcopy__", [](mochi::prefab::SceneParams const& self, nb::dict) { return mochi::prefab::SceneParams(self); })
+    .def_prop_rw("comment", [](mochi::prefab::SceneParams& self) -> std::optional<mochi::DynamicString>& { return self.comment; }, [](mochi::prefab::SceneParams& self, nb::handle val) { self.comment = val.is_none() ? std::optional<mochi::DynamicString>{} : nb::cast<std::optional<mochi::DynamicString>>(val); }, "Optional serialized comment.", nb::for_setter(nb::arg("value").none()))
+    .def_rw("description", &mochi::prefab::SceneParams::description, "Human-readable description of the scene.")
+    .def_prop_rw("gravity", [](mochi::prefab::SceneParams& self) -> std::optional<mochi::Real3>& { return self.gravity; }, [](mochi::prefab::SceneParams& self, nb::handle val) { self.gravity = val.is_none() ? std::optional<mochi::Real3>{} : nb::cast<std::optional<mochi::Real3>>(val); }, "Optional gravity vector [m/s^2] in world frame.\n\n:func:`~superdex.physics.prefab.add_to_scene` replaces the scene's gravity only\nwhen this value is provided by the top-level prefab and\n:attr:`~superdex.physics.prefab.PrefabParams.apply_scene_settings` is true.\nOtherwise, the existing scene gravity is preserved.", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("solver", [](mochi::prefab::SceneParams& self) -> std::optional<mochi::SolverParams>& { return self.solver; }, [](mochi::prefab::SceneParams& self, nb::handle val) { self.solver = val.is_none() ? std::optional<mochi::SolverParams>{} : nb::cast<std::optional<mochi::SolverParams>>(val); }, "Optional solver parameters.\n\n:func:`~superdex.physics.prefab.add_to_scene` replaces the scene's complete\nsolver parameters only when this value is provided by the top-level prefab and\n:attr:`~superdex.physics.prefab.PrefabParams.apply_scene_settings` is true. In\nall other cases, the existing scene solver parameters are preserved. When\nreplacement occurs, fields omitted from the solver object use their default\nvalues, e.g. `\"solver\": {}` resets all solver parameters to their defaults.", nb::for_setter(nb::arg("value").none()))
   ;
 
   registry.GetClass<mochi::prefab::RigidActorPrefab, mochi::RigidActorParams>()
-    .def(py::init([](py::object name, py::object layer, py::object shape, py::object world_from_local, py::object collider_type, py::object is_static, py::object contact, py::object sdf, py::object has_gravity, py::object density, py::object mass, py::object center_of_mass, py::object moment_of_inertia, py::object boundary_element_type, py::object boundary_subsampling, py::object linear_velocity, py::object angular_velocity, py::object comment, py::object shape_file, py::object scale, py::object shape_rotation, py::object shape_translation, py::object rotation, py::object translation, py::object render_model_file, py::object render_model_scale, py::object render_model_rotation, py::object render_model_translation) {
-      mochi::prefab::RigidActorPrefab result;
-      result.name = py::cast<mochi::DynamicString>(name);
-      result.layer = py::cast<mochi::DynamicString>(layer);
-      result.shape = py::cast<mochi::ShapeHandle>(shape);
-      result.worldFromLocal = py::cast<mochi::TransformRT>(world_from_local);
-      result.colliderType = py::cast<mochi::ColliderType>(collider_type);
-      result.isStatic = py::cast<bool>(is_static);
-      result.contact = py::cast<mochi::ContactParams>(contact);
-      result.sdf = py::cast<mochi::GridSdfParams>(sdf);
-      result.hasGravity = py::cast<bool>(has_gravity);
-      result.density = py::cast<std::optional<mochi::real>>(density);
-      result.mass = py::cast<std::optional<mochi::real>>(mass);
-      result.centerOfMass = py::cast<std::optional<mochi::Real3>>(center_of_mass);
-      result.momentOfInertia = py::cast<std::optional<mochi::Real6>>(moment_of_inertia);
-      result.boundaryElementType = py::cast<mochi::ActorBoundaryElementType>(boundary_element_type);
-      result.boundarySubsampling = py::cast<std::optional<mochi::BoundarySubsamplingParams>>(boundary_subsampling);
-      result.linearVelocity = py::cast<std::optional<mochi::Real3>>(linear_velocity);
-      result.angularVelocity = py::cast<std::optional<mochi::Real3>>(angular_velocity);
-      result.comment = py::cast<std::optional<mochi::DynamicString>>(comment);
-      result.shapeFile = py::cast<mochi::DynamicString>(shape_file);
-      result.scale = py::cast<mochi::Real3>(scale);
-      result.shapeRotation = py::cast<mochi::Quaternion>(shape_rotation);
-      result.shapeTranslation = py::cast<mochi::Real3>(shape_translation);
-      result.rotation = py::cast<mochi::Quaternion>(rotation);
-      result.translation = py::cast<mochi::Real3>(translation);
-      result.renderModelFile = py::cast<mochi::DynamicString>(render_model_file);
-      result.renderModelScale = py::cast<mochi::Real3>(render_model_scale);
-      result.renderModelRotation = py::cast<mochi::Quaternion>(render_model_rotation);
-      result.renderModelTranslation = py::cast<mochi::Real3>(render_model_translation);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("name") = mochi::prefab::RigidActorPrefab{}.name
-      , py::arg("layer") = mochi::prefab::RigidActorPrefab{}.layer
-      , py::arg("shape") = mochi::prefab::RigidActorPrefab{}.shape
-      , py::arg("world_from_local") = mochi::prefab::RigidActorPrefab{}.worldFromLocal
-      , py::arg("collider_type") = mochi::prefab::RigidActorPrefab{}.colliderType
-      , py::arg("is_static") = mochi::prefab::RigidActorPrefab{}.isStatic
-      , py::arg("contact") = mochi::prefab::RigidActorPrefab{}.contact
-      , py::arg("sdf") = mochi::prefab::RigidActorPrefab{}.sdf
-      , py::arg("has_gravity") = mochi::prefab::RigidActorPrefab{}.hasGravity
-      , py::arg("density") = mochi::prefab::RigidActorPrefab{}.density
-      , py::arg("mass") = mochi::prefab::RigidActorPrefab{}.mass
-      , py::arg("center_of_mass") = mochi::prefab::RigidActorPrefab{}.centerOfMass
-      , py::arg("moment_of_inertia") = mochi::prefab::RigidActorPrefab{}.momentOfInertia
-      , py::arg("boundary_element_type") = mochi::prefab::RigidActorPrefab{}.boundaryElementType
-      , py::arg("boundary_subsampling") = mochi::prefab::RigidActorPrefab{}.boundarySubsampling
-      , py::arg("linear_velocity") = mochi::prefab::RigidActorPrefab{}.linearVelocity
-      , py::arg("angular_velocity") = mochi::prefab::RigidActorPrefab{}.angularVelocity
-      , py::arg("comment") = mochi::prefab::RigidActorPrefab{}.comment
-      , py::arg("shape_file") = mochi::prefab::RigidActorPrefab{}.shapeFile
-      , py::arg("scale") = mochi::prefab::RigidActorPrefab{}.scale
-      , py::arg("shape_rotation") = mochi::prefab::RigidActorPrefab{}.shapeRotation
-      , py::arg("shape_translation") = mochi::prefab::RigidActorPrefab{}.shapeTranslation
-      , py::arg("rotation") = mochi::prefab::RigidActorPrefab{}.rotation
-      , py::arg("translation") = mochi::prefab::RigidActorPrefab{}.translation
-      , py::arg("render_model_file") = mochi::prefab::RigidActorPrefab{}.renderModelFile
-      , py::arg("render_model_scale") = mochi::prefab::RigidActorPrefab{}.renderModelScale
-      , py::arg("render_model_rotation") = mochi::prefab::RigidActorPrefab{}.renderModelRotation
-      , py::arg("render_model_translation") = mochi::prefab::RigidActorPrefab{}.renderModelTranslation
+    .def("__init__", [](mochi::prefab::RigidActorPrefab* self, nb::object name, nb::object layer, nb::object shape, nb::object world_from_local, nb::object collider_type, nb::object is_static, nb::object contact, nb::object sdf, nb::object has_gravity, nb::object density, nb::object mass, nb::object center_of_mass, nb::object moment_of_inertia, nb::object boundary_element_type, nb::object boundary_subsampling, nb::object linear_velocity, nb::object angular_velocity, nb::object comment, nb::object shape_file, nb::object scale, nb::object shape_rotation, nb::object shape_translation, nb::object rotation, nb::object translation, nb::object render_model_file, nb::object render_model_scale, nb::object render_model_rotation, nb::object render_model_translation) {
+      mochi::prefab::RigidActorPrefab result{};
+      result.name = nb::cast<mochi::DynamicString>(name);
+      result.layer = nb::cast<mochi::DynamicString>(layer);
+      result.shape = nb::cast<mochi::ShapeHandle>(shape);
+      result.worldFromLocal = nb::cast<mochi::TransformRT>(world_from_local);
+      result.colliderType = nb::cast<mochi::ColliderType>(collider_type);
+      result.isStatic = nb::cast<bool>(is_static);
+      result.contact = nb::cast<mochi::ContactParams>(contact);
+      result.sdf = nb::cast<mochi::GridSdfParams>(sdf);
+      result.hasGravity = nb::cast<bool>(has_gravity);
+      result.density = nb::cast<std::optional<mochi::real>>(density);
+      result.mass = nb::cast<std::optional<mochi::real>>(mass);
+      result.centerOfMass = nb::cast<std::optional<mochi::Real3>>(center_of_mass);
+      result.momentOfInertia = nb::cast<std::optional<mochi::Real6>>(moment_of_inertia);
+      result.boundaryElementType = nb::cast<mochi::ActorBoundaryElementType>(boundary_element_type);
+      result.boundarySubsampling = nb::cast<std::optional<mochi::BoundarySubsamplingParams>>(boundary_subsampling);
+      result.linearVelocity = nb::cast<std::optional<mochi::Real3>>(linear_velocity);
+      result.angularVelocity = nb::cast<std::optional<mochi::Real3>>(angular_velocity);
+      result.comment = nb::cast<std::optional<mochi::DynamicString>>(comment);
+      result.shapeFile = nb::cast<mochi::DynamicString>(shape_file);
+      result.scale = nb::cast<mochi::Real3>(scale);
+      result.shapeRotation = nb::cast<mochi::Quaternion>(shape_rotation);
+      result.shapeTranslation = nb::cast<mochi::Real3>(shape_translation);
+      result.rotation = nb::cast<mochi::Quaternion>(rotation);
+      result.translation = nb::cast<mochi::Real3>(translation);
+      result.renderModelFile = nb::cast<mochi::DynamicString>(render_model_file);
+      result.renderModelScale = nb::cast<mochi::Real3>(render_model_scale);
+      result.renderModelRotation = nb::cast<mochi::Quaternion>(render_model_rotation);
+      result.renderModelTranslation = nb::cast<mochi::Real3>(render_model_translation);
+      new (self) mochi::prefab::RigidActorPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("name") = mochi::prefab::RigidActorPrefab{}.name
+      , nb::arg("layer") = mochi::prefab::RigidActorPrefab{}.layer
+      , nb::arg("shape").sig("...") = mochi::prefab::RigidActorPrefab{}.shape
+      , nb::arg("world_from_local").sig("...") = mochi::prefab::RigidActorPrefab{}.worldFromLocal
+      , nb::arg("collider_type") = mochi::prefab::RigidActorPrefab{}.colliderType
+      , nb::arg("is_static") = mochi::prefab::RigidActorPrefab{}.isStatic
+      , nb::arg("contact").sig("...") = mochi::prefab::RigidActorPrefab{}.contact
+      , nb::arg("sdf").sig("...") = mochi::prefab::RigidActorPrefab{}.sdf
+      , nb::arg("has_gravity") = mochi::prefab::RigidActorPrefab{}.hasGravity
+      , nb::arg("density").sig("...") = mochi::prefab::RigidActorPrefab{}.density
+      , nb::arg("mass").sig("...") = mochi::prefab::RigidActorPrefab{}.mass
+      , nb::arg("center_of_mass").sig("...") = mochi::prefab::RigidActorPrefab{}.centerOfMass
+      , nb::arg("moment_of_inertia").sig("...") = mochi::prefab::RigidActorPrefab{}.momentOfInertia
+      , nb::arg("boundary_element_type") = mochi::prefab::RigidActorPrefab{}.boundaryElementType
+      , nb::arg("boundary_subsampling").sig("...") = mochi::prefab::RigidActorPrefab{}.boundarySubsampling
+      , nb::arg("linear_velocity").sig("...") = mochi::prefab::RigidActorPrefab{}.linearVelocity
+      , nb::arg("angular_velocity").sig("...") = mochi::prefab::RigidActorPrefab{}.angularVelocity
+      , nb::arg("comment").sig("...") = mochi::prefab::RigidActorPrefab{}.comment
+      , nb::arg("shape_file") = mochi::prefab::RigidActorPrefab{}.shapeFile
+      , nb::arg("scale").sig("...") = mochi::prefab::RigidActorPrefab{}.scale
+      , nb::arg("shape_rotation").sig("...") = mochi::prefab::RigidActorPrefab{}.shapeRotation
+      , nb::arg("shape_translation").sig("...") = mochi::prefab::RigidActorPrefab{}.shapeTranslation
+      , nb::arg("rotation").sig("...") = mochi::prefab::RigidActorPrefab{}.rotation
+      , nb::arg("translation").sig("...") = mochi::prefab::RigidActorPrefab{}.translation
+      , nb::arg("render_model_file") = mochi::prefab::RigidActorPrefab{}.renderModelFile
+      , nb::arg("render_model_scale").sig("...") = mochi::prefab::RigidActorPrefab{}.renderModelScale
+      , nb::arg("render_model_rotation").sig("...") = mochi::prefab::RigidActorPrefab{}.renderModelRotation
+      , nb::arg("render_model_translation").sig("...") = mochi::prefab::RigidActorPrefab{}.renderModelTranslation
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::RigidActorPrefab const& self) { return mochi::prefab::RigidActorPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::RigidActorPrefab const& self, py::dict) { return mochi::prefab::RigidActorPrefab(self); })
-    .def_readwrite("comment", &mochi::prefab::RigidActorPrefab::comment, "Optional serialized comment.")
-    .def_readwrite("shape_file", &mochi::prefab::RigidActorPrefab::shapeFile, "Path to a model file that will be loaded and referenced via\n:class:`~superdex.physics.ShapeHandle`.")
-    .def_property("scale", [](mochi::prefab::RigidActorPrefab& self) -> mochi::Real3& { return self.scale; }, [](mochi::prefab::RigidActorPrefab& self, py::object val) { self.scale = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Scale [x, y, z] to bake into the shape file.\n\nNote:\n    All components must be non-zero and finite. Negative scale mirrors the\n    shape.\n\nNote:\n    Some shape data cannot bake arbitrary non-uniform scale. Unsupported scale\n    values are rejected when the shape is loaded.\n\nNote:\n    Precomputed grid SDF data is preserved only when\n    :attr:`~superdex.physics.prefab.RigidActorPrefab.scale` is uniform by\n    absolute value. Non-uniform scale by absolute value discards the precomputed\n    SDF. If an SDF collider is used, SuperDex Physics regenerates the SDF from\n    the transformed mesh at runtime, which may be expensive.")
-    .def_property("shape_rotation", [](mochi::prefab::RigidActorPrefab& self) -> mochi::Quaternion& { return self.shapeRotation; }, [](mochi::prefab::RigidActorPrefab& self, py::object val) { self.shapeRotation = py::cast<mochi::Quaternion>(val); }, py::return_value_policy::reference_internal, "Rotation quaternion [x, y, z, w] to bake into the shape file.")
-    .def_property("shape_translation", [](mochi::prefab::RigidActorPrefab& self) -> mochi::Real3& { return self.shapeTranslation; }, [](mochi::prefab::RigidActorPrefab& self, py::object val) { self.shapeTranslation = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Translation [x, y, z] to bake into the shape file.")
-    .def_property("rotation", [](mochi::prefab::RigidActorPrefab& self) -> mochi::Quaternion& { return self.rotation; }, [](mochi::prefab::RigidActorPrefab& self, py::object val) { self.rotation = py::cast<mochi::Quaternion>(val); }, py::return_value_policy::reference_internal, "Actor rotation quaternion [x, y, z, w] relative to the prefab's local frame\n(i.e., the prefab-from-local rotation). Composes with\n:attr:`~superdex.physics.prefab.PrefabParams.rotation` to produce the final\nworld-from-local rotation.\n\nNote:\n    Must be finite and non-zero.")
-    .def_property("translation", [](mochi::prefab::RigidActorPrefab& self) -> mochi::Real3& { return self.translation; }, [](mochi::prefab::RigidActorPrefab& self, py::object val) { self.translation = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Actor translation [x, y, z] relative to the prefab's local frame (i.e., the\nprefab-from-local translation). Composes with\n:attr:`~superdex.physics.prefab.PrefabParams.scale`,\n:attr:`~superdex.physics.prefab.PrefabParams.rotation`, and\n:attr:`~superdex.physics.prefab.PrefabParams.translation` to produce the final\nworld-from-local translation.\n\nNote:\n    Must be finite.")
-    .def_readwrite("render_model_file", &mochi::prefab::RigidActorPrefab::renderModelFile, "Optional path to a render model file (e.g. .glb) for visualization.\n\nNote:\n    SuperDex Physics does not use this field for simulation. It provides\n    additional metadata for visualization in supported tools. Ignored if empty.")
-    .def_property("render_model_scale", [](mochi::prefab::RigidActorPrefab& self) -> mochi::Real3& { return self.renderModelScale; }, [](mochi::prefab::RigidActorPrefab& self, py::object val) { self.renderModelScale = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Scale [x, y, z] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.RigidActorPrefab.render_model_file` is\n    empty.")
-    .def_property("render_model_rotation", [](mochi::prefab::RigidActorPrefab& self) -> mochi::Quaternion& { return self.renderModelRotation; }, [](mochi::prefab::RigidActorPrefab& self, py::object val) { self.renderModelRotation = py::cast<mochi::Quaternion>(val); }, py::return_value_policy::reference_internal, "Rotation quaternion [x, y, z, w] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.RigidActorPrefab.render_model_file` is\n    empty.")
-    .def_property("render_model_translation", [](mochi::prefab::RigidActorPrefab& self) -> mochi::Real3& { return self.renderModelTranslation; }, [](mochi::prefab::RigidActorPrefab& self, py::object val) { self.renderModelTranslation = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Translation [x, y, z] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.RigidActorPrefab.render_model_file` is\n    empty.")
+    .def("__deepcopy__", [](mochi::prefab::RigidActorPrefab const& self, nb::dict) { return mochi::prefab::RigidActorPrefab(self); })
+    .def_prop_rw("comment", [](mochi::prefab::RigidActorPrefab& self) -> std::optional<mochi::DynamicString>& { return self.comment; }, [](mochi::prefab::RigidActorPrefab& self, nb::handle val) { self.comment = val.is_none() ? std::optional<mochi::DynamicString>{} : nb::cast<std::optional<mochi::DynamicString>>(val); }, "Optional serialized comment.", nb::for_setter(nb::arg("value").none()))
+    .def_rw("shape_file", &mochi::prefab::RigidActorPrefab::shapeFile, "Path to a model file that will be loaded and referenced via\n:class:`~superdex.physics.ShapeHandle`.")
+    .def_prop_rw("scale", [](mochi::prefab::RigidActorPrefab& self) -> mochi::Real3& { return self.scale; }, [](mochi::prefab::RigidActorPrefab& self, nb::object val) { self.scale = nb::cast<mochi::Real3>(val); }, "Scale [x, y, z] to bake into the shape file.\n\nNote:\n    All components must be non-zero and finite. Negative scale mirrors the\n    shape.\n\nNote:\n    Some shape data cannot bake arbitrary non-uniform scale. Unsupported scale\n    values are rejected when the shape is loaded.\n\nNote:\n    Precomputed grid SDF data is preserved only when\n    :attr:`~superdex.physics.prefab.RigidActorPrefab.scale` is uniform by\n    absolute value. Non-uniform scale by absolute value discards the precomputed\n    SDF. If an SDF collider is used, SuperDex Physics regenerates the SDF from\n    the transformed mesh at runtime, which may be expensive.")
+    .def_prop_rw("shape_rotation", [](mochi::prefab::RigidActorPrefab& self) -> mochi::Quaternion& { return self.shapeRotation; }, [](mochi::prefab::RigidActorPrefab& self, nb::object val) { self.shapeRotation = nb::cast<mochi::Quaternion>(val); }, "Rotation quaternion [x, y, z, w] to bake into the shape file.")
+    .def_prop_rw("shape_translation", [](mochi::prefab::RigidActorPrefab& self) -> mochi::Real3& { return self.shapeTranslation; }, [](mochi::prefab::RigidActorPrefab& self, nb::object val) { self.shapeTranslation = nb::cast<mochi::Real3>(val); }, "Translation [x, y, z] to bake into the shape file.")
+    .def_prop_rw("rotation", [](mochi::prefab::RigidActorPrefab& self) -> mochi::Quaternion& { return self.rotation; }, [](mochi::prefab::RigidActorPrefab& self, nb::object val) { self.rotation = nb::cast<mochi::Quaternion>(val); }, "Actor rotation quaternion [x, y, z, w] relative to the prefab's local frame\n(i.e., the prefab-from-local rotation). Composes with\n:attr:`~superdex.physics.prefab.PrefabParams.rotation` to produce the final\nworld-from-local rotation.\n\nNote:\n    Must be finite and non-zero.")
+    .def_prop_rw("translation", [](mochi::prefab::RigidActorPrefab& self) -> mochi::Real3& { return self.translation; }, [](mochi::prefab::RigidActorPrefab& self, nb::object val) { self.translation = nb::cast<mochi::Real3>(val); }, "Actor translation [x, y, z] relative to the prefab's local frame (i.e., the\nprefab-from-local translation). Composes with\n:attr:`~superdex.physics.prefab.PrefabParams.scale`,\n:attr:`~superdex.physics.prefab.PrefabParams.rotation`, and\n:attr:`~superdex.physics.prefab.PrefabParams.translation` to produce the final\nworld-from-local translation.\n\nNote:\n    Must be finite.")
+    .def_rw("render_model_file", &mochi::prefab::RigidActorPrefab::renderModelFile, "Optional path to a render model file (e.g. .glb) for visualization.\n\nNote:\n    SuperDex Physics does not use this field for simulation. It provides\n    additional metadata for visualization in supported tools. Ignored if empty.")
+    .def_prop_rw("render_model_scale", [](mochi::prefab::RigidActorPrefab& self) -> mochi::Real3& { return self.renderModelScale; }, [](mochi::prefab::RigidActorPrefab& self, nb::object val) { self.renderModelScale = nb::cast<mochi::Real3>(val); }, "Scale [x, y, z] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.RigidActorPrefab.render_model_file` is\n    empty.")
+    .def_prop_rw("render_model_rotation", [](mochi::prefab::RigidActorPrefab& self) -> mochi::Quaternion& { return self.renderModelRotation; }, [](mochi::prefab::RigidActorPrefab& self, nb::object val) { self.renderModelRotation = nb::cast<mochi::Quaternion>(val); }, "Rotation quaternion [x, y, z, w] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.RigidActorPrefab.render_model_file` is\n    empty.")
+    .def_prop_rw("render_model_translation", [](mochi::prefab::RigidActorPrefab& self) -> mochi::Real3& { return self.renderModelTranslation; }, [](mochi::prefab::RigidActorPrefab& self, nb::object val) { self.renderModelTranslation = nb::cast<mochi::Real3>(val); }, "Translation [x, y, z] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.RigidActorPrefab.render_model_file` is\n    empty.")
   ;
 
   registry.GetClass<mochi::prefab::SoftActorPrefab, mochi::SoftActorParams>()
-    .def(py::init([](py::object name, py::object layer, py::object world_from_local, py::object shape, py::object material, py::object contact, py::object has_gravity, py::object has_inertia, py::object has_stress, py::object boundary_element_type, py::object comment, py::object shape_file, py::object collider_type, py::object sdf, py::object flow_file, py::object flow, py::object use_recentering, py::object scale, py::object shape_rotation, py::object shape_translation, py::object rotation, py::object translation, py::object render_model_file, py::object render_model_scale, py::object render_model_rotation, py::object render_model_translation) {
-      mochi::prefab::SoftActorPrefab result;
-      result.name = py::cast<mochi::DynamicString>(name);
-      result.layer = py::cast<mochi::DynamicString>(layer);
-      result.worldFromLocal = py::cast<mochi::TransformRT>(world_from_local);
-      result.shape = py::cast<mochi::ShapeHandle>(shape);
-      result.material = py::cast<mochi::SoftMaterialParams>(material);
-      result.contact = py::cast<mochi::ContactParams>(contact);
-      result.hasGravity = py::cast<bool>(has_gravity);
-      result.hasInertia = py::cast<bool>(has_inertia);
-      result.hasStress = py::cast<bool>(has_stress);
-      result.boundaryElementType = py::cast<mochi::ActorBoundaryElementType>(boundary_element_type);
-      result.comment = py::cast<std::optional<mochi::DynamicString>>(comment);
-      result.shapeFile = py::cast<mochi::DynamicString>(shape_file);
-      result.colliderType = py::cast<mochi::ColliderType>(collider_type);
-      result.sdf = py::cast<mochi::GridSdfParams>(sdf);
-      result.flowFile = py::cast<mochi::DynamicString>(flow_file);
-      result.flow = py::cast<mochi::ShapeHandle>(flow);
-      result.useRecentering = py::cast<bool>(use_recentering);
-      result.scale = py::cast<mochi::Real3>(scale);
-      result.shapeRotation = py::cast<mochi::Quaternion>(shape_rotation);
-      result.shapeTranslation = py::cast<mochi::Real3>(shape_translation);
-      result.rotation = py::cast<mochi::Quaternion>(rotation);
-      result.translation = py::cast<mochi::Real3>(translation);
-      result.renderModelFile = py::cast<mochi::DynamicString>(render_model_file);
-      result.renderModelScale = py::cast<mochi::Real3>(render_model_scale);
-      result.renderModelRotation = py::cast<mochi::Quaternion>(render_model_rotation);
-      result.renderModelTranslation = py::cast<mochi::Real3>(render_model_translation);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("name") = mochi::prefab::SoftActorPrefab{}.name
-      , py::arg("layer") = mochi::prefab::SoftActorPrefab{}.layer
-      , py::arg("world_from_local") = mochi::prefab::SoftActorPrefab{}.worldFromLocal
-      , py::arg("shape") = mochi::prefab::SoftActorPrefab{}.shape
-      , py::arg("material") = mochi::prefab::SoftActorPrefab{}.material
-      , py::arg("contact") = mochi::prefab::SoftActorPrefab{}.contact
-      , py::arg("has_gravity") = mochi::prefab::SoftActorPrefab{}.hasGravity
-      , py::arg("has_inertia") = mochi::prefab::SoftActorPrefab{}.hasInertia
-      , py::arg("has_stress") = mochi::prefab::SoftActorPrefab{}.hasStress
-      , py::arg("boundary_element_type") = mochi::prefab::SoftActorPrefab{}.boundaryElementType
-      , py::arg("comment") = mochi::prefab::SoftActorPrefab{}.comment
-      , py::arg("shape_file") = mochi::prefab::SoftActorPrefab{}.shapeFile
-      , py::arg("collider_type") = mochi::prefab::SoftActorPrefab{}.colliderType
-      , py::arg("sdf") = mochi::prefab::SoftActorPrefab{}.sdf
-      , py::arg("flow_file") = mochi::prefab::SoftActorPrefab{}.flowFile
-      , py::arg("flow") = mochi::prefab::SoftActorPrefab{}.flow
-      , py::arg("use_recentering") = mochi::prefab::SoftActorPrefab{}.useRecentering
-      , py::arg("scale") = mochi::prefab::SoftActorPrefab{}.scale
-      , py::arg("shape_rotation") = mochi::prefab::SoftActorPrefab{}.shapeRotation
-      , py::arg("shape_translation") = mochi::prefab::SoftActorPrefab{}.shapeTranslation
-      , py::arg("rotation") = mochi::prefab::SoftActorPrefab{}.rotation
-      , py::arg("translation") = mochi::prefab::SoftActorPrefab{}.translation
-      , py::arg("render_model_file") = mochi::prefab::SoftActorPrefab{}.renderModelFile
-      , py::arg("render_model_scale") = mochi::prefab::SoftActorPrefab{}.renderModelScale
-      , py::arg("render_model_rotation") = mochi::prefab::SoftActorPrefab{}.renderModelRotation
-      , py::arg("render_model_translation") = mochi::prefab::SoftActorPrefab{}.renderModelTranslation
+    .def("__init__", [](mochi::prefab::SoftActorPrefab* self, nb::object name, nb::object layer, nb::object world_from_local, nb::object shape, nb::object material, nb::object contact, nb::object has_gravity, nb::object has_inertia, nb::object has_stress, nb::object boundary_element_type, nb::object comment, nb::object shape_file, nb::object collider_type, nb::object sdf, nb::object flow_file, nb::object flow, nb::object use_recentering, nb::object scale, nb::object shape_rotation, nb::object shape_translation, nb::object rotation, nb::object translation, nb::object render_model_file, nb::object render_model_scale, nb::object render_model_rotation, nb::object render_model_translation) {
+      mochi::prefab::SoftActorPrefab result{};
+      result.name = nb::cast<mochi::DynamicString>(name);
+      result.layer = nb::cast<mochi::DynamicString>(layer);
+      result.worldFromLocal = nb::cast<mochi::TransformRT>(world_from_local);
+      result.shape = nb::cast<mochi::ShapeHandle>(shape);
+      result.material = nb::cast<mochi::SoftMaterialParams>(material);
+      result.contact = nb::cast<mochi::ContactParams>(contact);
+      result.hasGravity = nb::cast<bool>(has_gravity);
+      result.hasInertia = nb::cast<bool>(has_inertia);
+      result.hasStress = nb::cast<bool>(has_stress);
+      result.boundaryElementType = nb::cast<mochi::ActorBoundaryElementType>(boundary_element_type);
+      result.comment = nb::cast<std::optional<mochi::DynamicString>>(comment);
+      result.shapeFile = nb::cast<mochi::DynamicString>(shape_file);
+      result.colliderType = nb::cast<mochi::ColliderType>(collider_type);
+      result.sdf = nb::cast<mochi::GridSdfParams>(sdf);
+      result.flowFile = nb::cast<mochi::DynamicString>(flow_file);
+      result.flow = nb::cast<mochi::ShapeHandle>(flow);
+      result.useRecentering = nb::cast<bool>(use_recentering);
+      result.scale = nb::cast<mochi::Real3>(scale);
+      result.shapeRotation = nb::cast<mochi::Quaternion>(shape_rotation);
+      result.shapeTranslation = nb::cast<mochi::Real3>(shape_translation);
+      result.rotation = nb::cast<mochi::Quaternion>(rotation);
+      result.translation = nb::cast<mochi::Real3>(translation);
+      result.renderModelFile = nb::cast<mochi::DynamicString>(render_model_file);
+      result.renderModelScale = nb::cast<mochi::Real3>(render_model_scale);
+      result.renderModelRotation = nb::cast<mochi::Quaternion>(render_model_rotation);
+      result.renderModelTranslation = nb::cast<mochi::Real3>(render_model_translation);
+      new (self) mochi::prefab::SoftActorPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("name") = mochi::prefab::SoftActorPrefab{}.name
+      , nb::arg("layer") = mochi::prefab::SoftActorPrefab{}.layer
+      , nb::arg("world_from_local").sig("...") = mochi::prefab::SoftActorPrefab{}.worldFromLocal
+      , nb::arg("shape").sig("...") = mochi::prefab::SoftActorPrefab{}.shape
+      , nb::arg("material").sig("...") = mochi::prefab::SoftActorPrefab{}.material
+      , nb::arg("contact").sig("...") = mochi::prefab::SoftActorPrefab{}.contact
+      , nb::arg("has_gravity") = mochi::prefab::SoftActorPrefab{}.hasGravity
+      , nb::arg("has_inertia") = mochi::prefab::SoftActorPrefab{}.hasInertia
+      , nb::arg("has_stress") = mochi::prefab::SoftActorPrefab{}.hasStress
+      , nb::arg("boundary_element_type") = mochi::prefab::SoftActorPrefab{}.boundaryElementType
+      , nb::arg("comment").sig("...") = mochi::prefab::SoftActorPrefab{}.comment
+      , nb::arg("shape_file") = mochi::prefab::SoftActorPrefab{}.shapeFile
+      , nb::arg("collider_type") = mochi::prefab::SoftActorPrefab{}.colliderType
+      , nb::arg("sdf").sig("...") = mochi::prefab::SoftActorPrefab{}.sdf
+      , nb::arg("flow_file") = mochi::prefab::SoftActorPrefab{}.flowFile
+      , nb::arg("flow").sig("...") = mochi::prefab::SoftActorPrefab{}.flow
+      , nb::arg("use_recentering") = mochi::prefab::SoftActorPrefab{}.useRecentering
+      , nb::arg("scale").sig("...") = mochi::prefab::SoftActorPrefab{}.scale
+      , nb::arg("shape_rotation").sig("...") = mochi::prefab::SoftActorPrefab{}.shapeRotation
+      , nb::arg("shape_translation").sig("...") = mochi::prefab::SoftActorPrefab{}.shapeTranslation
+      , nb::arg("rotation").sig("...") = mochi::prefab::SoftActorPrefab{}.rotation
+      , nb::arg("translation").sig("...") = mochi::prefab::SoftActorPrefab{}.translation
+      , nb::arg("render_model_file") = mochi::prefab::SoftActorPrefab{}.renderModelFile
+      , nb::arg("render_model_scale").sig("...") = mochi::prefab::SoftActorPrefab{}.renderModelScale
+      , nb::arg("render_model_rotation").sig("...") = mochi::prefab::SoftActorPrefab{}.renderModelRotation
+      , nb::arg("render_model_translation").sig("...") = mochi::prefab::SoftActorPrefab{}.renderModelTranslation
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::SoftActorPrefab const& self) { return mochi::prefab::SoftActorPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::SoftActorPrefab const& self, py::dict) { return mochi::prefab::SoftActorPrefab(self); })
-    .def_readwrite("comment", &mochi::prefab::SoftActorPrefab::comment, "Optional serialized comment.")
-    .def_readwrite("shape_file", &mochi::prefab::SoftActorPrefab::shapeFile, "Path to a model file that will be loaded and referenced via\n:class:`~superdex.physics.ShapeHandle`.")
-    .def_readwrite("collider_type", &mochi::prefab::SoftActorPrefab::colliderType, "[Experimental] Collision detection geometry.\n\nNote:\n    Determines how OTHER actors detect contact with this actor. It does not\n    affect how this actor detects contact with other actors.\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk.")
-    .def_readwrite("sdf", &mochi::prefab::SoftActorPrefab::sdf, "[Experimental] Parameters used to construct a grid-based Signed Distance Field\n(SDF) if the shape doesn't already have one.\n\nNote:\n    Ignored if :attr:`~superdex.physics.prefab.SoftActorPrefab.collider_type` is\n    not :class:`SDF <superdex.physics.ColliderType>`.\n\nNote:\n    Ignored if the shape already has a grid-based SDF.\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk.")
-    .def_readwrite("flow_file", &mochi::prefab::SoftActorPrefab::flowFile, "[Experimental] Optional path to a deep flow shape handle for collision\ndetection.\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk.")
-    .def_readwrite("flow", &mochi::prefab::SoftActorPrefab::flow, "[Experimental] Optional deep flow shape handle loaded from\n:attr:`~superdex.physics.prefab.SoftActorPrefab.flow_file`.\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk.")
-    .def_readwrite("use_recentering", &mochi::prefab::SoftActorPrefab::useRecentering, "[Experimental] Enable automatic recentering of the local coordinate system.\n\nNote:\n    Recentering updates the root transform as the actor moves, keeping\n    local-space displacements small. This improves numerical stability for\n    actors that move far from their initial position.\n\nNote:\n    Ignored for nested soft actors in soft-skinned actors, which do not support\n    recentering.\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk.")
-    .def_property("scale", [](mochi::prefab::SoftActorPrefab& self) -> mochi::Real3& { return self.scale; }, [](mochi::prefab::SoftActorPrefab& self, py::object val) { self.scale = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Scale [x, y, z] to bake into the shape file.\n\nNote:\n    All components must be strictly positive and finite. Negative scale\n    (mirroring) is not supported and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`.\n\nNote:\n    If :attr:`~superdex.physics.prefab.SoftActorPrefab.flow_file` is set,\n    :attr:`~superdex.physics.prefab.SoftActorPrefab.scale` must be (1, 1, 1).\n\nNote:\n    Non-uniform scale is supported only for shape data that supports arbitrary\n    per-axis bake scale. Unsupported scale values are rejected when the shape is\n    loaded.")
-    .def_property("shape_rotation", [](mochi::prefab::SoftActorPrefab& self) -> mochi::Quaternion& { return self.shapeRotation; }, [](mochi::prefab::SoftActorPrefab& self, py::object val) { self.shapeRotation = py::cast<mochi::Quaternion>(val); }, py::return_value_policy::reference_internal, "Rotation quaternion [x, y, z, w] to bake into the shape file.")
-    .def_property("shape_translation", [](mochi::prefab::SoftActorPrefab& self) -> mochi::Real3& { return self.shapeTranslation; }, [](mochi::prefab::SoftActorPrefab& self, py::object val) { self.shapeTranslation = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Translation [x, y, z] to bake into the shape file.")
-    .def_property("rotation", [](mochi::prefab::SoftActorPrefab& self) -> mochi::Quaternion& { return self.rotation; }, [](mochi::prefab::SoftActorPrefab& self, py::object val) { self.rotation = py::cast<mochi::Quaternion>(val); }, py::return_value_policy::reference_internal, "Actor rotation quaternion [x, y, z, w] relative to the prefab's local frame\n(i.e., the prefab-from-local rotation). Composes with\n:attr:`~superdex.physics.prefab.PrefabParams.rotation` to produce the final\nworld-from-local rotation.\n\nNote:\n    Must be finite and non-zero when used in\n    :attr:`~superdex.physics.prefab.ActorLists.soft`.\n\nNote:\n    Ignored when used in\n    :attr:`~superdex.physics.prefab.SoftSkinnedActorPrefab.soft_params`.")
-    .def_property("translation", [](mochi::prefab::SoftActorPrefab& self) -> mochi::Real3& { return self.translation; }, [](mochi::prefab::SoftActorPrefab& self, py::object val) { self.translation = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Actor translation [x, y, z] relative to the prefab's local frame (i.e., the\nprefab-from-local translation). Composes with\n:attr:`~superdex.physics.prefab.PrefabParams.scale`,\n:attr:`~superdex.physics.prefab.PrefabParams.rotation`, and\n:attr:`~superdex.physics.prefab.PrefabParams.translation` to produce the final\nworld-from-local translation.\n\nNote:\n    Must be finite when used in\n    :attr:`~superdex.physics.prefab.ActorLists.soft`.\n\nNote:\n    Ignored when used in\n    :attr:`~superdex.physics.prefab.SoftSkinnedActorPrefab.soft_params`.")
-    .def_readwrite("render_model_file", &mochi::prefab::SoftActorPrefab::renderModelFile, "Optional path to a render model file (e.g. .glb) for visualization.\n\nNote:\n    SuperDex Physics does not use this field for simulation. It provides\n    additional metadata for visualization in supported tools. Ignored if empty.")
-    .def_property("render_model_scale", [](mochi::prefab::SoftActorPrefab& self) -> mochi::Real3& { return self.renderModelScale; }, [](mochi::prefab::SoftActorPrefab& self, py::object val) { self.renderModelScale = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Scale [x, y, z] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.SoftActorPrefab.render_model_file` is empty.")
-    .def_property("render_model_rotation", [](mochi::prefab::SoftActorPrefab& self) -> mochi::Quaternion& { return self.renderModelRotation; }, [](mochi::prefab::SoftActorPrefab& self, py::object val) { self.renderModelRotation = py::cast<mochi::Quaternion>(val); }, py::return_value_policy::reference_internal, "Rotation quaternion [x, y, z, w] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.SoftActorPrefab.render_model_file` is empty.")
-    .def_property("render_model_translation", [](mochi::prefab::SoftActorPrefab& self) -> mochi::Real3& { return self.renderModelTranslation; }, [](mochi::prefab::SoftActorPrefab& self, py::object val) { self.renderModelTranslation = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Translation [x, y, z] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.SoftActorPrefab.render_model_file` is empty.")
+    .def("__deepcopy__", [](mochi::prefab::SoftActorPrefab const& self, nb::dict) { return mochi::prefab::SoftActorPrefab(self); })
+    .def_prop_rw("comment", [](mochi::prefab::SoftActorPrefab& self) -> std::optional<mochi::DynamicString>& { return self.comment; }, [](mochi::prefab::SoftActorPrefab& self, nb::handle val) { self.comment = val.is_none() ? std::optional<mochi::DynamicString>{} : nb::cast<std::optional<mochi::DynamicString>>(val); }, "Optional serialized comment.", nb::for_setter(nb::arg("value").none()))
+    .def_rw("shape_file", &mochi::prefab::SoftActorPrefab::shapeFile, "Path to a model file that will be loaded and referenced via\n:class:`~superdex.physics.ShapeHandle`.")
+    .def_rw("collider_type", &mochi::prefab::SoftActorPrefab::colliderType, "[Experimental] Collision detection geometry.\n\nNote:\n    Determines how OTHER actors detect contact with this actor. It does not\n    affect how this actor detects contact with other actors.\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk.")
+    .def_rw("sdf", &mochi::prefab::SoftActorPrefab::sdf, "[Experimental] Parameters used to construct a grid-based Signed Distance Field\n(SDF) if the shape doesn't already have one.\n\nNote:\n    Ignored if :attr:`~superdex.physics.prefab.SoftActorPrefab.collider_type` is\n    not :class:`SDF <superdex.physics.ColliderType>`.\n\nNote:\n    Ignored if the shape already has a grid-based SDF.\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk.")
+    .def_rw("flow_file", &mochi::prefab::SoftActorPrefab::flowFile, "[Experimental] Optional path to a deep flow shape handle for collision\ndetection.\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk.")
+    .def_rw("flow", &mochi::prefab::SoftActorPrefab::flow, "[Experimental] Optional deep flow shape handle loaded from\n:attr:`~superdex.physics.prefab.SoftActorPrefab.flow_file`.\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk.")
+    .def_rw("use_recentering", &mochi::prefab::SoftActorPrefab::useRecentering, "[Experimental] Enable automatic recentering of the local coordinate system.\n\nNote:\n    Recentering updates the root transform as the actor moves, keeping\n    local-space displacements small. This improves numerical stability for\n    actors that move far from their initial position.\n\nNote:\n    Ignored for nested soft actors in soft-skinned actors, which do not support\n    recentering.\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk.")
+    .def_prop_rw("scale", [](mochi::prefab::SoftActorPrefab& self) -> mochi::Real3& { return self.scale; }, [](mochi::prefab::SoftActorPrefab& self, nb::object val) { self.scale = nb::cast<mochi::Real3>(val); }, "Scale [x, y, z] to bake into the shape file.\n\nNote:\n    All components must be strictly positive and finite. Negative scale\n    (mirroring) is not supported and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`.\n\nNote:\n    If :attr:`~superdex.physics.prefab.SoftActorPrefab.flow_file` is set,\n    :attr:`~superdex.physics.prefab.SoftActorPrefab.scale` must be (1, 1, 1).\n\nNote:\n    Non-uniform scale is supported only for shape data that supports arbitrary\n    per-axis bake scale. Unsupported scale values are rejected when the shape is\n    loaded.")
+    .def_prop_rw("shape_rotation", [](mochi::prefab::SoftActorPrefab& self) -> mochi::Quaternion& { return self.shapeRotation; }, [](mochi::prefab::SoftActorPrefab& self, nb::object val) { self.shapeRotation = nb::cast<mochi::Quaternion>(val); }, "Rotation quaternion [x, y, z, w] to bake into the shape file.")
+    .def_prop_rw("shape_translation", [](mochi::prefab::SoftActorPrefab& self) -> mochi::Real3& { return self.shapeTranslation; }, [](mochi::prefab::SoftActorPrefab& self, nb::object val) { self.shapeTranslation = nb::cast<mochi::Real3>(val); }, "Translation [x, y, z] to bake into the shape file.")
+    .def_prop_rw("rotation", [](mochi::prefab::SoftActorPrefab& self) -> mochi::Quaternion& { return self.rotation; }, [](mochi::prefab::SoftActorPrefab& self, nb::object val) { self.rotation = nb::cast<mochi::Quaternion>(val); }, "Actor rotation quaternion [x, y, z, w] relative to the prefab's local frame\n(i.e., the prefab-from-local rotation). Composes with\n:attr:`~superdex.physics.prefab.PrefabParams.rotation` to produce the final\nworld-from-local rotation.\n\nNote:\n    Must be finite and non-zero when used in\n    :attr:`~superdex.physics.prefab.ActorLists.soft`.\n\nNote:\n    Ignored when used in\n    :attr:`~superdex.physics.prefab.SoftSkinnedActorPrefab.soft_params`.")
+    .def_prop_rw("translation", [](mochi::prefab::SoftActorPrefab& self) -> mochi::Real3& { return self.translation; }, [](mochi::prefab::SoftActorPrefab& self, nb::object val) { self.translation = nb::cast<mochi::Real3>(val); }, "Actor translation [x, y, z] relative to the prefab's local frame (i.e., the\nprefab-from-local translation). Composes with\n:attr:`~superdex.physics.prefab.PrefabParams.scale`,\n:attr:`~superdex.physics.prefab.PrefabParams.rotation`, and\n:attr:`~superdex.physics.prefab.PrefabParams.translation` to produce the final\nworld-from-local translation.\n\nNote:\n    Must be finite when used in\n    :attr:`~superdex.physics.prefab.ActorLists.soft`.\n\nNote:\n    Ignored when used in\n    :attr:`~superdex.physics.prefab.SoftSkinnedActorPrefab.soft_params`.")
+    .def_rw("render_model_file", &mochi::prefab::SoftActorPrefab::renderModelFile, "Optional path to a render model file (e.g. .glb) for visualization.\n\nNote:\n    SuperDex Physics does not use this field for simulation. It provides\n    additional metadata for visualization in supported tools. Ignored if empty.")
+    .def_prop_rw("render_model_scale", [](mochi::prefab::SoftActorPrefab& self) -> mochi::Real3& { return self.renderModelScale; }, [](mochi::prefab::SoftActorPrefab& self, nb::object val) { self.renderModelScale = nb::cast<mochi::Real3>(val); }, "Scale [x, y, z] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.SoftActorPrefab.render_model_file` is empty.")
+    .def_prop_rw("render_model_rotation", [](mochi::prefab::SoftActorPrefab& self) -> mochi::Quaternion& { return self.renderModelRotation; }, [](mochi::prefab::SoftActorPrefab& self, nb::object val) { self.renderModelRotation = nb::cast<mochi::Quaternion>(val); }, "Rotation quaternion [x, y, z, w] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.SoftActorPrefab.render_model_file` is empty.")
+    .def_prop_rw("render_model_translation", [](mochi::prefab::SoftActorPrefab& self) -> mochi::Real3& { return self.renderModelTranslation; }, [](mochi::prefab::SoftActorPrefab& self, nb::object val) { self.renderModelTranslation = nb::cast<mochi::Real3>(val); }, "Translation [x, y, z] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.SoftActorPrefab.render_model_file` is empty.")
   ;
 
   registry.GetClass<mochi::prefab::ArticulatedJointPrefab, mochi::ArticulatedJointParams>()
-    .def(py::init([](py::object name, py::object type, py::object parent_link_from_joint, py::object axis, py::object friction, py::object inertia, py::object min_limit, py::object max_limit, py::object limit_stiffness, py::object limit_damping) {
-      mochi::prefab::ArticulatedJointPrefab result;
-      result.name = py::cast<mochi::DynamicString>(name);
-      result.type = py::cast<mochi::ArticulatedJointType>(type);
-      result.parentLinkFromJoint = py::cast<mochi::TransformRT>(parent_link_from_joint);
-      result.axis = py::cast<mochi::Real3>(axis);
-      result.friction = py::cast<mochi::ArticulatedJointFrictionParams>(friction);
-      result.inertia = py::cast<std::optional<mochi::real>>(inertia);
-      result.minLimit = py::cast<std::optional<mochi::Real3>>(min_limit);
-      result.maxLimit = py::cast<std::optional<mochi::Real3>>(max_limit);
-      result.limitStiffness = py::cast<mochi::real>(limit_stiffness);
-      result.limitDamping = py::cast<mochi::real>(limit_damping);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("name") = mochi::prefab::ArticulatedJointPrefab{}.name
-      , py::arg("type") = mochi::prefab::ArticulatedJointPrefab{}.type
-      , py::arg("parent_link_from_joint") = mochi::prefab::ArticulatedJointPrefab{}.parentLinkFromJoint
-      , py::arg("axis") = mochi::prefab::ArticulatedJointPrefab{}.axis
-      , py::arg("friction") = mochi::prefab::ArticulatedJointPrefab{}.friction
-      , py::arg("inertia") = mochi::prefab::ArticulatedJointPrefab{}.inertia
-      , py::arg("min_limit") = mochi::prefab::ArticulatedJointPrefab{}.minLimit
-      , py::arg("max_limit") = mochi::prefab::ArticulatedJointPrefab{}.maxLimit
-      , py::arg("limit_stiffness") = mochi::prefab::ArticulatedJointPrefab{}.limitStiffness
-      , py::arg("limit_damping") = mochi::prefab::ArticulatedJointPrefab{}.limitDamping
+    .def("__init__", [](mochi::prefab::ArticulatedJointPrefab* self, nb::object name, nb::object type, nb::object parent_link_from_joint, nb::object axis, nb::object friction, nb::object inertia, nb::object min_limit, nb::object max_limit, nb::object limit_stiffness, nb::object limit_damping) {
+      mochi::prefab::ArticulatedJointPrefab result{};
+      result.name = nb::cast<mochi::DynamicString>(name);
+      result.type = nb::cast<mochi::ArticulatedJointType>(type);
+      result.parentLinkFromJoint = nb::cast<mochi::TransformRT>(parent_link_from_joint);
+      result.axis = nb::cast<mochi::Real3>(axis);
+      result.friction = nb::cast<mochi::ArticulatedJointFrictionParams>(friction);
+      result.inertia = nb::cast<std::optional<mochi::real>>(inertia);
+      result.minLimit = nb::cast<std::optional<mochi::Real3>>(min_limit);
+      result.maxLimit = nb::cast<std::optional<mochi::Real3>>(max_limit);
+      result.limitStiffness = nb::cast<mochi::real>(limit_stiffness);
+      result.limitDamping = nb::cast<mochi::real>(limit_damping);
+      new (self) mochi::prefab::ArticulatedJointPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("name") = mochi::prefab::ArticulatedJointPrefab{}.name
+      , nb::arg("type") = mochi::prefab::ArticulatedJointPrefab{}.type
+      , nb::arg("parent_link_from_joint").sig("...") = mochi::prefab::ArticulatedJointPrefab{}.parentLinkFromJoint
+      , nb::arg("axis").sig("...") = mochi::prefab::ArticulatedJointPrefab{}.axis
+      , nb::arg("friction").sig("...") = mochi::prefab::ArticulatedJointPrefab{}.friction
+      , nb::arg("inertia").sig("...") = mochi::prefab::ArticulatedJointPrefab{}.inertia
+      , nb::arg("min_limit").sig("...") = mochi::prefab::ArticulatedJointPrefab{}.minLimit
+      , nb::arg("max_limit").sig("...") = mochi::prefab::ArticulatedJointPrefab{}.maxLimit
+      , nb::arg("limit_stiffness") = mochi::prefab::ArticulatedJointPrefab{}.limitStiffness
+      , nb::arg("limit_damping") = mochi::prefab::ArticulatedJointPrefab{}.limitDamping
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::prefab::ArticulatedJointPrefab const& self) { return mochi::prefab::ArticulatedJointPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::ArticulatedJointPrefab const& self, py::dict) { return mochi::prefab::ArticulatedJointPrefab(self); })
+    .def("__deepcopy__", [](mochi::prefab::ArticulatedJointPrefab const& self, nb::dict) { return mochi::prefab::ArticulatedJointPrefab(self); })
   ;
 
   registry.GetClass<mochi::prefab::ArticulatedLinkPrefab, mochi::ArticulatedLinkParams>()
-    .def(py::init([](py::object name, py::object parent_link, py::object parent_joint_from_link, py::object shape, py::object layer, py::object collider_type, py::object contact, py::object has_gravity, py::object density, py::object mass, py::object center_of_mass, py::object moment_of_inertia, py::object boundary_element_type, py::object boundary_subsampling, py::object shape_file, py::object shape_scale, py::object shape_rotation, py::object shape_translation, py::object render_model_file, py::object render_model_scale, py::object render_model_rotation, py::object render_model_translation) {
-      mochi::prefab::ArticulatedLinkPrefab result;
-      result.name = py::cast<mochi::DynamicString>(name);
-      result.parentLink = py::cast<int>(parent_link);
-      result.parentJointFromLink = py::cast<mochi::TransformRT>(parent_joint_from_link);
-      result.shape = py::cast<mochi::ShapeHandle>(shape);
-      result.layer = py::cast<mochi::DynamicString>(layer);
-      result.colliderType = py::cast<mochi::ColliderType>(collider_type);
-      result.contact = py::cast<mochi::ContactParams>(contact);
-      result.hasGravity = py::cast<bool>(has_gravity);
-      result.density = py::cast<std::optional<mochi::real>>(density);
-      result.mass = py::cast<std::optional<mochi::real>>(mass);
-      result.centerOfMass = py::cast<std::optional<mochi::Real3>>(center_of_mass);
-      result.momentOfInertia = py::cast<std::optional<mochi::Real6>>(moment_of_inertia);
-      result.boundaryElementType = py::cast<mochi::ActorBoundaryElementType>(boundary_element_type);
-      result.boundarySubsampling = py::cast<std::optional<mochi::BoundarySubsamplingParams>>(boundary_subsampling);
-      result.shapeFile = py::cast<mochi::DynamicString>(shape_file);
-      result.shapeScale = py::cast<mochi::Real3>(shape_scale);
-      result.shapeRotation = py::cast<mochi::Quaternion>(shape_rotation);
-      result.shapeTranslation = py::cast<mochi::Real3>(shape_translation);
-      result.renderModelFile = py::cast<mochi::DynamicString>(render_model_file);
-      result.renderModelScale = py::cast<mochi::Real3>(render_model_scale);
-      result.renderModelRotation = py::cast<mochi::Quaternion>(render_model_rotation);
-      result.renderModelTranslation = py::cast<mochi::Real3>(render_model_translation);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("name") = mochi::prefab::ArticulatedLinkPrefab{}.name
-      , py::arg("parent_link") = mochi::prefab::ArticulatedLinkPrefab{}.parentLink
-      , py::arg("parent_joint_from_link") = mochi::prefab::ArticulatedLinkPrefab{}.parentJointFromLink
-      , py::arg("shape") = mochi::prefab::ArticulatedLinkPrefab{}.shape
-      , py::arg("layer") = mochi::prefab::ArticulatedLinkPrefab{}.layer
-      , py::arg("collider_type") = mochi::prefab::ArticulatedLinkPrefab{}.colliderType
-      , py::arg("contact") = mochi::prefab::ArticulatedLinkPrefab{}.contact
-      , py::arg("has_gravity") = mochi::prefab::ArticulatedLinkPrefab{}.hasGravity
-      , py::arg("density") = mochi::prefab::ArticulatedLinkPrefab{}.density
-      , py::arg("mass") = mochi::prefab::ArticulatedLinkPrefab{}.mass
-      , py::arg("center_of_mass") = mochi::prefab::ArticulatedLinkPrefab{}.centerOfMass
-      , py::arg("moment_of_inertia") = mochi::prefab::ArticulatedLinkPrefab{}.momentOfInertia
-      , py::arg("boundary_element_type") = mochi::prefab::ArticulatedLinkPrefab{}.boundaryElementType
-      , py::arg("boundary_subsampling") = mochi::prefab::ArticulatedLinkPrefab{}.boundarySubsampling
-      , py::arg("shape_file") = mochi::prefab::ArticulatedLinkPrefab{}.shapeFile
-      , py::arg("shape_scale") = mochi::prefab::ArticulatedLinkPrefab{}.shapeScale
-      , py::arg("shape_rotation") = mochi::prefab::ArticulatedLinkPrefab{}.shapeRotation
-      , py::arg("shape_translation") = mochi::prefab::ArticulatedLinkPrefab{}.shapeTranslation
-      , py::arg("render_model_file") = mochi::prefab::ArticulatedLinkPrefab{}.renderModelFile
-      , py::arg("render_model_scale") = mochi::prefab::ArticulatedLinkPrefab{}.renderModelScale
-      , py::arg("render_model_rotation") = mochi::prefab::ArticulatedLinkPrefab{}.renderModelRotation
-      , py::arg("render_model_translation") = mochi::prefab::ArticulatedLinkPrefab{}.renderModelTranslation
+    .def("__init__", [](mochi::prefab::ArticulatedLinkPrefab* self, nb::object name, nb::object parent_link, nb::object parent_joint_from_link, nb::object shape, nb::object layer, nb::object collider_type, nb::object contact, nb::object has_gravity, nb::object density, nb::object mass, nb::object center_of_mass, nb::object moment_of_inertia, nb::object boundary_element_type, nb::object boundary_subsampling, nb::object shape_file, nb::object shape_scale, nb::object shape_rotation, nb::object shape_translation, nb::object render_model_file, nb::object render_model_scale, nb::object render_model_rotation, nb::object render_model_translation) {
+      mochi::prefab::ArticulatedLinkPrefab result{};
+      result.name = nb::cast<mochi::DynamicString>(name);
+      result.parentLink = nb::cast<int>(parent_link);
+      result.parentJointFromLink = nb::cast<mochi::TransformRT>(parent_joint_from_link);
+      result.shape = nb::cast<mochi::ShapeHandle>(shape);
+      result.layer = nb::cast<mochi::DynamicString>(layer);
+      result.colliderType = nb::cast<mochi::ColliderType>(collider_type);
+      result.contact = nb::cast<mochi::ContactParams>(contact);
+      result.hasGravity = nb::cast<bool>(has_gravity);
+      result.density = nb::cast<std::optional<mochi::real>>(density);
+      result.mass = nb::cast<std::optional<mochi::real>>(mass);
+      result.centerOfMass = nb::cast<std::optional<mochi::Real3>>(center_of_mass);
+      result.momentOfInertia = nb::cast<std::optional<mochi::Real6>>(moment_of_inertia);
+      result.boundaryElementType = nb::cast<mochi::ActorBoundaryElementType>(boundary_element_type);
+      result.boundarySubsampling = nb::cast<std::optional<mochi::BoundarySubsamplingParams>>(boundary_subsampling);
+      result.shapeFile = nb::cast<mochi::DynamicString>(shape_file);
+      result.shapeScale = nb::cast<mochi::Real3>(shape_scale);
+      result.shapeRotation = nb::cast<mochi::Quaternion>(shape_rotation);
+      result.shapeTranslation = nb::cast<mochi::Real3>(shape_translation);
+      result.renderModelFile = nb::cast<mochi::DynamicString>(render_model_file);
+      result.renderModelScale = nb::cast<mochi::Real3>(render_model_scale);
+      result.renderModelRotation = nb::cast<mochi::Quaternion>(render_model_rotation);
+      result.renderModelTranslation = nb::cast<mochi::Real3>(render_model_translation);
+      new (self) mochi::prefab::ArticulatedLinkPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("name") = mochi::prefab::ArticulatedLinkPrefab{}.name
+      , nb::arg("parent_link") = mochi::prefab::ArticulatedLinkPrefab{}.parentLink
+      , nb::arg("parent_joint_from_link").sig("...") = mochi::prefab::ArticulatedLinkPrefab{}.parentJointFromLink
+      , nb::arg("shape").sig("...") = mochi::prefab::ArticulatedLinkPrefab{}.shape
+      , nb::arg("layer") = mochi::prefab::ArticulatedLinkPrefab{}.layer
+      , nb::arg("collider_type") = mochi::prefab::ArticulatedLinkPrefab{}.colliderType
+      , nb::arg("contact").sig("...") = mochi::prefab::ArticulatedLinkPrefab{}.contact
+      , nb::arg("has_gravity") = mochi::prefab::ArticulatedLinkPrefab{}.hasGravity
+      , nb::arg("density").sig("...") = mochi::prefab::ArticulatedLinkPrefab{}.density
+      , nb::arg("mass").sig("...") = mochi::prefab::ArticulatedLinkPrefab{}.mass
+      , nb::arg("center_of_mass").sig("...") = mochi::prefab::ArticulatedLinkPrefab{}.centerOfMass
+      , nb::arg("moment_of_inertia").sig("...") = mochi::prefab::ArticulatedLinkPrefab{}.momentOfInertia
+      , nb::arg("boundary_element_type") = mochi::prefab::ArticulatedLinkPrefab{}.boundaryElementType
+      , nb::arg("boundary_subsampling").sig("...") = mochi::prefab::ArticulatedLinkPrefab{}.boundarySubsampling
+      , nb::arg("shape_file") = mochi::prefab::ArticulatedLinkPrefab{}.shapeFile
+      , nb::arg("shape_scale").sig("...") = mochi::prefab::ArticulatedLinkPrefab{}.shapeScale
+      , nb::arg("shape_rotation").sig("...") = mochi::prefab::ArticulatedLinkPrefab{}.shapeRotation
+      , nb::arg("shape_translation").sig("...") = mochi::prefab::ArticulatedLinkPrefab{}.shapeTranslation
+      , nb::arg("render_model_file") = mochi::prefab::ArticulatedLinkPrefab{}.renderModelFile
+      , nb::arg("render_model_scale").sig("...") = mochi::prefab::ArticulatedLinkPrefab{}.renderModelScale
+      , nb::arg("render_model_rotation").sig("...") = mochi::prefab::ArticulatedLinkPrefab{}.renderModelRotation
+      , nb::arg("render_model_translation").sig("...") = mochi::prefab::ArticulatedLinkPrefab{}.renderModelTranslation
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::prefab::ArticulatedLinkPrefab const& self) { return mochi::prefab::ArticulatedLinkPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::ArticulatedLinkPrefab const& self, py::dict) { return mochi::prefab::ArticulatedLinkPrefab(self); })
-    .def_readwrite("shape_file", &mochi::prefab::ArticulatedLinkPrefab::shapeFile, "Path to a simulation model file defining the geometry of the rigid link actor.\n\nNote:\n    Leave empty for dummy links.")
-    .def_property("shape_scale", [](mochi::prefab::ArticulatedLinkPrefab& self) -> mochi::Real3& { return self.shapeScale; }, [](mochi::prefab::ArticulatedLinkPrefab& self, py::object val) { self.shapeScale = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Scale [x, y, z] to bake into the shape file.\n\nNote:\n    Ignored if :attr:`~superdex.physics.prefab.ArticulatedLinkPrefab.shape_file`\n    is empty.\n\nNote:\n    All components must be non-zero and finite. Negative scale mirrors the link\n    shape.\n\nNote:\n    Non-uniform scale is supported only for shape data that supports arbitrary\n    per-axis bake scale. Unsupported scale values are rejected when the shape is\n    loaded.\n\nNote:\n    If :attr:`~superdex.physics.ArticulatedLinkParams.mass`,\n    :attr:`~superdex.physics.ArticulatedLinkParams.center_of_mass`, or\n    :attr:`~superdex.physics.ArticulatedLinkParams.moment_of_inertia` are set\n    explicitly, they are transformed consistently with the final per-axis scale\n    applied to the link at :func:`~superdex.physics.prefab.add_to_scene`. If\n    they are left unset, they are computed from the scaled shape.")
-    .def_property("shape_rotation", [](mochi::prefab::ArticulatedLinkPrefab& self) -> mochi::Quaternion& { return self.shapeRotation; }, [](mochi::prefab::ArticulatedLinkPrefab& self, py::object val) { self.shapeRotation = py::cast<mochi::Quaternion>(val); }, py::return_value_policy::reference_internal, "Rotation quaternion [x, y, z, w] to bake into the shape file.\n\nNote:\n    Ignored if :attr:`~superdex.physics.prefab.ArticulatedLinkPrefab.shape_file`\n    is empty.")
-    .def_property("shape_translation", [](mochi::prefab::ArticulatedLinkPrefab& self) -> mochi::Real3& { return self.shapeTranslation; }, [](mochi::prefab::ArticulatedLinkPrefab& self, py::object val) { self.shapeTranslation = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Translation [x, y, z] to bake into the shape file.\n\nNote:\n    Ignored if :attr:`~superdex.physics.prefab.ArticulatedLinkPrefab.shape_file`\n    is empty.")
-    .def_readwrite("render_model_file", &mochi::prefab::ArticulatedLinkPrefab::renderModelFile, "Optional path to a render model file (e.g. .glb) for visualization.\n\nNote:\n    SuperDex Physics does not use this field for simulation. It provides\n    additional metadata for visualization in supported tools. Ignored if empty.")
-    .def_property("render_model_scale", [](mochi::prefab::ArticulatedLinkPrefab& self) -> mochi::Real3& { return self.renderModelScale; }, [](mochi::prefab::ArticulatedLinkPrefab& self, py::object val) { self.renderModelScale = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Scale [x, y, z] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.ArticulatedLinkPrefab.render_model_file` is\n    empty.")
-    .def_property("render_model_rotation", [](mochi::prefab::ArticulatedLinkPrefab& self) -> mochi::Quaternion& { return self.renderModelRotation; }, [](mochi::prefab::ArticulatedLinkPrefab& self, py::object val) { self.renderModelRotation = py::cast<mochi::Quaternion>(val); }, py::return_value_policy::reference_internal, "Rotation quaternion [x, y, z, w] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.ArticulatedLinkPrefab.render_model_file` is\n    empty.")
-    .def_property("render_model_translation", [](mochi::prefab::ArticulatedLinkPrefab& self) -> mochi::Real3& { return self.renderModelTranslation; }, [](mochi::prefab::ArticulatedLinkPrefab& self, py::object val) { self.renderModelTranslation = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Translation [x, y, z] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.ArticulatedLinkPrefab.render_model_file` is\n    empty.")
+    .def("__deepcopy__", [](mochi::prefab::ArticulatedLinkPrefab const& self, nb::dict) { return mochi::prefab::ArticulatedLinkPrefab(self); })
+    .def_rw("shape_file", &mochi::prefab::ArticulatedLinkPrefab::shapeFile, "Path to a simulation model file defining the geometry of the rigid link actor.\n\nNote:\n    Leave empty for dummy links.")
+    .def_prop_rw("shape_scale", [](mochi::prefab::ArticulatedLinkPrefab& self) -> mochi::Real3& { return self.shapeScale; }, [](mochi::prefab::ArticulatedLinkPrefab& self, nb::object val) { self.shapeScale = nb::cast<mochi::Real3>(val); }, "Scale [x, y, z] to bake into the shape file.\n\nNote:\n    Ignored if :attr:`~superdex.physics.prefab.ArticulatedLinkPrefab.shape_file`\n    is empty.\n\nNote:\n    All components must be non-zero and finite. Negative scale mirrors the link\n    shape.\n\nNote:\n    Non-uniform scale is supported only for shape data that supports arbitrary\n    per-axis bake scale. Unsupported scale values are rejected when the shape is\n    loaded.\n\nNote:\n    If :attr:`~superdex.physics.ArticulatedLinkParams.mass`,\n    :attr:`~superdex.physics.ArticulatedLinkParams.center_of_mass`, or\n    :attr:`~superdex.physics.ArticulatedLinkParams.moment_of_inertia` are set\n    explicitly, they are transformed consistently with the final per-axis scale\n    applied to the link at :func:`~superdex.physics.prefab.add_to_scene`. If\n    they are left unset, they are computed from the scaled shape.")
+    .def_prop_rw("shape_rotation", [](mochi::prefab::ArticulatedLinkPrefab& self) -> mochi::Quaternion& { return self.shapeRotation; }, [](mochi::prefab::ArticulatedLinkPrefab& self, nb::object val) { self.shapeRotation = nb::cast<mochi::Quaternion>(val); }, "Rotation quaternion [x, y, z, w] to bake into the shape file.\n\nNote:\n    Ignored if :attr:`~superdex.physics.prefab.ArticulatedLinkPrefab.shape_file`\n    is empty.")
+    .def_prop_rw("shape_translation", [](mochi::prefab::ArticulatedLinkPrefab& self) -> mochi::Real3& { return self.shapeTranslation; }, [](mochi::prefab::ArticulatedLinkPrefab& self, nb::object val) { self.shapeTranslation = nb::cast<mochi::Real3>(val); }, "Translation [x, y, z] to bake into the shape file.\n\nNote:\n    Ignored if :attr:`~superdex.physics.prefab.ArticulatedLinkPrefab.shape_file`\n    is empty.")
+    .def_rw("render_model_file", &mochi::prefab::ArticulatedLinkPrefab::renderModelFile, "Optional path to a render model file (e.g. .glb) for visualization.\n\nNote:\n    SuperDex Physics does not use this field for simulation. It provides\n    additional metadata for visualization in supported tools. Ignored if empty.")
+    .def_prop_rw("render_model_scale", [](mochi::prefab::ArticulatedLinkPrefab& self) -> mochi::Real3& { return self.renderModelScale; }, [](mochi::prefab::ArticulatedLinkPrefab& self, nb::object val) { self.renderModelScale = nb::cast<mochi::Real3>(val); }, "Scale [x, y, z] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.ArticulatedLinkPrefab.render_model_file` is\n    empty.")
+    .def_prop_rw("render_model_rotation", [](mochi::prefab::ArticulatedLinkPrefab& self) -> mochi::Quaternion& { return self.renderModelRotation; }, [](mochi::prefab::ArticulatedLinkPrefab& self, nb::object val) { self.renderModelRotation = nb::cast<mochi::Quaternion>(val); }, "Rotation quaternion [x, y, z, w] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.ArticulatedLinkPrefab.render_model_file` is\n    empty.")
+    .def_prop_rw("render_model_translation", [](mochi::prefab::ArticulatedLinkPrefab& self) -> mochi::Real3& { return self.renderModelTranslation; }, [](mochi::prefab::ArticulatedLinkPrefab& self, nb::object val) { self.renderModelTranslation = nb::cast<mochi::Real3>(val); }, "Translation [x, y, z] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.ArticulatedLinkPrefab.render_model_file` is\n    empty.")
   ;
 
   registry.GetClass<mochi::prefab::ArticulatedSkinPrefab, mochi::ArticulatedSkinParams>()
-    .def(py::init([](py::object shape, py::object layer, py::object contact, py::object boundary_element_type, py::object boundary_subsampling, py::object shape_file, py::object render_model_file, py::object render_model_scale, py::object render_model_rotation, py::object render_model_translation) {
-      mochi::prefab::ArticulatedSkinPrefab result;
-      result.shape = py::cast<mochi::ShapeHandle>(shape);
-      result.layer = py::cast<mochi::DynamicString>(layer);
-      result.contact = py::cast<mochi::ContactParams>(contact);
-      result.boundaryElementType = py::cast<mochi::ActorBoundaryElementType>(boundary_element_type);
-      result.boundarySubsampling = py::cast<std::optional<mochi::BoundarySubsamplingParams>>(boundary_subsampling);
-      result.shapeFile = py::cast<mochi::DynamicString>(shape_file);
-      result.renderModelFile = py::cast<mochi::DynamicString>(render_model_file);
-      result.renderModelScale = py::cast<mochi::Real3>(render_model_scale);
-      result.renderModelRotation = py::cast<mochi::Quaternion>(render_model_rotation);
-      result.renderModelTranslation = py::cast<mochi::Real3>(render_model_translation);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("shape") = mochi::prefab::ArticulatedSkinPrefab{}.shape
-      , py::arg("layer") = mochi::prefab::ArticulatedSkinPrefab{}.layer
-      , py::arg("contact") = mochi::prefab::ArticulatedSkinPrefab{}.contact
-      , py::arg("boundary_element_type") = mochi::prefab::ArticulatedSkinPrefab{}.boundaryElementType
-      , py::arg("boundary_subsampling") = mochi::prefab::ArticulatedSkinPrefab{}.boundarySubsampling
-      , py::arg("shape_file") = mochi::prefab::ArticulatedSkinPrefab{}.shapeFile
-      , py::arg("render_model_file") = mochi::prefab::ArticulatedSkinPrefab{}.renderModelFile
-      , py::arg("render_model_scale") = mochi::prefab::ArticulatedSkinPrefab{}.renderModelScale
-      , py::arg("render_model_rotation") = mochi::prefab::ArticulatedSkinPrefab{}.renderModelRotation
-      , py::arg("render_model_translation") = mochi::prefab::ArticulatedSkinPrefab{}.renderModelTranslation
+    .def("__init__", [](mochi::prefab::ArticulatedSkinPrefab* self, nb::object shape, nb::object layer, nb::object contact, nb::object boundary_element_type, nb::object boundary_subsampling, nb::object shape_file, nb::object render_model_file, nb::object render_model_scale, nb::object render_model_rotation, nb::object render_model_translation) {
+      mochi::prefab::ArticulatedSkinPrefab result{};
+      result.shape = nb::cast<mochi::ShapeHandle>(shape);
+      result.layer = nb::cast<mochi::DynamicString>(layer);
+      result.contact = nb::cast<mochi::ContactParams>(contact);
+      result.boundaryElementType = nb::cast<mochi::ActorBoundaryElementType>(boundary_element_type);
+      result.boundarySubsampling = nb::cast<std::optional<mochi::BoundarySubsamplingParams>>(boundary_subsampling);
+      result.shapeFile = nb::cast<mochi::DynamicString>(shape_file);
+      result.renderModelFile = nb::cast<mochi::DynamicString>(render_model_file);
+      result.renderModelScale = nb::cast<mochi::Real3>(render_model_scale);
+      result.renderModelRotation = nb::cast<mochi::Quaternion>(render_model_rotation);
+      result.renderModelTranslation = nb::cast<mochi::Real3>(render_model_translation);
+      new (self) mochi::prefab::ArticulatedSkinPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("shape").sig("...") = mochi::prefab::ArticulatedSkinPrefab{}.shape
+      , nb::arg("layer") = mochi::prefab::ArticulatedSkinPrefab{}.layer
+      , nb::arg("contact").sig("...") = mochi::prefab::ArticulatedSkinPrefab{}.contact
+      , nb::arg("boundary_element_type") = mochi::prefab::ArticulatedSkinPrefab{}.boundaryElementType
+      , nb::arg("boundary_subsampling").sig("...") = mochi::prefab::ArticulatedSkinPrefab{}.boundarySubsampling
+      , nb::arg("shape_file") = mochi::prefab::ArticulatedSkinPrefab{}.shapeFile
+      , nb::arg("render_model_file") = mochi::prefab::ArticulatedSkinPrefab{}.renderModelFile
+      , nb::arg("render_model_scale").sig("...") = mochi::prefab::ArticulatedSkinPrefab{}.renderModelScale
+      , nb::arg("render_model_rotation").sig("...") = mochi::prefab::ArticulatedSkinPrefab{}.renderModelRotation
+      , nb::arg("render_model_translation").sig("...") = mochi::prefab::ArticulatedSkinPrefab{}.renderModelTranslation
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::prefab::ArticulatedSkinPrefab const& self) { return mochi::prefab::ArticulatedSkinPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::ArticulatedSkinPrefab const& self, py::dict) { return mochi::prefab::ArticulatedSkinPrefab(self); })
-    .def_readwrite("shape_file", &mochi::prefab::ArticulatedSkinPrefab::shapeFile, "Path to the model file containing a skinned mesh.")
-    .def_readwrite("render_model_file", &mochi::prefab::ArticulatedSkinPrefab::renderModelFile, "Optional path to a render model file (e.g. .glb) for visualization.\n\nNote:\n    SuperDex Physics does not use this field for simulation. It provides\n    additional metadata for visualization in supported tools. Ignored if empty.")
-    .def_property("render_model_scale", [](mochi::prefab::ArticulatedSkinPrefab& self) -> mochi::Real3& { return self.renderModelScale; }, [](mochi::prefab::ArticulatedSkinPrefab& self, py::object val) { self.renderModelScale = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Scale [x, y, z] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.ArticulatedSkinPrefab.render_model_file` is\n    empty.")
-    .def_property("render_model_rotation", [](mochi::prefab::ArticulatedSkinPrefab& self) -> mochi::Quaternion& { return self.renderModelRotation; }, [](mochi::prefab::ArticulatedSkinPrefab& self, py::object val) { self.renderModelRotation = py::cast<mochi::Quaternion>(val); }, py::return_value_policy::reference_internal, "Rotation quaternion [x, y, z, w] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.ArticulatedSkinPrefab.render_model_file` is\n    empty.")
-    .def_property("render_model_translation", [](mochi::prefab::ArticulatedSkinPrefab& self) -> mochi::Real3& { return self.renderModelTranslation; }, [](mochi::prefab::ArticulatedSkinPrefab& self, py::object val) { self.renderModelTranslation = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Translation [x, y, z] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.ArticulatedSkinPrefab.render_model_file` is\n    empty.")
+    .def("__deepcopy__", [](mochi::prefab::ArticulatedSkinPrefab const& self, nb::dict) { return mochi::prefab::ArticulatedSkinPrefab(self); })
+    .def_rw("shape_file", &mochi::prefab::ArticulatedSkinPrefab::shapeFile, "Path to the model file containing a skinned mesh.")
+    .def_rw("render_model_file", &mochi::prefab::ArticulatedSkinPrefab::renderModelFile, "Optional path to a render model file (e.g. .glb) for visualization.\n\nNote:\n    SuperDex Physics does not use this field for simulation. It provides\n    additional metadata for visualization in supported tools. Ignored if empty.")
+    .def_prop_rw("render_model_scale", [](mochi::prefab::ArticulatedSkinPrefab& self) -> mochi::Real3& { return self.renderModelScale; }, [](mochi::prefab::ArticulatedSkinPrefab& self, nb::object val) { self.renderModelScale = nb::cast<mochi::Real3>(val); }, "Scale [x, y, z] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.ArticulatedSkinPrefab.render_model_file` is\n    empty.")
+    .def_prop_rw("render_model_rotation", [](mochi::prefab::ArticulatedSkinPrefab& self) -> mochi::Quaternion& { return self.renderModelRotation; }, [](mochi::prefab::ArticulatedSkinPrefab& self, nb::object val) { self.renderModelRotation = nb::cast<mochi::Quaternion>(val); }, "Rotation quaternion [x, y, z, w] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.ArticulatedSkinPrefab.render_model_file` is\n    empty.")
+    .def_prop_rw("render_model_translation", [](mochi::prefab::ArticulatedSkinPrefab& self) -> mochi::Real3& { return self.renderModelTranslation; }, [](mochi::prefab::ArticulatedSkinPrefab& self, nb::object val) { self.renderModelTranslation = nb::cast<mochi::Real3>(val); }, "Translation [x, y, z] to apply to the render model.\n\nNote:\n    Ignored if\n    :attr:`~superdex.physics.prefab.ArticulatedSkinPrefab.render_model_file` is\n    empty.")
   ;
 
   registry.GetClass<mochi::prefab::ArticulatedActorPrefab>()
-    .def(py::init([](py::object comment, py::object name, py::object scale, py::object rotation, py::object translation, py::object cycles, py::object joints, py::object links, py::object skin, py::object joint_velocities) {
-      mochi::prefab::ArticulatedActorPrefab result;
-      result.comment = py::cast<std::optional<mochi::DynamicString>>(comment);
-      result.name = py::cast<mochi::DynamicString>(name);
-      result.scale = py::cast<mochi::real>(scale);
-      result.rotation = py::cast<mochi::Quaternion>(rotation);
-      result.translation = py::cast<mochi::Real3>(translation);
-      result.cycles = py::cast<mochi::DynamicArray<mochi::ArticulatedCycleJointParams>>(cycles);
-      result.joints = py::cast<mochi::DynamicArray<mochi::prefab::ArticulatedJointPrefab>>(joints);
-      result.links = py::cast<mochi::DynamicArray<mochi::prefab::ArticulatedLinkPrefab>>(links);
-      result.skin = py::cast<std::optional<mochi::prefab::ArticulatedSkinPrefab>>(skin);
-      result.jointVelocities = py::cast<std::optional<mochi::DynamicArray<mochi::real>>>(joint_velocities);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("comment") = mochi::prefab::ArticulatedActorPrefab{}.comment
-      , py::arg("name") = mochi::prefab::ArticulatedActorPrefab{}.name
-      , py::arg("scale") = mochi::prefab::ArticulatedActorPrefab{}.scale
-      , py::arg("rotation") = mochi::prefab::ArticulatedActorPrefab{}.rotation
-      , py::arg("translation") = mochi::prefab::ArticulatedActorPrefab{}.translation
-      , py::arg("cycles") = mochi::prefab::ArticulatedActorPrefab{}.cycles
-      , py::arg("joints") = mochi::prefab::ArticulatedActorPrefab{}.joints
-      , py::arg("links") = mochi::prefab::ArticulatedActorPrefab{}.links
-      , py::arg("skin") = mochi::prefab::ArticulatedActorPrefab{}.skin
-      , py::arg("joint_velocities") = mochi::prefab::ArticulatedActorPrefab{}.jointVelocities
+    .def("__init__", [](mochi::prefab::ArticulatedActorPrefab* self, nb::object comment, nb::object name, nb::object scale, nb::object rotation, nb::object translation, nb::object cycles, nb::object joints, nb::object links, nb::object skin, nb::object joint_velocities) {
+      mochi::prefab::ArticulatedActorPrefab result{};
+      result.comment = nb::cast<std::optional<mochi::DynamicString>>(comment);
+      result.name = nb::cast<mochi::DynamicString>(name);
+      result.scale = nb::cast<mochi::real>(scale);
+      result.rotation = nb::cast<mochi::Quaternion>(rotation);
+      result.translation = nb::cast<mochi::Real3>(translation);
+      result.cycles = nb::cast<mochi::DynamicArray<mochi::ArticulatedCycleJointParams>>(cycles);
+      result.joints = nb::cast<mochi::DynamicArray<mochi::prefab::ArticulatedJointPrefab>>(joints);
+      result.links = nb::cast<mochi::DynamicArray<mochi::prefab::ArticulatedLinkPrefab>>(links);
+      result.skin = nb::cast<std::optional<mochi::prefab::ArticulatedSkinPrefab>>(skin);
+      result.jointVelocities = nb::cast<std::optional<mochi::DynamicArray<mochi::real>>>(joint_velocities);
+      new (self) mochi::prefab::ArticulatedActorPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("comment").sig("...") = mochi::prefab::ArticulatedActorPrefab{}.comment
+      , nb::arg("name") = mochi::prefab::ArticulatedActorPrefab{}.name
+      , nb::arg("scale") = mochi::prefab::ArticulatedActorPrefab{}.scale
+      , nb::arg("rotation").sig("...") = mochi::prefab::ArticulatedActorPrefab{}.rotation
+      , nb::arg("translation").sig("...") = mochi::prefab::ArticulatedActorPrefab{}.translation
+      , nb::arg("cycles").sig("...") = mochi::prefab::ArticulatedActorPrefab{}.cycles
+      , nb::arg("joints").sig("...") = mochi::prefab::ArticulatedActorPrefab{}.joints
+      , nb::arg("links").sig("...") = mochi::prefab::ArticulatedActorPrefab{}.links
+      , nb::arg("skin").sig("...") = mochi::prefab::ArticulatedActorPrefab{}.skin
+      , nb::arg("joint_velocities").sig("...") = mochi::prefab::ArticulatedActorPrefab{}.jointVelocities
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::prefab::ArticulatedActorPrefab const& self) { return mochi::prefab::ArticulatedActorPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::ArticulatedActorPrefab const& self, py::dict) { return mochi::prefab::ArticulatedActorPrefab(self); })
-    .def_readwrite("comment", &mochi::prefab::ArticulatedActorPrefab::comment, "Optional serialized comment.")
-    .def_readwrite("name", &mochi::prefab::ArticulatedActorPrefab::name, "Optional actor name. Uniqueness is not enforced.\n\nNote:\n    Nested actor runtime paths use the effective actor name as the parent path,\n    where the effective actor name is this actor name combined with any\n    enclosing :attr:`~superdex.physics.prefab.PrefabParams.name` or\n    :attr:`~superdex.physics.prefab.PrefabReference.name` path. If the effective\n    actor name is empty, runtime nested actor paths use \"unnamed_articulation\"\n    as the parent path. Prefab actor-reference fields such as contact filters\n    and constraints are authored relative to their containing prefab, and\n    enclosing prefab-reference names are prepended during instantiation. They do\n    not resolve through the \"unnamed_articulation\" fallback. Use a non-empty\n    actor name or enclosing prefab name when prefab references need to target\n    nested actors.\n\nNote:\n    A name shared by more than one actor cannot be used by name-based prefab\n    references.")
-    .def_readwrite("scale", &mochi::prefab::ArticulatedActorPrefab::scale, "Uniform scale baked into all link and skin shapes when the prefab is\ninstantiated.\n\nNote:\n    Must be strictly positive and finite. Negative or zero scale is invalid and\n    rejected at :func:`~superdex.physics.prefab.add_to_scene`.\n\nNote:\n    This scale is not applied to\n    :attr:`~superdex.physics.prefab.ArticulatedActorPrefab.rotation` and\n    :attr:`~superdex.physics.prefab.ArticulatedActorPrefab.translation`. It\n    scales each link's baked shape by multiplying both\n    :attr:`~superdex.physics.prefab.ArticulatedLinkPrefab.shape_scale` and\n    :attr:`~superdex.physics.prefab.ArticulatedLinkPrefab.shape_translation`. It\n    also uniformly scales the skin shape.")
-    .def_property("rotation", [](mochi::prefab::ArticulatedActorPrefab& self) -> mochi::Quaternion& { return self.rotation; }, [](mochi::prefab::ArticulatedActorPrefab& self, py::object val) { self.rotation = py::cast<mochi::Quaternion>(val); }, py::return_value_policy::reference_internal, "Actor rotation quaternion [x, y, z, w] relative to the prefab's local frame\n(i.e., the prefab-from-root rotation). Composes with\n:attr:`~superdex.physics.prefab.PrefabParams.rotation` to produce the final\nworld-from-root rotation.\n\nNote:\n    Must be finite and non-zero.")
-    .def_property("translation", [](mochi::prefab::ArticulatedActorPrefab& self) -> mochi::Real3& { return self.translation; }, [](mochi::prefab::ArticulatedActorPrefab& self, py::object val) { self.translation = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Actor translation [x, y, z] relative to the prefab's local frame (i.e., the\nprefab-from-root translation). Composes with\n:attr:`~superdex.physics.prefab.PrefabParams.scale`,\n:attr:`~superdex.physics.prefab.PrefabParams.rotation`, and\n:attr:`~superdex.physics.prefab.PrefabParams.translation` to produce the final\nworld-from-root translation.\n\nNote:\n    Must be finite.")
-    .def_property("cycles", [](mochi::prefab::ArticulatedActorPrefab& self) -> mochi::DynamicArray<mochi::ArticulatedCycleJointParams>& { return self.cycles; }, [](mochi::prefab::ArticulatedActorPrefab& self, py::object val) { self.cycles = py::cast<mochi::DynamicArray<mochi::ArticulatedCycleJointParams>>(val); }, py::return_value_policy::reference_internal, "Cycle joints creating closed kinematic loops. Empty if no cycles exist.")
-    .def_property("joints", [](mochi::prefab::ArticulatedActorPrefab& self) -> mochi::DynamicArray<mochi::prefab::ArticulatedJointPrefab>& { return self.joints; }, [](mochi::prefab::ArticulatedActorPrefab& self, py::object val) { self.joints = py::cast<mochi::DynamicArray<mochi::prefab::ArticulatedJointPrefab>>(val); }, py::return_value_policy::reference_internal, "Joint parameters (one per joint).")
-    .def_property("links", [](mochi::prefab::ArticulatedActorPrefab& self) -> mochi::DynamicArray<mochi::prefab::ArticulatedLinkPrefab>& { return self.links; }, [](mochi::prefab::ArticulatedActorPrefab& self, py::object val) { self.links = py::cast<mochi::DynamicArray<mochi::prefab::ArticulatedLinkPrefab>>(val); }, py::return_value_policy::reference_internal, "Link parameters (one per link).")
-    .def_readwrite("skin", &mochi::prefab::ArticulatedActorPrefab::skin, "Optional skinned mesh parameters.")
-    .def_property("joint_velocities", [](mochi::prefab::ArticulatedActorPrefab& self) -> std::optional<mochi::DynamicArray<mochi::real>>& { return self.jointVelocities; }, [](mochi::prefab::ArticulatedActorPrefab& self, py::object val) { self.jointVelocities = py::cast<std::optional<mochi::DynamicArray<mochi::real>>>(val); }, py::return_value_policy::reference_internal, "Optional initial velocity per DoF.\n\nNote:\n    Units depend on joint type: [rad/s] for revolute and spherical, [m/s] for\n    prismatic.")
+    .def("__deepcopy__", [](mochi::prefab::ArticulatedActorPrefab const& self, nb::dict) { return mochi::prefab::ArticulatedActorPrefab(self); })
+    .def_prop_rw("comment", [](mochi::prefab::ArticulatedActorPrefab& self) -> std::optional<mochi::DynamicString>& { return self.comment; }, [](mochi::prefab::ArticulatedActorPrefab& self, nb::handle val) { self.comment = val.is_none() ? std::optional<mochi::DynamicString>{} : nb::cast<std::optional<mochi::DynamicString>>(val); }, "Optional serialized comment.", nb::for_setter(nb::arg("value").none()))
+    .def_rw("name", &mochi::prefab::ArticulatedActorPrefab::name, "Optional actor name. Uniqueness is not enforced.\n\nNote:\n    Nested actor runtime paths use the effective actor name as the parent path,\n    where the effective actor name is this actor name combined with any\n    enclosing :attr:`~superdex.physics.prefab.PrefabParams.name` or\n    :attr:`~superdex.physics.prefab.PrefabReference.name` path. If the effective\n    actor name is empty, runtime nested actor paths use \"unnamed_articulation\"\n    as the parent path. Prefab actor-reference fields such as contact filters\n    and constraints are authored relative to their containing prefab, and\n    enclosing prefab-reference names are prepended during instantiation. They do\n    not resolve through the \"unnamed_articulation\" fallback. Use a non-empty\n    actor name or enclosing prefab name when prefab references need to target\n    nested actors.\n\nNote:\n    A name shared by more than one actor cannot be used by name-based prefab\n    references.")
+    .def_rw("scale", &mochi::prefab::ArticulatedActorPrefab::scale, "Uniform scale baked into all link and skin shapes when the prefab is\ninstantiated.\n\nNote:\n    Must be strictly positive and finite. Negative or zero scale is invalid and\n    rejected at :func:`~superdex.physics.prefab.add_to_scene`.\n\nNote:\n    This scale is not applied to\n    :attr:`~superdex.physics.prefab.ArticulatedActorPrefab.rotation` and\n    :attr:`~superdex.physics.prefab.ArticulatedActorPrefab.translation`. It\n    scales each link's baked shape by multiplying both\n    :attr:`~superdex.physics.prefab.ArticulatedLinkPrefab.shape_scale` and\n    :attr:`~superdex.physics.prefab.ArticulatedLinkPrefab.shape_translation`. It\n    also uniformly scales the skin shape.")
+    .def_prop_rw("rotation", [](mochi::prefab::ArticulatedActorPrefab& self) -> mochi::Quaternion& { return self.rotation; }, [](mochi::prefab::ArticulatedActorPrefab& self, nb::object val) { self.rotation = nb::cast<mochi::Quaternion>(val); }, "Actor rotation quaternion [x, y, z, w] relative to the prefab's local frame\n(i.e., the prefab-from-root rotation). Composes with\n:attr:`~superdex.physics.prefab.PrefabParams.rotation` to produce the final\nworld-from-root rotation.\n\nNote:\n    Must be finite and non-zero.")
+    .def_prop_rw("translation", [](mochi::prefab::ArticulatedActorPrefab& self) -> mochi::Real3& { return self.translation; }, [](mochi::prefab::ArticulatedActorPrefab& self, nb::object val) { self.translation = nb::cast<mochi::Real3>(val); }, "Actor translation [x, y, z] relative to the prefab's local frame (i.e., the\nprefab-from-root translation). Composes with\n:attr:`~superdex.physics.prefab.PrefabParams.scale`,\n:attr:`~superdex.physics.prefab.PrefabParams.rotation`, and\n:attr:`~superdex.physics.prefab.PrefabParams.translation` to produce the final\nworld-from-root translation.\n\nNote:\n    Must be finite.")
+    .def_prop_rw("cycles", [](mochi::prefab::ArticulatedActorPrefab& self) -> mochi::DynamicArray<mochi::ArticulatedCycleJointParams>& { return self.cycles; }, [](mochi::prefab::ArticulatedActorPrefab& self, nb::object val) { self.cycles = nb::cast<mochi::DynamicArray<mochi::ArticulatedCycleJointParams>>(val); }, "Cycle joints creating closed kinematic loops. Empty if no cycles exist.")
+    .def_prop_rw("joints", [](mochi::prefab::ArticulatedActorPrefab& self) -> mochi::DynamicArray<mochi::prefab::ArticulatedJointPrefab>& { return self.joints; }, [](mochi::prefab::ArticulatedActorPrefab& self, nb::object val) { self.joints = nb::cast<mochi::DynamicArray<mochi::prefab::ArticulatedJointPrefab>>(val); }, "Joint parameters (one per joint).")
+    .def_prop_rw("links", [](mochi::prefab::ArticulatedActorPrefab& self) -> mochi::DynamicArray<mochi::prefab::ArticulatedLinkPrefab>& { return self.links; }, [](mochi::prefab::ArticulatedActorPrefab& self, nb::object val) { self.links = nb::cast<mochi::DynamicArray<mochi::prefab::ArticulatedLinkPrefab>>(val); }, "Link parameters (one per link).")
+    .def_prop_rw("skin", [](mochi::prefab::ArticulatedActorPrefab& self) -> std::optional<mochi::prefab::ArticulatedSkinPrefab>& { return self.skin; }, [](mochi::prefab::ArticulatedActorPrefab& self, nb::handle val) { self.skin = val.is_none() ? std::optional<mochi::prefab::ArticulatedSkinPrefab>{} : nb::cast<std::optional<mochi::prefab::ArticulatedSkinPrefab>>(val); }, "Optional skinned mesh parameters.", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("joint_velocities", [](mochi::prefab::ArticulatedActorPrefab& self) -> std::optional<mochi::DynamicArray<mochi::real>>& { return self.jointVelocities; }, [](mochi::prefab::ArticulatedActorPrefab& self, nb::handle val) { self.jointVelocities = val.is_none() ? std::optional<mochi::DynamicArray<mochi::real>>{} : nb::cast<std::optional<mochi::DynamicArray<mochi::real>>>(val); }, "Optional initial velocity per DoF.\n\nNote:\n    Units depend on joint type: [rad/s] for revolute and spherical, [m/s] for\n    prismatic.", nb::for_setter(nb::arg("value").none()))
   ;
 
   registry.GetClass<mochi::prefab::SoftSkinnedActorPrefab>()
-    .def(py::init([](py::object comment, py::object skeleton_params, py::object soft_params, py::object soft_attach_links, py::object enable_colliding_links, py::object has_gravity, py::object has_inertia, py::object has_stress) {
-      mochi::prefab::SoftSkinnedActorPrefab result;
-      result.comment = py::cast<std::optional<mochi::DynamicString>>(comment);
-      result.skeletonParams = py::cast<mochi::prefab::ArticulatedActorPrefab>(skeleton_params);
-      result.softParams = py::cast<mochi::DynamicArray<mochi::prefab::SoftActorPrefab>>(soft_params);
-      result.softAttachLinks = py::cast<mochi::DynamicArray<mochi::DynamicString>>(soft_attach_links);
-      result.enableCollidingLinks = py::cast<bool>(enable_colliding_links);
-      result.hasGravity = py::cast<bool>(has_gravity);
-      result.hasInertia = py::cast<bool>(has_inertia);
-      result.hasStress = py::cast<bool>(has_stress);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("comment") = mochi::prefab::SoftSkinnedActorPrefab{}.comment
-      , py::arg("skeleton_params") = mochi::prefab::SoftSkinnedActorPrefab{}.skeletonParams
-      , py::arg("soft_params") = mochi::prefab::SoftSkinnedActorPrefab{}.softParams
-      , py::arg("soft_attach_links") = mochi::prefab::SoftSkinnedActorPrefab{}.softAttachLinks
-      , py::arg("enable_colliding_links") = mochi::prefab::SoftSkinnedActorPrefab{}.enableCollidingLinks
-      , py::arg("has_gravity") = mochi::prefab::SoftSkinnedActorPrefab{}.hasGravity
-      , py::arg("has_inertia") = mochi::prefab::SoftSkinnedActorPrefab{}.hasInertia
-      , py::arg("has_stress") = mochi::prefab::SoftSkinnedActorPrefab{}.hasStress
+    .def("__init__", [](mochi::prefab::SoftSkinnedActorPrefab* self, nb::object comment, nb::object skeleton_params, nb::object soft_params, nb::object soft_attach_links, nb::object enable_colliding_links, nb::object has_gravity, nb::object has_inertia, nb::object has_stress) {
+      mochi::prefab::SoftSkinnedActorPrefab result{};
+      result.comment = nb::cast<std::optional<mochi::DynamicString>>(comment);
+      result.skeletonParams = nb::cast<mochi::prefab::ArticulatedActorPrefab>(skeleton_params);
+      result.softParams = nb::cast<mochi::DynamicArray<mochi::prefab::SoftActorPrefab>>(soft_params);
+      result.softAttachLinks = nb::cast<mochi::DynamicArray<mochi::DynamicString>>(soft_attach_links);
+      result.enableCollidingLinks = nb::cast<bool>(enable_colliding_links);
+      result.hasGravity = nb::cast<bool>(has_gravity);
+      result.hasInertia = nb::cast<bool>(has_inertia);
+      result.hasStress = nb::cast<bool>(has_stress);
+      new (self) mochi::prefab::SoftSkinnedActorPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("comment").sig("...") = mochi::prefab::SoftSkinnedActorPrefab{}.comment
+      , nb::arg("skeleton_params").sig("...") = mochi::prefab::SoftSkinnedActorPrefab{}.skeletonParams
+      , nb::arg("soft_params").sig("...") = mochi::prefab::SoftSkinnedActorPrefab{}.softParams
+      , nb::arg("soft_attach_links").sig("...") = mochi::prefab::SoftSkinnedActorPrefab{}.softAttachLinks
+      , nb::arg("enable_colliding_links") = mochi::prefab::SoftSkinnedActorPrefab{}.enableCollidingLinks
+      , nb::arg("has_gravity") = mochi::prefab::SoftSkinnedActorPrefab{}.hasGravity
+      , nb::arg("has_inertia") = mochi::prefab::SoftSkinnedActorPrefab{}.hasInertia
+      , nb::arg("has_stress") = mochi::prefab::SoftSkinnedActorPrefab{}.hasStress
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::SoftSkinnedActorPrefab const& self) { return mochi::prefab::SoftSkinnedActorPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::SoftSkinnedActorPrefab const& self, py::dict) { return mochi::prefab::SoftSkinnedActorPrefab(self); })
-    .def_readwrite("comment", &mochi::prefab::SoftSkinnedActorPrefab::comment, "Optional serialized comment.")
-    .def_readwrite("skeleton_params", &mochi::prefab::SoftSkinnedActorPrefab::skeletonParams, "Articulated actor parameters for the skeleton.")
-    .def_property("soft_params", [](mochi::prefab::SoftSkinnedActorPrefab& self) -> mochi::DynamicArray<mochi::prefab::SoftActorPrefab>& { return self.softParams; }, [](mochi::prefab::SoftSkinnedActorPrefab& self, py::object val) { self.softParams = py::cast<mochi::DynamicArray<mochi::prefab::SoftActorPrefab>>(val); }, py::return_value_policy::reference_internal, "Parameters for each nested soft actor.\n\nNote:\n    The :attr:`~superdex.physics.prefab.SoftActorPrefab.rotation` and\n    :attr:`~superdex.physics.prefab.SoftActorPrefab.translation` fields for each\n    nested soft actor are ignored. Nested soft actor transforms are determined\n    by the skeleton's link attachments (see\n    :attr:`~superdex.physics.prefab.SoftSkinnedActorPrefab.soft_attach_links`).\n\nNote:\n    Each nested soft actor's\n    :attr:`~superdex.physics.prefab.SoftActorPrefab.scale` must be uniform\n    (three equal, strictly positive, finite values). Non-uniform soft shape\n    scale is not supported for soft-skinned prefabs.\n\nNote:\n    If a nested soft actor's\n    :attr:`~superdex.physics.prefab.SoftActorPrefab.flow_file` is set, that\n    entry's :attr:`~superdex.physics.prefab.SoftActorPrefab.scale` must be (1,\n    1, 1).\n\nNote:\n    Each entry's inherited name field is a nested soft local name. Explicit\n    non-empty names must be unique across skeleton link local names and other\n    nested soft local names, and must not contain forward slash, backslash, or\n    embedded NUL characters.\n\nNote:\n    Empty names are assigned deterministically after reserving all skeleton link\n    names and all explicit nested soft names: an empty entry at index `i` uses\n    `soft_i` if available; otherwise it uses the first available `soft_N` found\n    by scanning upward from `N = 0`.")
-    .def_property("soft_attach_links", [](mochi::prefab::SoftSkinnedActorPrefab& self) -> mochi::DynamicArray<mochi::DynamicString>& { return self.softAttachLinks; }, [](mochi::prefab::SoftSkinnedActorPrefab& self, py::object val) { self.softAttachLinks = py::cast<mochi::DynamicArray<mochi::DynamicString>>(val); }, py::return_value_policy::reference_internal, "Local link names to attach each nested soft actor to. Empty or one entry per\n:attr:`~superdex.physics.prefab.SoftSkinnedActorPrefab.soft_params` element.\n\nNote:\n    If provided, each entry must be non-empty and must match a skeleton link\n    local name.")
-    .def_readwrite("enable_colliding_links", &mochi::prefab::SoftSkinnedActorPrefab::enableCollidingLinks, "Whether links can collide with each other.")
-    .def_readwrite("has_gravity", &mochi::prefab::SoftSkinnedActorPrefab::hasGravity, "Whether gravity is applied.")
-    .def_readwrite("has_inertia", &mochi::prefab::SoftSkinnedActorPrefab::hasInertia, "Whether inertia is applied.")
-    .def_readwrite("has_stress", &mochi::prefab::SoftSkinnedActorPrefab::hasStress, "Whether soft material stress is applied.")
+    .def("__deepcopy__", [](mochi::prefab::SoftSkinnedActorPrefab const& self, nb::dict) { return mochi::prefab::SoftSkinnedActorPrefab(self); })
+    .def_prop_rw("comment", [](mochi::prefab::SoftSkinnedActorPrefab& self) -> std::optional<mochi::DynamicString>& { return self.comment; }, [](mochi::prefab::SoftSkinnedActorPrefab& self, nb::handle val) { self.comment = val.is_none() ? std::optional<mochi::DynamicString>{} : nb::cast<std::optional<mochi::DynamicString>>(val); }, "Optional serialized comment.", nb::for_setter(nb::arg("value").none()))
+    .def_rw("skeleton_params", &mochi::prefab::SoftSkinnedActorPrefab::skeletonParams, "Articulated actor parameters for the skeleton.")
+    .def_prop_rw("soft_params", [](mochi::prefab::SoftSkinnedActorPrefab& self) -> mochi::DynamicArray<mochi::prefab::SoftActorPrefab>& { return self.softParams; }, [](mochi::prefab::SoftSkinnedActorPrefab& self, nb::object val) { self.softParams = nb::cast<mochi::DynamicArray<mochi::prefab::SoftActorPrefab>>(val); }, "Parameters for each nested soft actor.\n\nNote:\n    The :attr:`~superdex.physics.prefab.SoftActorPrefab.rotation` and\n    :attr:`~superdex.physics.prefab.SoftActorPrefab.translation` fields for each\n    nested soft actor are ignored. Nested soft actor transforms are determined\n    by the skeleton's link attachments (see\n    :attr:`~superdex.physics.prefab.SoftSkinnedActorPrefab.soft_attach_links`).\n\nNote:\n    Each nested soft actor's\n    :attr:`~superdex.physics.prefab.SoftActorPrefab.scale` must be uniform\n    (three equal, strictly positive, finite values). Non-uniform soft shape\n    scale is not supported for soft-skinned prefabs.\n\nNote:\n    If a nested soft actor's\n    :attr:`~superdex.physics.prefab.SoftActorPrefab.flow_file` is set, that\n    entry's :attr:`~superdex.physics.prefab.SoftActorPrefab.scale` must be (1,\n    1, 1).\n\nNote:\n    Each entry's inherited name field is a nested soft local name. Explicit\n    non-empty names must be unique across skeleton link local names and other\n    nested soft local names, and must not contain forward slash, backslash, or\n    embedded NUL characters.\n\nNote:\n    Empty names are assigned deterministically after reserving all skeleton link\n    names and all explicit nested soft names: an empty entry at index `i` uses\n    `soft_i` if available; otherwise it uses the first available `soft_N` found\n    by scanning upward from `N = 0`.")
+    .def_prop_rw("soft_attach_links", [](mochi::prefab::SoftSkinnedActorPrefab& self) -> mochi::DynamicArray<mochi::DynamicString>& { return self.softAttachLinks; }, [](mochi::prefab::SoftSkinnedActorPrefab& self, nb::object val) { self.softAttachLinks = nb::cast<mochi::DynamicArray<mochi::DynamicString>>(val); }, "Local link names to attach each nested soft actor to. Empty or one entry per\n:attr:`~superdex.physics.prefab.SoftSkinnedActorPrefab.soft_params` element.\n\nNote:\n    If provided, each entry must be non-empty and must match a skeleton link\n    local name.")
+    .def_rw("enable_colliding_links", &mochi::prefab::SoftSkinnedActorPrefab::enableCollidingLinks, "Whether links can collide with each other.")
+    .def_rw("has_gravity", &mochi::prefab::SoftSkinnedActorPrefab::hasGravity, "Whether gravity is applied.")
+    .def_rw("has_inertia", &mochi::prefab::SoftSkinnedActorPrefab::hasInertia, "Whether inertia is applied.")
+    .def_rw("has_stress", &mochi::prefab::SoftSkinnedActorPrefab::hasStress, "Whether soft material stress is applied.")
   ;
 
   registry.GetClass<mochi::prefab::ActorLists>()
-    .def(py::init([](py::object comment, py::object articulated, py::object rigid, py::object soft, py::object soft_skinned) {
-      mochi::prefab::ActorLists result;
-      result.comment = py::cast<std::optional<mochi::DynamicString>>(comment);
-      result.articulated = py::cast<mochi::DynamicArray<mochi::prefab::ArticulatedActorPrefab>>(articulated);
-      result.rigid = py::cast<mochi::DynamicArray<mochi::prefab::RigidActorPrefab>>(rigid);
-      result.soft = py::cast<mochi::DynamicArray<mochi::prefab::SoftActorPrefab>>(soft);
-      result.softSkinned = py::cast<mochi::DynamicArray<mochi::prefab::SoftSkinnedActorPrefab>>(soft_skinned);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("comment") = mochi::prefab::ActorLists{}.comment
-      , py::arg("articulated") = mochi::prefab::ActorLists{}.articulated
-      , py::arg("rigid") = mochi::prefab::ActorLists{}.rigid
-      , py::arg("soft") = mochi::prefab::ActorLists{}.soft
-      , py::arg("soft_skinned") = mochi::prefab::ActorLists{}.softSkinned
+    .def("__init__", [](mochi::prefab::ActorLists* self, nb::object comment, nb::object articulated, nb::object rigid, nb::object soft, nb::object soft_skinned) {
+      mochi::prefab::ActorLists result{};
+      result.comment = nb::cast<std::optional<mochi::DynamicString>>(comment);
+      result.articulated = nb::cast<mochi::DynamicArray<mochi::prefab::ArticulatedActorPrefab>>(articulated);
+      result.rigid = nb::cast<mochi::DynamicArray<mochi::prefab::RigidActorPrefab>>(rigid);
+      result.soft = nb::cast<mochi::DynamicArray<mochi::prefab::SoftActorPrefab>>(soft);
+      result.softSkinned = nb::cast<mochi::DynamicArray<mochi::prefab::SoftSkinnedActorPrefab>>(soft_skinned);
+      new (self) mochi::prefab::ActorLists(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("comment").sig("...") = mochi::prefab::ActorLists{}.comment
+      , nb::arg("articulated").sig("...") = mochi::prefab::ActorLists{}.articulated
+      , nb::arg("rigid").sig("...") = mochi::prefab::ActorLists{}.rigid
+      , nb::arg("soft").sig("...") = mochi::prefab::ActorLists{}.soft
+      , nb::arg("soft_skinned").sig("...") = mochi::prefab::ActorLists{}.softSkinned
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::ActorLists const& self) { return mochi::prefab::ActorLists(self); })
-    .def("__deepcopy__", [](mochi::prefab::ActorLists const& self, py::dict) { return mochi::prefab::ActorLists(self); })
-    .def_readwrite("comment", &mochi::prefab::ActorLists::comment, "Optional serialized comment.")
-    .def_property("articulated", [](mochi::prefab::ActorLists& self) -> mochi::DynamicArray<mochi::prefab::ArticulatedActorPrefab>& { return self.articulated; }, [](mochi::prefab::ActorLists& self, py::object val) { self.articulated = py::cast<mochi::DynamicArray<mochi::prefab::ArticulatedActorPrefab>>(val); }, py::return_value_policy::reference_internal, "Articulated actors.")
-    .def_property("rigid", [](mochi::prefab::ActorLists& self) -> mochi::DynamicArray<mochi::prefab::RigidActorPrefab>& { return self.rigid; }, [](mochi::prefab::ActorLists& self, py::object val) { self.rigid = py::cast<mochi::DynamicArray<mochi::prefab::RigidActorPrefab>>(val); }, py::return_value_policy::reference_internal, "Rigid actors.")
-    .def_property("soft", [](mochi::prefab::ActorLists& self) -> mochi::DynamicArray<mochi::prefab::SoftActorPrefab>& { return self.soft; }, [](mochi::prefab::ActorLists& self, py::object val) { self.soft = py::cast<mochi::DynamicArray<mochi::prefab::SoftActorPrefab>>(val); }, py::return_value_policy::reference_internal, "Soft actors.")
-    .def_property("soft_skinned", [](mochi::prefab::ActorLists& self) -> mochi::DynamicArray<mochi::prefab::SoftSkinnedActorPrefab>& { return self.softSkinned; }, [](mochi::prefab::ActorLists& self, py::object val) { self.softSkinned = py::cast<mochi::DynamicArray<mochi::prefab::SoftSkinnedActorPrefab>>(val); }, py::return_value_policy::reference_internal, "Soft-skinned actors.")
+    .def("__deepcopy__", [](mochi::prefab::ActorLists const& self, nb::dict) { return mochi::prefab::ActorLists(self); })
+    .def_prop_rw("comment", [](mochi::prefab::ActorLists& self) -> std::optional<mochi::DynamicString>& { return self.comment; }, [](mochi::prefab::ActorLists& self, nb::handle val) { self.comment = val.is_none() ? std::optional<mochi::DynamicString>{} : nb::cast<std::optional<mochi::DynamicString>>(val); }, "Optional serialized comment.", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("articulated", [](mochi::prefab::ActorLists& self) -> mochi::DynamicArray<mochi::prefab::ArticulatedActorPrefab>& { return self.articulated; }, [](mochi::prefab::ActorLists& self, nb::object val) { self.articulated = nb::cast<mochi::DynamicArray<mochi::prefab::ArticulatedActorPrefab>>(val); }, "Articulated actors.")
+    .def_prop_rw("rigid", [](mochi::prefab::ActorLists& self) -> mochi::DynamicArray<mochi::prefab::RigidActorPrefab>& { return self.rigid; }, [](mochi::prefab::ActorLists& self, nb::object val) { self.rigid = nb::cast<mochi::DynamicArray<mochi::prefab::RigidActorPrefab>>(val); }, "Rigid actors.")
+    .def_prop_rw("soft", [](mochi::prefab::ActorLists& self) -> mochi::DynamicArray<mochi::prefab::SoftActorPrefab>& { return self.soft; }, [](mochi::prefab::ActorLists& self, nb::object val) { self.soft = nb::cast<mochi::DynamicArray<mochi::prefab::SoftActorPrefab>>(val); }, "Soft actors.")
+    .def_prop_rw("soft_skinned", [](mochi::prefab::ActorLists& self) -> mochi::DynamicArray<mochi::prefab::SoftSkinnedActorPrefab>& { return self.softSkinned; }, [](mochi::prefab::ActorLists& self, nb::object val) { self.softSkinned = nb::cast<mochi::DynamicArray<mochi::prefab::SoftSkinnedActorPrefab>>(val); }, "Soft-skinned actors.")
   ;
 
   registry.GetClass<mochi::prefab::RigidSphericalJointConstraintPrefab, mochi::RigidSphericalJointConstraintParams>()
-    .def(py::init([](py::object stiffness, py::object damping, py::object saturation, py::object local_pos_a, py::object local_pos_b, py::object actor_a, py::object actor_b, py::object actor_name_a, py::object actor_name_b) {
-      mochi::prefab::RigidSphericalJointConstraintPrefab result;
-      result.stiffness = py::cast<mochi::real>(stiffness);
-      result.damping = py::cast<mochi::real>(damping);
-      result.saturation = py::cast<mochi::real>(saturation);
-      result.localPosA = py::cast<mochi::Real3>(local_pos_a);
-      result.localPosB = py::cast<mochi::Real3>(local_pos_b);
-      result.actorA = py::cast<mochi::ActorHandle>(actor_a);
-      result.actorB = py::cast<mochi::ActorHandle>(actor_b);
-      result.actorNameA = py::cast<mochi::DynamicString>(actor_name_a);
-      result.actorNameB = py::cast<mochi::DynamicString>(actor_name_b);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::prefab::RigidSphericalJointConstraintPrefab{}.stiffness
-      , py::arg("damping") = mochi::prefab::RigidSphericalJointConstraintPrefab{}.damping
-      , py::arg("saturation") = mochi::prefab::RigidSphericalJointConstraintPrefab{}.saturation
-      , py::arg("local_pos_a") = mochi::prefab::RigidSphericalJointConstraintPrefab{}.localPosA
-      , py::arg("local_pos_b") = mochi::prefab::RigidSphericalJointConstraintPrefab{}.localPosB
-      , py::arg("actor_a") = mochi::prefab::RigidSphericalJointConstraintPrefab{}.actorA
-      , py::arg("actor_b") = mochi::prefab::RigidSphericalJointConstraintPrefab{}.actorB
-      , py::arg("actor_name_a") = mochi::prefab::RigidSphericalJointConstraintPrefab{}.actorNameA
-      , py::arg("actor_name_b") = mochi::prefab::RigidSphericalJointConstraintPrefab{}.actorNameB
+    .def("__init__", [](mochi::prefab::RigidSphericalJointConstraintPrefab* self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object local_pos_a, nb::object local_pos_b, nb::object actor_a, nb::object actor_b, nb::object actor_name_a, nb::object actor_name_b) {
+      mochi::prefab::RigidSphericalJointConstraintPrefab result{};
+      result.stiffness = nb::cast<mochi::real>(stiffness);
+      result.damping = nb::cast<mochi::real>(damping);
+      result.saturation = nb::cast<mochi::real>(saturation);
+      result.localPosA = nb::cast<mochi::Real3>(local_pos_a);
+      result.localPosB = nb::cast<mochi::Real3>(local_pos_b);
+      result.actorA = nb::cast<mochi::ActorHandle>(actor_a);
+      result.actorB = nb::cast<mochi::ActorHandle>(actor_b);
+      result.actorNameA = nb::cast<mochi::DynamicString>(actor_name_a);
+      result.actorNameB = nb::cast<mochi::DynamicString>(actor_name_b);
+      new (self) mochi::prefab::RigidSphericalJointConstraintPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::prefab::RigidSphericalJointConstraintPrefab{}.stiffness
+      , nb::arg("damping") = mochi::prefab::RigidSphericalJointConstraintPrefab{}.damping
+      , nb::arg("saturation") = mochi::prefab::RigidSphericalJointConstraintPrefab{}.saturation
+      , nb::arg("local_pos_a").sig("...") = mochi::prefab::RigidSphericalJointConstraintPrefab{}.localPosA
+      , nb::arg("local_pos_b").sig("...") = mochi::prefab::RigidSphericalJointConstraintPrefab{}.localPosB
+      , nb::arg("actor_a").sig("...") = mochi::prefab::RigidSphericalJointConstraintPrefab{}.actorA
+      , nb::arg("actor_b").sig("...") = mochi::prefab::RigidSphericalJointConstraintPrefab{}.actorB
+      , nb::arg("actor_name_a") = mochi::prefab::RigidSphericalJointConstraintPrefab{}.actorNameA
+      , nb::arg("actor_name_b") = mochi::prefab::RigidSphericalJointConstraintPrefab{}.actorNameB
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::RigidSphericalJointConstraintPrefab const& self) { return mochi::prefab::RigidSphericalJointConstraintPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::RigidSphericalJointConstraintPrefab const& self, py::dict) { return mochi::prefab::RigidSphericalJointConstraintPrefab(self); })
-    .def_readwrite("actor_name_a", &mochi::prefab::RigidSphericalJointConstraintPrefab::actorNameA, "Name or hierarchy path identifying rigid actor A.")
-    .def_readwrite("actor_name_b", &mochi::prefab::RigidSphericalJointConstraintPrefab::actorNameB, "Name or hierarchy path identifying rigid actor B.")
+    .def("__deepcopy__", [](mochi::prefab::RigidSphericalJointConstraintPrefab const& self, nb::dict) { return mochi::prefab::RigidSphericalJointConstraintPrefab(self); })
+    .def_rw("actor_name_a", &mochi::prefab::RigidSphericalJointConstraintPrefab::actorNameA, "Name or hierarchy path identifying rigid actor A.")
+    .def_rw("actor_name_b", &mochi::prefab::RigidSphericalJointConstraintPrefab::actorNameB, "Name or hierarchy path identifying rigid actor B.")
   ;
 
   registry.GetClass<mochi::prefab::RigidPrismaticJointConstraintPrefab, mochi::RigidPrismaticJointConstraintParams>()
-    .def(py::init([](py::object stiffness, py::object damping, py::object saturation, py::object free_axis, py::object actor_a, py::object actor_b, py::object max, py::object min, py::object actor_name_a, py::object actor_name_b) {
-      mochi::prefab::RigidPrismaticJointConstraintPrefab result;
-      result.stiffness = py::cast<mochi::real>(stiffness);
-      result.damping = py::cast<mochi::real>(damping);
-      result.saturation = py::cast<mochi::real>(saturation);
-      result.freeAxis = py::cast<mochi::Real3>(free_axis);
-      result.actorA = py::cast<mochi::ActorHandle>(actor_a);
-      result.actorB = py::cast<mochi::ActorHandle>(actor_b);
-      result.max = py::cast<std::optional<mochi::real>>(max);
-      result.min = py::cast<std::optional<mochi::real>>(min);
-      result.actorNameA = py::cast<mochi::DynamicString>(actor_name_a);
-      result.actorNameB = py::cast<mochi::DynamicString>(actor_name_b);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.stiffness
-      , py::arg("damping") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.damping
-      , py::arg("saturation") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.saturation
-      , py::arg("free_axis") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.freeAxis
-      , py::arg("actor_a") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.actorA
-      , py::arg("actor_b") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.actorB
-      , py::arg("max") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.max
-      , py::arg("min") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.min
-      , py::arg("actor_name_a") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.actorNameA
-      , py::arg("actor_name_b") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.actorNameB
+    .def("__init__", [](mochi::prefab::RigidPrismaticJointConstraintPrefab* self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object free_axis, nb::object actor_a, nb::object actor_b, nb::object max, nb::object min, nb::object actor_name_a, nb::object actor_name_b) {
+      mochi::prefab::RigidPrismaticJointConstraintPrefab result{};
+      result.stiffness = nb::cast<mochi::real>(stiffness);
+      result.damping = nb::cast<mochi::real>(damping);
+      result.saturation = nb::cast<mochi::real>(saturation);
+      result.freeAxis = nb::cast<mochi::Real3>(free_axis);
+      result.actorA = nb::cast<mochi::ActorHandle>(actor_a);
+      result.actorB = nb::cast<mochi::ActorHandle>(actor_b);
+      result.max = nb::cast<std::optional<mochi::real>>(max);
+      result.min = nb::cast<std::optional<mochi::real>>(min);
+      result.actorNameA = nb::cast<mochi::DynamicString>(actor_name_a);
+      result.actorNameB = nb::cast<mochi::DynamicString>(actor_name_b);
+      new (self) mochi::prefab::RigidPrismaticJointConstraintPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.stiffness
+      , nb::arg("damping") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.damping
+      , nb::arg("saturation") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.saturation
+      , nb::arg("free_axis").sig("...") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.freeAxis
+      , nb::arg("actor_a").sig("...") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.actorA
+      , nb::arg("actor_b").sig("...") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.actorB
+      , nb::arg("max").sig("...") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.max
+      , nb::arg("min").sig("...") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.min
+      , nb::arg("actor_name_a") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.actorNameA
+      , nb::arg("actor_name_b") = mochi::prefab::RigidPrismaticJointConstraintPrefab{}.actorNameB
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::RigidPrismaticJointConstraintPrefab const& self) { return mochi::prefab::RigidPrismaticJointConstraintPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::RigidPrismaticJointConstraintPrefab const& self, py::dict) { return mochi::prefab::RigidPrismaticJointConstraintPrefab(self); })
-    .def_readwrite("actor_name_a", &mochi::prefab::RigidPrismaticJointConstraintPrefab::actorNameA, "Name or hierarchy path identifying rigid actor A.")
-    .def_readwrite("actor_name_b", &mochi::prefab::RigidPrismaticJointConstraintPrefab::actorNameB, "Name or hierarchy path identifying rigid actor B.")
+    .def("__deepcopy__", [](mochi::prefab::RigidPrismaticJointConstraintPrefab const& self, nb::dict) { return mochi::prefab::RigidPrismaticJointConstraintPrefab(self); })
+    .def_rw("actor_name_a", &mochi::prefab::RigidPrismaticJointConstraintPrefab::actorNameA, "Name or hierarchy path identifying rigid actor A.")
+    .def_rw("actor_name_b", &mochi::prefab::RigidPrismaticJointConstraintPrefab::actorNameB, "Name or hierarchy path identifying rigid actor B.")
   ;
 
   registry.GetClass<mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab, mochi::DeformableNodeToDeformableNodeConstraintParams>()
-    .def(py::init([](py::object stiffness, py::object damping, py::object saturation, py::object node_index_a, py::object node_index_b, py::object actor_a, py::object actor_b, py::object find_closest, py::object actor_name_a, py::object actor_name_b) {
-      mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab result;
-      result.stiffness = py::cast<mochi::real>(stiffness);
-      result.damping = py::cast<mochi::real>(damping);
-      result.saturation = py::cast<mochi::real>(saturation);
-      result.nodeIndexA = py::cast<int>(node_index_a);
-      result.nodeIndexB = py::cast<int>(node_index_b);
-      result.actorA = py::cast<mochi::ActorHandle>(actor_a);
-      result.actorB = py::cast<mochi::ActorHandle>(actor_b);
-      result.findClosest = py::cast<bool>(find_closest);
-      result.actorNameA = py::cast<mochi::DynamicString>(actor_name_a);
-      result.actorNameB = py::cast<mochi::DynamicString>(actor_name_b);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.stiffness
-      , py::arg("damping") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.damping
-      , py::arg("saturation") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.saturation
-      , py::arg("node_index_a") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.nodeIndexA
-      , py::arg("node_index_b") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.nodeIndexB
-      , py::arg("actor_a") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.actorA
-      , py::arg("actor_b") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.actorB
-      , py::arg("find_closest") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.findClosest
-      , py::arg("actor_name_a") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.actorNameA
-      , py::arg("actor_name_b") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.actorNameB
+    .def("__init__", [](mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab* self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object node_index_a, nb::object node_index_b, nb::object actor_a, nb::object actor_b, nb::object find_closest, nb::object actor_name_a, nb::object actor_name_b) {
+      mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab result{};
+      result.stiffness = nb::cast<mochi::real>(stiffness);
+      result.damping = nb::cast<mochi::real>(damping);
+      result.saturation = nb::cast<mochi::real>(saturation);
+      result.nodeIndexA = nb::cast<int>(node_index_a);
+      result.nodeIndexB = nb::cast<int>(node_index_b);
+      result.actorA = nb::cast<mochi::ActorHandle>(actor_a);
+      result.actorB = nb::cast<mochi::ActorHandle>(actor_b);
+      result.findClosest = nb::cast<bool>(find_closest);
+      result.actorNameA = nb::cast<mochi::DynamicString>(actor_name_a);
+      result.actorNameB = nb::cast<mochi::DynamicString>(actor_name_b);
+      new (self) mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.stiffness
+      , nb::arg("damping") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.damping
+      , nb::arg("saturation") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.saturation
+      , nb::arg("node_index_a") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.nodeIndexA
+      , nb::arg("node_index_b") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.nodeIndexB
+      , nb::arg("actor_a").sig("...") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.actorA
+      , nb::arg("actor_b").sig("...") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.actorB
+      , nb::arg("find_closest") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.findClosest
+      , nb::arg("actor_name_a") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.actorNameA
+      , nb::arg("actor_name_b") = mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab{}.actorNameB
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab const& self) { return mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab const& self, py::dict) { return mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab(self); })
-    .def_readwrite("actor_name_a", &mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab::actorNameA, "Name or hierarchy path identifying deformable actor A.")
-    .def_readwrite("actor_name_b", &mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab::actorNameB, "Name or hierarchy path identifying deformable actor B.")
+    .def("__deepcopy__", [](mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab const& self, nb::dict) { return mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab(self); })
+    .def_rw("actor_name_a", &mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab::actorNameA, "Name or hierarchy path identifying deformable actor A.")
+    .def_rw("actor_name_b", &mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab::actorNameB, "Name or hierarchy path identifying deformable actor B.")
   ;
 
   registry.GetClass<mochi::prefab::DeformableNodeToRigidConstraintPrefab, mochi::DeformableNodeToRigidConstraintParams>()
-    .def(py::init([](py::object stiffness, py::object damping, py::object saturation, py::object rigid_local_pos, py::object deformable_node_index, py::object rigid_actor, py::object deformable_actor, py::object find_closest, py::object fix_to_deformable_pos, py::object rigid_actor_name, py::object deformable_actor_name) {
-      mochi::prefab::DeformableNodeToRigidConstraintPrefab result;
-      result.stiffness = py::cast<mochi::real>(stiffness);
-      result.damping = py::cast<mochi::real>(damping);
-      result.saturation = py::cast<mochi::real>(saturation);
-      result.rigidLocalPos = py::cast<mochi::Real3>(rigid_local_pos);
-      result.deformableNodeIndex = py::cast<int>(deformable_node_index);
-      result.rigidActor = py::cast<mochi::ActorHandle>(rigid_actor);
-      result.deformableActor = py::cast<mochi::ActorHandle>(deformable_actor);
-      result.findClosest = py::cast<bool>(find_closest);
-      result.fixToDeformablePos = py::cast<bool>(fix_to_deformable_pos);
-      result.rigidActorName = py::cast<mochi::DynamicString>(rigid_actor_name);
-      result.deformableActorName = py::cast<mochi::DynamicString>(deformable_actor_name);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.stiffness
-      , py::arg("damping") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.damping
-      , py::arg("saturation") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.saturation
-      , py::arg("rigid_local_pos") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.rigidLocalPos
-      , py::arg("deformable_node_index") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.deformableNodeIndex
-      , py::arg("rigid_actor") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.rigidActor
-      , py::arg("deformable_actor") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.deformableActor
-      , py::arg("find_closest") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.findClosest
-      , py::arg("fix_to_deformable_pos") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.fixToDeformablePos
-      , py::arg("rigid_actor_name") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.rigidActorName
-      , py::arg("deformable_actor_name") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.deformableActorName
+    .def("__init__", [](mochi::prefab::DeformableNodeToRigidConstraintPrefab* self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object rigid_local_pos, nb::object deformable_node_index, nb::object rigid_actor, nb::object deformable_actor, nb::object find_closest, nb::object fix_to_deformable_pos, nb::object rigid_actor_name, nb::object deformable_actor_name) {
+      mochi::prefab::DeformableNodeToRigidConstraintPrefab result{};
+      result.stiffness = nb::cast<mochi::real>(stiffness);
+      result.damping = nb::cast<mochi::real>(damping);
+      result.saturation = nb::cast<mochi::real>(saturation);
+      result.rigidLocalPos = nb::cast<mochi::Real3>(rigid_local_pos);
+      result.deformableNodeIndex = nb::cast<int>(deformable_node_index);
+      result.rigidActor = nb::cast<mochi::ActorHandle>(rigid_actor);
+      result.deformableActor = nb::cast<mochi::ActorHandle>(deformable_actor);
+      result.findClosest = nb::cast<bool>(find_closest);
+      result.fixToDeformablePos = nb::cast<bool>(fix_to_deformable_pos);
+      result.rigidActorName = nb::cast<mochi::DynamicString>(rigid_actor_name);
+      result.deformableActorName = nb::cast<mochi::DynamicString>(deformable_actor_name);
+      new (self) mochi::prefab::DeformableNodeToRigidConstraintPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.stiffness
+      , nb::arg("damping") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.damping
+      , nb::arg("saturation") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.saturation
+      , nb::arg("rigid_local_pos").sig("...") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.rigidLocalPos
+      , nb::arg("deformable_node_index") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.deformableNodeIndex
+      , nb::arg("rigid_actor").sig("...") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.rigidActor
+      , nb::arg("deformable_actor").sig("...") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.deformableActor
+      , nb::arg("find_closest") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.findClosest
+      , nb::arg("fix_to_deformable_pos") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.fixToDeformablePos
+      , nb::arg("rigid_actor_name") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.rigidActorName
+      , nb::arg("deformable_actor_name") = mochi::prefab::DeformableNodeToRigidConstraintPrefab{}.deformableActorName
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::DeformableNodeToRigidConstraintPrefab const& self) { return mochi::prefab::DeformableNodeToRigidConstraintPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::DeformableNodeToRigidConstraintPrefab const& self, py::dict) { return mochi::prefab::DeformableNodeToRigidConstraintPrefab(self); })
-    .def_readwrite("rigid_actor_name", &mochi::prefab::DeformableNodeToRigidConstraintPrefab::rigidActorName, "Name or hierarchy path identifying the rigid actor.")
-    .def_readwrite("deformable_actor_name", &mochi::prefab::DeformableNodeToRigidConstraintPrefab::deformableActorName, "Name or hierarchy path identifying the deformable actor.")
+    .def("__deepcopy__", [](mochi::prefab::DeformableNodeToRigidConstraintPrefab const& self, nb::dict) { return mochi::prefab::DeformableNodeToRigidConstraintPrefab(self); })
+    .def_rw("rigid_actor_name", &mochi::prefab::DeformableNodeToRigidConstraintPrefab::rigidActorName, "Name or hierarchy path identifying the rigid actor.")
+    .def_rw("deformable_actor_name", &mochi::prefab::DeformableNodeToRigidConstraintPrefab::deformableActorName, "Name or hierarchy path identifying the deformable actor.")
   ;
 
   registry.GetClass<mochi::prefab::JointRotationRangeConstraintPrefab, mochi::JointRotationRangeConstraintParams>()
-    .def(py::init([](py::object stiffness, py::object damping, py::object saturation, py::object ref_frame_rot_vec, py::object angle_range_x, py::object angle_range_y, py::object angle_range_z, py::object actor_a, py::object actor_b, py::object range_around_rest, py::object actor_name_a, py::object actor_name_b) {
-      mochi::prefab::JointRotationRangeConstraintPrefab result;
-      result.stiffness = py::cast<mochi::real>(stiffness);
-      result.damping = py::cast<mochi::real>(damping);
-      result.saturation = py::cast<mochi::real>(saturation);
-      result.refFrameRotVec = py::cast<mochi::Real3>(ref_frame_rot_vec);
-      result.angleRangeX = py::cast<mochi::Real2>(angle_range_x);
-      result.angleRangeY = py::cast<mochi::Real2>(angle_range_y);
-      result.angleRangeZ = py::cast<mochi::Real2>(angle_range_z);
-      result.actorA = py::cast<mochi::ActorHandle>(actor_a);
-      result.actorB = py::cast<mochi::ActorHandle>(actor_b);
-      result.rangeAroundRest = py::cast<bool>(range_around_rest);
-      result.actorNameA = py::cast<mochi::DynamicString>(actor_name_a);
-      result.actorNameB = py::cast<mochi::DynamicString>(actor_name_b);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::prefab::JointRotationRangeConstraintPrefab{}.stiffness
-      , py::arg("damping") = mochi::prefab::JointRotationRangeConstraintPrefab{}.damping
-      , py::arg("saturation") = mochi::prefab::JointRotationRangeConstraintPrefab{}.saturation
-      , py::arg("ref_frame_rot_vec") = mochi::prefab::JointRotationRangeConstraintPrefab{}.refFrameRotVec
-      , py::arg("angle_range_x") = mochi::prefab::JointRotationRangeConstraintPrefab{}.angleRangeX
-      , py::arg("angle_range_y") = mochi::prefab::JointRotationRangeConstraintPrefab{}.angleRangeY
-      , py::arg("angle_range_z") = mochi::prefab::JointRotationRangeConstraintPrefab{}.angleRangeZ
-      , py::arg("actor_a") = mochi::prefab::JointRotationRangeConstraintPrefab{}.actorA
-      , py::arg("actor_b") = mochi::prefab::JointRotationRangeConstraintPrefab{}.actorB
-      , py::arg("range_around_rest") = mochi::prefab::JointRotationRangeConstraintPrefab{}.rangeAroundRest
-      , py::arg("actor_name_a") = mochi::prefab::JointRotationRangeConstraintPrefab{}.actorNameA
-      , py::arg("actor_name_b") = mochi::prefab::JointRotationRangeConstraintPrefab{}.actorNameB
+    .def("__init__", [](mochi::prefab::JointRotationRangeConstraintPrefab* self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object ref_frame_rot_vec, nb::object angle_range_x, nb::object angle_range_y, nb::object angle_range_z, nb::object actor_a, nb::object actor_b, nb::object range_around_rest, nb::object actor_name_a, nb::object actor_name_b) {
+      mochi::prefab::JointRotationRangeConstraintPrefab result{};
+      result.stiffness = nb::cast<mochi::real>(stiffness);
+      result.damping = nb::cast<mochi::real>(damping);
+      result.saturation = nb::cast<mochi::real>(saturation);
+      result.refFrameRotVec = nb::cast<mochi::Real3>(ref_frame_rot_vec);
+      result.angleRangeX = nb::cast<mochi::Real2>(angle_range_x);
+      result.angleRangeY = nb::cast<mochi::Real2>(angle_range_y);
+      result.angleRangeZ = nb::cast<mochi::Real2>(angle_range_z);
+      result.actorA = nb::cast<mochi::ActorHandle>(actor_a);
+      result.actorB = nb::cast<mochi::ActorHandle>(actor_b);
+      result.rangeAroundRest = nb::cast<bool>(range_around_rest);
+      result.actorNameA = nb::cast<mochi::DynamicString>(actor_name_a);
+      result.actorNameB = nb::cast<mochi::DynamicString>(actor_name_b);
+      new (self) mochi::prefab::JointRotationRangeConstraintPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::prefab::JointRotationRangeConstraintPrefab{}.stiffness
+      , nb::arg("damping") = mochi::prefab::JointRotationRangeConstraintPrefab{}.damping
+      , nb::arg("saturation") = mochi::prefab::JointRotationRangeConstraintPrefab{}.saturation
+      , nb::arg("ref_frame_rot_vec").sig("...") = mochi::prefab::JointRotationRangeConstraintPrefab{}.refFrameRotVec
+      , nb::arg("angle_range_x").sig("...") = mochi::prefab::JointRotationRangeConstraintPrefab{}.angleRangeX
+      , nb::arg("angle_range_y").sig("...") = mochi::prefab::JointRotationRangeConstraintPrefab{}.angleRangeY
+      , nb::arg("angle_range_z").sig("...") = mochi::prefab::JointRotationRangeConstraintPrefab{}.angleRangeZ
+      , nb::arg("actor_a").sig("...") = mochi::prefab::JointRotationRangeConstraintPrefab{}.actorA
+      , nb::arg("actor_b").sig("...") = mochi::prefab::JointRotationRangeConstraintPrefab{}.actorB
+      , nb::arg("range_around_rest") = mochi::prefab::JointRotationRangeConstraintPrefab{}.rangeAroundRest
+      , nb::arg("actor_name_a") = mochi::prefab::JointRotationRangeConstraintPrefab{}.actorNameA
+      , nb::arg("actor_name_b") = mochi::prefab::JointRotationRangeConstraintPrefab{}.actorNameB
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::JointRotationRangeConstraintPrefab const& self) { return mochi::prefab::JointRotationRangeConstraintPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::JointRotationRangeConstraintPrefab const& self, py::dict) { return mochi::prefab::JointRotationRangeConstraintPrefab(self); })
-    .def_readwrite("actor_name_a", &mochi::prefab::JointRotationRangeConstraintPrefab::actorNameA, "Name or hierarchy path identifying rigid actor A.")
-    .def_readwrite("actor_name_b", &mochi::prefab::JointRotationRangeConstraintPrefab::actorNameB, "Name or hierarchy path identifying rigid actor B.")
+    .def("__deepcopy__", [](mochi::prefab::JointRotationRangeConstraintPrefab const& self, nb::dict) { return mochi::prefab::JointRotationRangeConstraintPrefab(self); })
+    .def_rw("actor_name_a", &mochi::prefab::JointRotationRangeConstraintPrefab::actorNameA, "Name or hierarchy path identifying rigid actor A.")
+    .def_rw("actor_name_b", &mochi::prefab::JointRotationRangeConstraintPrefab::actorNameB, "Name or hierarchy path identifying rigid actor B.")
   ;
 
   registry.GetClass<mochi::prefab::RigidPivotPositionConstraintPrefab, mochi::RigidPivotPositionConstraintParams>()
-    .def(py::init([](py::object stiffness, py::object damping, py::object saturation, py::object target_position, py::object local_position, py::object actor, py::object actor_name) {
-      mochi::prefab::RigidPivotPositionConstraintPrefab result;
-      result.stiffness = py::cast<mochi::real>(stiffness);
-      result.damping = py::cast<mochi::real>(damping);
-      result.saturation = py::cast<mochi::real>(saturation);
-      result.targetPosition = py::cast<mochi::Real3>(target_position);
-      result.localPosition = py::cast<mochi::Real3>(local_position);
-      result.actor = py::cast<mochi::ActorHandle>(actor);
-      result.actorName = py::cast<mochi::DynamicString>(actor_name);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::prefab::RigidPivotPositionConstraintPrefab{}.stiffness
-      , py::arg("damping") = mochi::prefab::RigidPivotPositionConstraintPrefab{}.damping
-      , py::arg("saturation") = mochi::prefab::RigidPivotPositionConstraintPrefab{}.saturation
-      , py::arg("target_position") = mochi::prefab::RigidPivotPositionConstraintPrefab{}.targetPosition
-      , py::arg("local_position") = mochi::prefab::RigidPivotPositionConstraintPrefab{}.localPosition
-      , py::arg("actor") = mochi::prefab::RigidPivotPositionConstraintPrefab{}.actor
-      , py::arg("actor_name") = mochi::prefab::RigidPivotPositionConstraintPrefab{}.actorName
+    .def("__init__", [](mochi::prefab::RigidPivotPositionConstraintPrefab* self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object target_position, nb::object local_position, nb::object actor, nb::object actor_name) {
+      mochi::prefab::RigidPivotPositionConstraintPrefab result{};
+      result.stiffness = nb::cast<mochi::real>(stiffness);
+      result.damping = nb::cast<mochi::real>(damping);
+      result.saturation = nb::cast<mochi::real>(saturation);
+      result.targetPosition = nb::cast<mochi::Real3>(target_position);
+      result.localPosition = nb::cast<mochi::Real3>(local_position);
+      result.actor = nb::cast<mochi::ActorHandle>(actor);
+      result.actorName = nb::cast<mochi::DynamicString>(actor_name);
+      new (self) mochi::prefab::RigidPivotPositionConstraintPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::prefab::RigidPivotPositionConstraintPrefab{}.stiffness
+      , nb::arg("damping") = mochi::prefab::RigidPivotPositionConstraintPrefab{}.damping
+      , nb::arg("saturation") = mochi::prefab::RigidPivotPositionConstraintPrefab{}.saturation
+      , nb::arg("target_position").sig("...") = mochi::prefab::RigidPivotPositionConstraintPrefab{}.targetPosition
+      , nb::arg("local_position").sig("...") = mochi::prefab::RigidPivotPositionConstraintPrefab{}.localPosition
+      , nb::arg("actor").sig("...") = mochi::prefab::RigidPivotPositionConstraintPrefab{}.actor
+      , nb::arg("actor_name") = mochi::prefab::RigidPivotPositionConstraintPrefab{}.actorName
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::RigidPivotPositionConstraintPrefab const& self) { return mochi::prefab::RigidPivotPositionConstraintPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::RigidPivotPositionConstraintPrefab const& self, py::dict) { return mochi::prefab::RigidPivotPositionConstraintPrefab(self); })
-    .def_readwrite("actor_name", &mochi::prefab::RigidPivotPositionConstraintPrefab::actorName, "Name or hierarchy path identifying the rigid actor.")
+    .def("__deepcopy__", [](mochi::prefab::RigidPivotPositionConstraintPrefab const& self, nb::dict) { return mochi::prefab::RigidPivotPositionConstraintPrefab(self); })
+    .def_rw("actor_name", &mochi::prefab::RigidPivotPositionConstraintPrefab::actorName, "Name or hierarchy path identifying the rigid actor.")
   ;
 
   registry.GetClass<mochi::prefab::RigidPivotToRigidTargetConstraintPrefab, mochi::RigidPivotToRigidTargetConstraintParams>()
-    .def(py::init([](py::object stiffness, py::object damping, py::object saturation, py::object target_transform, py::object local_position, py::object actor, py::object actor_name) {
-      mochi::prefab::RigidPivotToRigidTargetConstraintPrefab result;
-      result.stiffness = py::cast<mochi::real>(stiffness);
-      result.damping = py::cast<mochi::real>(damping);
-      result.saturation = py::cast<mochi::real>(saturation);
-      result.targetTransform = py::cast<mochi::TransformRT>(target_transform);
-      result.localPosition = py::cast<mochi::Real3>(local_position);
-      result.actor = py::cast<mochi::ActorHandle>(actor);
-      result.actorName = py::cast<mochi::DynamicString>(actor_name);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::prefab::RigidPivotToRigidTargetConstraintPrefab{}.stiffness
-      , py::arg("damping") = mochi::prefab::RigidPivotToRigidTargetConstraintPrefab{}.damping
-      , py::arg("saturation") = mochi::prefab::RigidPivotToRigidTargetConstraintPrefab{}.saturation
-      , py::arg("target_transform") = mochi::prefab::RigidPivotToRigidTargetConstraintPrefab{}.targetTransform
-      , py::arg("local_position") = mochi::prefab::RigidPivotToRigidTargetConstraintPrefab{}.localPosition
-      , py::arg("actor") = mochi::prefab::RigidPivotToRigidTargetConstraintPrefab{}.actor
-      , py::arg("actor_name") = mochi::prefab::RigidPivotToRigidTargetConstraintPrefab{}.actorName
+    .def("__init__", [](mochi::prefab::RigidPivotToRigidTargetConstraintPrefab* self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object target_transform, nb::object local_position, nb::object actor, nb::object actor_name) {
+      mochi::prefab::RigidPivotToRigidTargetConstraintPrefab result{};
+      result.stiffness = nb::cast<mochi::real>(stiffness);
+      result.damping = nb::cast<mochi::real>(damping);
+      result.saturation = nb::cast<mochi::real>(saturation);
+      result.targetTransform = nb::cast<mochi::TransformRT>(target_transform);
+      result.localPosition = nb::cast<mochi::Real3>(local_position);
+      result.actor = nb::cast<mochi::ActorHandle>(actor);
+      result.actorName = nb::cast<mochi::DynamicString>(actor_name);
+      new (self) mochi::prefab::RigidPivotToRigidTargetConstraintPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::prefab::RigidPivotToRigidTargetConstraintPrefab{}.stiffness
+      , nb::arg("damping") = mochi::prefab::RigidPivotToRigidTargetConstraintPrefab{}.damping
+      , nb::arg("saturation") = mochi::prefab::RigidPivotToRigidTargetConstraintPrefab{}.saturation
+      , nb::arg("target_transform").sig("...") = mochi::prefab::RigidPivotToRigidTargetConstraintPrefab{}.targetTransform
+      , nb::arg("local_position").sig("...") = mochi::prefab::RigidPivotToRigidTargetConstraintPrefab{}.localPosition
+      , nb::arg("actor").sig("...") = mochi::prefab::RigidPivotToRigidTargetConstraintPrefab{}.actor
+      , nb::arg("actor_name") = mochi::prefab::RigidPivotToRigidTargetConstraintPrefab{}.actorName
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::RigidPivotToRigidTargetConstraintPrefab const& self) { return mochi::prefab::RigidPivotToRigidTargetConstraintPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::RigidPivotToRigidTargetConstraintPrefab const& self, py::dict) { return mochi::prefab::RigidPivotToRigidTargetConstraintPrefab(self); })
-    .def_readwrite("actor_name", &mochi::prefab::RigidPivotToRigidTargetConstraintPrefab::actorName, "Name or hierarchy path identifying the rigid actor.")
+    .def("__deepcopy__", [](mochi::prefab::RigidPivotToRigidTargetConstraintPrefab const& self, nb::dict) { return mochi::prefab::RigidPivotToRigidTargetConstraintPrefab(self); })
+    .def_rw("actor_name", &mochi::prefab::RigidPivotToRigidTargetConstraintPrefab::actorName, "Name or hierarchy path identifying the rigid actor.")
   ;
 
   registry.GetClass<mochi::prefab::RigidPivotRotationConstraintPrefab, mochi::RigidPivotRotationConstraintParams>()
-    .def(py::init([](py::object stiffness, py::object damping, py::object saturation, py::object target_rotation, py::object local_rotation, py::object actor, py::object actor_name) {
-      mochi::prefab::RigidPivotRotationConstraintPrefab result;
-      result.stiffness = py::cast<mochi::real>(stiffness);
-      result.damping = py::cast<mochi::real>(damping);
-      result.saturation = py::cast<mochi::real>(saturation);
-      result.targetRotation = py::cast<mochi::Real3>(target_rotation);
-      result.localRotation = py::cast<mochi::Real3>(local_rotation);
-      result.actor = py::cast<mochi::ActorHandle>(actor);
-      result.actorName = py::cast<mochi::DynamicString>(actor_name);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::prefab::RigidPivotRotationConstraintPrefab{}.stiffness
-      , py::arg("damping") = mochi::prefab::RigidPivotRotationConstraintPrefab{}.damping
-      , py::arg("saturation") = mochi::prefab::RigidPivotRotationConstraintPrefab{}.saturation
-      , py::arg("target_rotation") = mochi::prefab::RigidPivotRotationConstraintPrefab{}.targetRotation
-      , py::arg("local_rotation") = mochi::prefab::RigidPivotRotationConstraintPrefab{}.localRotation
-      , py::arg("actor") = mochi::prefab::RigidPivotRotationConstraintPrefab{}.actor
-      , py::arg("actor_name") = mochi::prefab::RigidPivotRotationConstraintPrefab{}.actorName
+    .def("__init__", [](mochi::prefab::RigidPivotRotationConstraintPrefab* self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object target_rotation, nb::object local_rotation, nb::object actor, nb::object actor_name) {
+      mochi::prefab::RigidPivotRotationConstraintPrefab result{};
+      result.stiffness = nb::cast<mochi::real>(stiffness);
+      result.damping = nb::cast<mochi::real>(damping);
+      result.saturation = nb::cast<mochi::real>(saturation);
+      result.targetRotation = nb::cast<mochi::Real3>(target_rotation);
+      result.localRotation = nb::cast<mochi::Real3>(local_rotation);
+      result.actor = nb::cast<mochi::ActorHandle>(actor);
+      result.actorName = nb::cast<mochi::DynamicString>(actor_name);
+      new (self) mochi::prefab::RigidPivotRotationConstraintPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::prefab::RigidPivotRotationConstraintPrefab{}.stiffness
+      , nb::arg("damping") = mochi::prefab::RigidPivotRotationConstraintPrefab{}.damping
+      , nb::arg("saturation") = mochi::prefab::RigidPivotRotationConstraintPrefab{}.saturation
+      , nb::arg("target_rotation").sig("...") = mochi::prefab::RigidPivotRotationConstraintPrefab{}.targetRotation
+      , nb::arg("local_rotation").sig("...") = mochi::prefab::RigidPivotRotationConstraintPrefab{}.localRotation
+      , nb::arg("actor").sig("...") = mochi::prefab::RigidPivotRotationConstraintPrefab{}.actor
+      , nb::arg("actor_name") = mochi::prefab::RigidPivotRotationConstraintPrefab{}.actorName
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::RigidPivotRotationConstraintPrefab const& self) { return mochi::prefab::RigidPivotRotationConstraintPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::RigidPivotRotationConstraintPrefab const& self, py::dict) { return mochi::prefab::RigidPivotRotationConstraintPrefab(self); })
-    .def_readwrite("actor_name", &mochi::prefab::RigidPivotRotationConstraintPrefab::actorName, "Name or hierarchy path identifying the rigid actor.")
+    .def("__deepcopy__", [](mochi::prefab::RigidPivotRotationConstraintPrefab const& self, nb::dict) { return mochi::prefab::RigidPivotRotationConstraintPrefab(self); })
+    .def_rw("actor_name", &mochi::prefab::RigidPivotRotationConstraintPrefab::actorName, "Name or hierarchy path identifying the rigid actor.")
   ;
 
   registry.GetClass<mochi::prefab::DeformableNodePositionConstraintPrefab, mochi::DeformableNodePositionConstraintParams>()
-    .def(py::init([](py::object stiffness, py::object damping, py::object saturation, py::object node_index, py::object position, py::object actor, py::object actor_name) {
-      mochi::prefab::DeformableNodePositionConstraintPrefab result;
-      result.stiffness = py::cast<mochi::real>(stiffness);
-      result.damping = py::cast<mochi::real>(damping);
-      result.saturation = py::cast<mochi::real>(saturation);
-      result.nodeIndex = py::cast<int>(node_index);
-      result.position = py::cast<mochi::Real3>(position);
-      result.actor = py::cast<mochi::ActorHandle>(actor);
-      result.actorName = py::cast<mochi::DynamicString>(actor_name);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::prefab::DeformableNodePositionConstraintPrefab{}.stiffness
-      , py::arg("damping") = mochi::prefab::DeformableNodePositionConstraintPrefab{}.damping
-      , py::arg("saturation") = mochi::prefab::DeformableNodePositionConstraintPrefab{}.saturation
-      , py::arg("node_index") = mochi::prefab::DeformableNodePositionConstraintPrefab{}.nodeIndex
-      , py::arg("position") = mochi::prefab::DeformableNodePositionConstraintPrefab{}.position
-      , py::arg("actor") = mochi::prefab::DeformableNodePositionConstraintPrefab{}.actor
-      , py::arg("actor_name") = mochi::prefab::DeformableNodePositionConstraintPrefab{}.actorName
+    .def("__init__", [](mochi::prefab::DeformableNodePositionConstraintPrefab* self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object node_index, nb::object position, nb::object actor, nb::object actor_name) {
+      mochi::prefab::DeformableNodePositionConstraintPrefab result{};
+      result.stiffness = nb::cast<mochi::real>(stiffness);
+      result.damping = nb::cast<mochi::real>(damping);
+      result.saturation = nb::cast<mochi::real>(saturation);
+      result.nodeIndex = nb::cast<int>(node_index);
+      result.position = nb::cast<mochi::Real3>(position);
+      result.actor = nb::cast<mochi::ActorHandle>(actor);
+      result.actorName = nb::cast<mochi::DynamicString>(actor_name);
+      new (self) mochi::prefab::DeformableNodePositionConstraintPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::prefab::DeformableNodePositionConstraintPrefab{}.stiffness
+      , nb::arg("damping") = mochi::prefab::DeformableNodePositionConstraintPrefab{}.damping
+      , nb::arg("saturation") = mochi::prefab::DeformableNodePositionConstraintPrefab{}.saturation
+      , nb::arg("node_index") = mochi::prefab::DeformableNodePositionConstraintPrefab{}.nodeIndex
+      , nb::arg("position").sig("...") = mochi::prefab::DeformableNodePositionConstraintPrefab{}.position
+      , nb::arg("actor").sig("...") = mochi::prefab::DeformableNodePositionConstraintPrefab{}.actor
+      , nb::arg("actor_name") = mochi::prefab::DeformableNodePositionConstraintPrefab{}.actorName
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::DeformableNodePositionConstraintPrefab const& self) { return mochi::prefab::DeformableNodePositionConstraintPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::DeformableNodePositionConstraintPrefab const& self, py::dict) { return mochi::prefab::DeformableNodePositionConstraintPrefab(self); })
-    .def_readwrite("actor_name", &mochi::prefab::DeformableNodePositionConstraintPrefab::actorName, "Name or hierarchy path identifying the deformable actor.")
+    .def("__deepcopy__", [](mochi::prefab::DeformableNodePositionConstraintPrefab const& self, nb::dict) { return mochi::prefab::DeformableNodePositionConstraintPrefab(self); })
+    .def_rw("actor_name", &mochi::prefab::DeformableNodePositionConstraintPrefab::actorName, "Name or hierarchy path identifying the deformable actor.")
   ;
 
   registry.GetClass<mochi::prefab::JointRotationTrackingConstraintPrefab, mochi::JointRotationTrackingConstraintParams>()
-    .def(py::init([](py::object stiffness, py::object damping, py::object saturation, py::object ref_frame_rot_vec, py::object actor_a, py::object actor_b, py::object actor_name_a, py::object actor_name_b) {
-      mochi::prefab::JointRotationTrackingConstraintPrefab result;
-      result.stiffness = py::cast<mochi::real>(stiffness);
-      result.damping = py::cast<mochi::real>(damping);
-      result.saturation = py::cast<mochi::real>(saturation);
-      result.refFrameRotVec = py::cast<mochi::Real3>(ref_frame_rot_vec);
-      result.actorA = py::cast<mochi::ActorHandle>(actor_a);
-      result.actorB = py::cast<mochi::ActorHandle>(actor_b);
-      result.actorNameA = py::cast<mochi::DynamicString>(actor_name_a);
-      result.actorNameB = py::cast<mochi::DynamicString>(actor_name_b);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::prefab::JointRotationTrackingConstraintPrefab{}.stiffness
-      , py::arg("damping") = mochi::prefab::JointRotationTrackingConstraintPrefab{}.damping
-      , py::arg("saturation") = mochi::prefab::JointRotationTrackingConstraintPrefab{}.saturation
-      , py::arg("ref_frame_rot_vec") = mochi::prefab::JointRotationTrackingConstraintPrefab{}.refFrameRotVec
-      , py::arg("actor_a") = mochi::prefab::JointRotationTrackingConstraintPrefab{}.actorA
-      , py::arg("actor_b") = mochi::prefab::JointRotationTrackingConstraintPrefab{}.actorB
-      , py::arg("actor_name_a") = mochi::prefab::JointRotationTrackingConstraintPrefab{}.actorNameA
-      , py::arg("actor_name_b") = mochi::prefab::JointRotationTrackingConstraintPrefab{}.actorNameB
+    .def("__init__", [](mochi::prefab::JointRotationTrackingConstraintPrefab* self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object ref_frame_rot_vec, nb::object actor_a, nb::object actor_b, nb::object actor_name_a, nb::object actor_name_b) {
+      mochi::prefab::JointRotationTrackingConstraintPrefab result{};
+      result.stiffness = nb::cast<mochi::real>(stiffness);
+      result.damping = nb::cast<mochi::real>(damping);
+      result.saturation = nb::cast<mochi::real>(saturation);
+      result.refFrameRotVec = nb::cast<mochi::Real3>(ref_frame_rot_vec);
+      result.actorA = nb::cast<mochi::ActorHandle>(actor_a);
+      result.actorB = nb::cast<mochi::ActorHandle>(actor_b);
+      result.actorNameA = nb::cast<mochi::DynamicString>(actor_name_a);
+      result.actorNameB = nb::cast<mochi::DynamicString>(actor_name_b);
+      new (self) mochi::prefab::JointRotationTrackingConstraintPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::prefab::JointRotationTrackingConstraintPrefab{}.stiffness
+      , nb::arg("damping") = mochi::prefab::JointRotationTrackingConstraintPrefab{}.damping
+      , nb::arg("saturation") = mochi::prefab::JointRotationTrackingConstraintPrefab{}.saturation
+      , nb::arg("ref_frame_rot_vec").sig("...") = mochi::prefab::JointRotationTrackingConstraintPrefab{}.refFrameRotVec
+      , nb::arg("actor_a").sig("...") = mochi::prefab::JointRotationTrackingConstraintPrefab{}.actorA
+      , nb::arg("actor_b").sig("...") = mochi::prefab::JointRotationTrackingConstraintPrefab{}.actorB
+      , nb::arg("actor_name_a") = mochi::prefab::JointRotationTrackingConstraintPrefab{}.actorNameA
+      , nb::arg("actor_name_b") = mochi::prefab::JointRotationTrackingConstraintPrefab{}.actorNameB
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::JointRotationTrackingConstraintPrefab const& self) { return mochi::prefab::JointRotationTrackingConstraintPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::JointRotationTrackingConstraintPrefab const& self, py::dict) { return mochi::prefab::JointRotationTrackingConstraintPrefab(self); })
-    .def_readwrite("actor_name_a", &mochi::prefab::JointRotationTrackingConstraintPrefab::actorNameA, "Name or hierarchy path identifying rigid actor A.")
-    .def_readwrite("actor_name_b", &mochi::prefab::JointRotationTrackingConstraintPrefab::actorNameB, "Name or hierarchy path identifying rigid actor B.")
+    .def("__deepcopy__", [](mochi::prefab::JointRotationTrackingConstraintPrefab const& self, nb::dict) { return mochi::prefab::JointRotationTrackingConstraintPrefab(self); })
+    .def_rw("actor_name_a", &mochi::prefab::JointRotationTrackingConstraintPrefab::actorNameA, "Name or hierarchy path identifying rigid actor A.")
+    .def_rw("actor_name_b", &mochi::prefab::JointRotationTrackingConstraintPrefab::actorNameB, "Name or hierarchy path identifying rigid actor B.")
   ;
 
   registry.GetClass<mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab, mochi::ArticulatedSingleDofTargetConstraintParams>()
-    .def(py::init([](py::object stiffness, py::object damping, py::object saturation, py::object actor, py::object joint_index, py::object dof_index, py::object target_value, py::object actor_name) {
-      mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab result;
-      result.stiffness = py::cast<mochi::real>(stiffness);
-      result.damping = py::cast<mochi::real>(damping);
-      result.saturation = py::cast<mochi::real>(saturation);
-      result.actor = py::cast<mochi::ActorHandle>(actor);
-      result.jointIndex = py::cast<int>(joint_index);
-      result.dofIndex = py::cast<int>(dof_index);
-      result.targetValue = py::cast<mochi::real>(target_value);
-      result.actorName = py::cast<mochi::DynamicString>(actor_name);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab{}.stiffness
-      , py::arg("damping") = mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab{}.damping
-      , py::arg("saturation") = mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab{}.saturation
-      , py::arg("actor") = mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab{}.actor
-      , py::arg("joint_index") = mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab{}.jointIndex
-      , py::arg("dof_index") = mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab{}.dofIndex
-      , py::arg("target_value") = mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab{}.targetValue
-      , py::arg("actor_name") = mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab{}.actorName
+    .def("__init__", [](mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab* self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object actor, nb::object joint_index, nb::object dof_index, nb::object target_value, nb::object actor_name) {
+      mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab result{};
+      result.stiffness = nb::cast<mochi::real>(stiffness);
+      result.damping = nb::cast<mochi::real>(damping);
+      result.saturation = nb::cast<mochi::real>(saturation);
+      result.actor = nb::cast<mochi::ActorHandle>(actor);
+      result.jointIndex = nb::cast<int>(joint_index);
+      result.dofIndex = nb::cast<int>(dof_index);
+      result.targetValue = nb::cast<mochi::real>(target_value);
+      result.actorName = nb::cast<mochi::DynamicString>(actor_name);
+      new (self) mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab{}.stiffness
+      , nb::arg("damping") = mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab{}.damping
+      , nb::arg("saturation") = mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab{}.saturation
+      , nb::arg("actor").sig("...") = mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab{}.actor
+      , nb::arg("joint_index") = mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab{}.jointIndex
+      , nb::arg("dof_index") = mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab{}.dofIndex
+      , nb::arg("target_value") = mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab{}.targetValue
+      , nb::arg("actor_name") = mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab{}.actorName
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab const& self) { return mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab const& self, py::dict) { return mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab(self); })
-    .def_readwrite("actor_name", &mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab::actorName, "Name or hierarchy path identifying the articulated actor.")
+    .def("__deepcopy__", [](mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab const& self, nb::dict) { return mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab(self); })
+    .def_rw("actor_name", &mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab::actorName, "Name or hierarchy path identifying the articulated actor.")
   ;
 
   registry.GetClass<mochi::prefab::Articulated3dRotationTargetConstraintPrefab, mochi::Articulated3dRotationTargetConstraintParams>()
-    .def(py::init([](py::object stiffness, py::object damping, py::object saturation, py::object actor, py::object joint_index, py::object target, py::object actor_name) {
-      mochi::prefab::Articulated3dRotationTargetConstraintPrefab result;
-      result.stiffness = py::cast<mochi::real>(stiffness);
-      result.damping = py::cast<mochi::real>(damping);
-      result.saturation = py::cast<mochi::real>(saturation);
-      result.actor = py::cast<mochi::ActorHandle>(actor);
-      result.jointIndex = py::cast<int>(joint_index);
-      result.target = py::cast<mochi::Quaternion>(target);
-      result.actorName = py::cast<mochi::DynamicString>(actor_name);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::prefab::Articulated3dRotationTargetConstraintPrefab{}.stiffness
-      , py::arg("damping") = mochi::prefab::Articulated3dRotationTargetConstraintPrefab{}.damping
-      , py::arg("saturation") = mochi::prefab::Articulated3dRotationTargetConstraintPrefab{}.saturation
-      , py::arg("actor") = mochi::prefab::Articulated3dRotationTargetConstraintPrefab{}.actor
-      , py::arg("joint_index") = mochi::prefab::Articulated3dRotationTargetConstraintPrefab{}.jointIndex
-      , py::arg("target") = mochi::prefab::Articulated3dRotationTargetConstraintPrefab{}.target
-      , py::arg("actor_name") = mochi::prefab::Articulated3dRotationTargetConstraintPrefab{}.actorName
+    .def("__init__", [](mochi::prefab::Articulated3dRotationTargetConstraintPrefab* self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object actor, nb::object joint_index, nb::object target, nb::object actor_name) {
+      mochi::prefab::Articulated3dRotationTargetConstraintPrefab result{};
+      result.stiffness = nb::cast<mochi::real>(stiffness);
+      result.damping = nb::cast<mochi::real>(damping);
+      result.saturation = nb::cast<mochi::real>(saturation);
+      result.actor = nb::cast<mochi::ActorHandle>(actor);
+      result.jointIndex = nb::cast<int>(joint_index);
+      result.target = nb::cast<mochi::Quaternion>(target);
+      result.actorName = nb::cast<mochi::DynamicString>(actor_name);
+      new (self) mochi::prefab::Articulated3dRotationTargetConstraintPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::prefab::Articulated3dRotationTargetConstraintPrefab{}.stiffness
+      , nb::arg("damping") = mochi::prefab::Articulated3dRotationTargetConstraintPrefab{}.damping
+      , nb::arg("saturation") = mochi::prefab::Articulated3dRotationTargetConstraintPrefab{}.saturation
+      , nb::arg("actor").sig("...") = mochi::prefab::Articulated3dRotationTargetConstraintPrefab{}.actor
+      , nb::arg("joint_index") = mochi::prefab::Articulated3dRotationTargetConstraintPrefab{}.jointIndex
+      , nb::arg("target").sig("...") = mochi::prefab::Articulated3dRotationTargetConstraintPrefab{}.target
+      , nb::arg("actor_name") = mochi::prefab::Articulated3dRotationTargetConstraintPrefab{}.actorName
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::Articulated3dRotationTargetConstraintPrefab const& self) { return mochi::prefab::Articulated3dRotationTargetConstraintPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::Articulated3dRotationTargetConstraintPrefab const& self, py::dict) { return mochi::prefab::Articulated3dRotationTargetConstraintPrefab(self); })
-    .def_readwrite("actor_name", &mochi::prefab::Articulated3dRotationTargetConstraintPrefab::actorName, "Name or hierarchy path identifying the articulated actor.")
+    .def("__deepcopy__", [](mochi::prefab::Articulated3dRotationTargetConstraintPrefab const& self, nb::dict) { return mochi::prefab::Articulated3dRotationTargetConstraintPrefab(self); })
+    .def_rw("actor_name", &mochi::prefab::Articulated3dRotationTargetConstraintPrefab::actorName, "Name or hierarchy path identifying the articulated actor.")
   ;
 
   registry.GetClass<mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab, mochi::ArticulatedSingleDofRangeConstraintParams>()
-    .def(py::init([](py::object stiffness, py::object damping, py::object saturation, py::object actor, py::object joint_index, py::object dof_index, py::object min_value, py::object max_value, py::object actor_name) {
-      mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab result;
-      result.stiffness = py::cast<mochi::real>(stiffness);
-      result.damping = py::cast<mochi::real>(damping);
-      result.saturation = py::cast<mochi::real>(saturation);
-      result.actor = py::cast<mochi::ActorHandle>(actor);
-      result.jointIndex = py::cast<int>(joint_index);
-      result.dofIndex = py::cast<int>(dof_index);
-      result.minValue = py::cast<mochi::real>(min_value);
-      result.maxValue = py::cast<mochi::real>(max_value);
-      result.actorName = py::cast<mochi::DynamicString>(actor_name);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab{}.stiffness
-      , py::arg("damping") = mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab{}.damping
-      , py::arg("saturation") = mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab{}.saturation
-      , py::arg("actor") = mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab{}.actor
-      , py::arg("joint_index") = mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab{}.jointIndex
-      , py::arg("dof_index") = mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab{}.dofIndex
-      , py::arg("min_value") = mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab{}.minValue
-      , py::arg("max_value") = mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab{}.maxValue
-      , py::arg("actor_name") = mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab{}.actorName
+    .def("__init__", [](mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab* self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object actor, nb::object joint_index, nb::object dof_index, nb::object min_value, nb::object max_value, nb::object actor_name) {
+      mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab result{};
+      result.stiffness = nb::cast<mochi::real>(stiffness);
+      result.damping = nb::cast<mochi::real>(damping);
+      result.saturation = nb::cast<mochi::real>(saturation);
+      result.actor = nb::cast<mochi::ActorHandle>(actor);
+      result.jointIndex = nb::cast<int>(joint_index);
+      result.dofIndex = nb::cast<int>(dof_index);
+      result.minValue = nb::cast<mochi::real>(min_value);
+      result.maxValue = nb::cast<mochi::real>(max_value);
+      result.actorName = nb::cast<mochi::DynamicString>(actor_name);
+      new (self) mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab{}.stiffness
+      , nb::arg("damping") = mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab{}.damping
+      , nb::arg("saturation") = mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab{}.saturation
+      , nb::arg("actor").sig("...") = mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab{}.actor
+      , nb::arg("joint_index") = mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab{}.jointIndex
+      , nb::arg("dof_index") = mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab{}.dofIndex
+      , nb::arg("min_value") = mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab{}.minValue
+      , nb::arg("max_value") = mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab{}.maxValue
+      , nb::arg("actor_name") = mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab{}.actorName
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab const& self) { return mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab const& self, py::dict) { return mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab(self); })
-    .def_readwrite("actor_name", &mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab::actorName, "Name or hierarchy path identifying the articulated actor.")
+    .def("__deepcopy__", [](mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab const& self, nb::dict) { return mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab(self); })
+    .def_rw("actor_name", &mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab::actorName, "Name or hierarchy path identifying the articulated actor.")
   ;
 
   registry.GetClass<mochi::prefab::Articulated3dRotationRangeConstraintPrefab, mochi::Articulated3dRotationRangeConstraintParams>()
-    .def(py::init([](py::object stiffness, py::object damping, py::object saturation, py::object actor, py::object joint_index, py::object min_values, py::object max_values, py::object actor_name) {
-      mochi::prefab::Articulated3dRotationRangeConstraintPrefab result;
-      result.stiffness = py::cast<mochi::real>(stiffness);
-      result.damping = py::cast<mochi::real>(damping);
-      result.saturation = py::cast<mochi::real>(saturation);
-      result.actor = py::cast<mochi::ActorHandle>(actor);
-      result.jointIndex = py::cast<int>(joint_index);
-      result.minValues = py::cast<mochi::Real3>(min_values);
-      result.maxValues = py::cast<mochi::Real3>(max_values);
-      result.actorName = py::cast<mochi::DynamicString>(actor_name);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::prefab::Articulated3dRotationRangeConstraintPrefab{}.stiffness
-      , py::arg("damping") = mochi::prefab::Articulated3dRotationRangeConstraintPrefab{}.damping
-      , py::arg("saturation") = mochi::prefab::Articulated3dRotationRangeConstraintPrefab{}.saturation
-      , py::arg("actor") = mochi::prefab::Articulated3dRotationRangeConstraintPrefab{}.actor
-      , py::arg("joint_index") = mochi::prefab::Articulated3dRotationRangeConstraintPrefab{}.jointIndex
-      , py::arg("min_values") = mochi::prefab::Articulated3dRotationRangeConstraintPrefab{}.minValues
-      , py::arg("max_values") = mochi::prefab::Articulated3dRotationRangeConstraintPrefab{}.maxValues
-      , py::arg("actor_name") = mochi::prefab::Articulated3dRotationRangeConstraintPrefab{}.actorName
+    .def("__init__", [](mochi::prefab::Articulated3dRotationRangeConstraintPrefab* self, nb::object stiffness, nb::object damping, nb::object saturation, nb::object actor, nb::object joint_index, nb::object min_values, nb::object max_values, nb::object actor_name) {
+      mochi::prefab::Articulated3dRotationRangeConstraintPrefab result{};
+      result.stiffness = nb::cast<mochi::real>(stiffness);
+      result.damping = nb::cast<mochi::real>(damping);
+      result.saturation = nb::cast<mochi::real>(saturation);
+      result.actor = nb::cast<mochi::ActorHandle>(actor);
+      result.jointIndex = nb::cast<int>(joint_index);
+      result.minValues = nb::cast<mochi::Real3>(min_values);
+      result.maxValues = nb::cast<mochi::Real3>(max_values);
+      result.actorName = nb::cast<mochi::DynamicString>(actor_name);
+      new (self) mochi::prefab::Articulated3dRotationRangeConstraintPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::prefab::Articulated3dRotationRangeConstraintPrefab{}.stiffness
+      , nb::arg("damping") = mochi::prefab::Articulated3dRotationRangeConstraintPrefab{}.damping
+      , nb::arg("saturation") = mochi::prefab::Articulated3dRotationRangeConstraintPrefab{}.saturation
+      , nb::arg("actor").sig("...") = mochi::prefab::Articulated3dRotationRangeConstraintPrefab{}.actor
+      , nb::arg("joint_index") = mochi::prefab::Articulated3dRotationRangeConstraintPrefab{}.jointIndex
+      , nb::arg("min_values").sig("...") = mochi::prefab::Articulated3dRotationRangeConstraintPrefab{}.minValues
+      , nb::arg("max_values").sig("...") = mochi::prefab::Articulated3dRotationRangeConstraintPrefab{}.maxValues
+      , nb::arg("actor_name") = mochi::prefab::Articulated3dRotationRangeConstraintPrefab{}.actorName
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::Articulated3dRotationRangeConstraintPrefab const& self) { return mochi::prefab::Articulated3dRotationRangeConstraintPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::Articulated3dRotationRangeConstraintPrefab const& self, py::dict) { return mochi::prefab::Articulated3dRotationRangeConstraintPrefab(self); })
-    .def_readwrite("actor_name", &mochi::prefab::Articulated3dRotationRangeConstraintPrefab::actorName, "Name or hierarchy path identifying the articulated actor.")
+    .def("__deepcopy__", [](mochi::prefab::Articulated3dRotationRangeConstraintPrefab const& self, nb::dict) { return mochi::prefab::Articulated3dRotationRangeConstraintPrefab(self); })
+    .def_rw("actor_name", &mochi::prefab::Articulated3dRotationRangeConstraintPrefab::actorName, "Name or hierarchy path identifying the articulated actor.")
   ;
 
   registry.GetClass<mochi::prefab::ConstraintLists>()
-    .def(py::init([](py::object comment, py::object articulated3d_rotation_range, py::object articulated_single_dof_range, py::object articulated3d_rotation_target, py::object articulated_single_dof_target, py::object joint_rotation_range, py::object joint_rotation_tracking, py::object rigid_pivot_position, py::object rigid_pivot_to_rigid_target, py::object rigid_pivot_rotation, py::object rigid_prismatic_joint, py::object rigid_spherical_joint, py::object deformable_node_position, py::object deformable_node_to_rigid, py::object deformable_node_to_deformable_node) {
-      mochi::prefab::ConstraintLists result;
-      result.comment = py::cast<std::optional<mochi::DynamicString>>(comment);
-      result.articulated3dRotationRange = py::cast<mochi::DynamicArray<mochi::prefab::Articulated3dRotationRangeConstraintPrefab>>(articulated3d_rotation_range);
-      result.articulatedSingleDofRange = py::cast<mochi::DynamicArray<mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab>>(articulated_single_dof_range);
-      result.articulated3dRotationTarget = py::cast<mochi::DynamicArray<mochi::prefab::Articulated3dRotationTargetConstraintPrefab>>(articulated3d_rotation_target);
-      result.articulatedSingleDofTarget = py::cast<mochi::DynamicArray<mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab>>(articulated_single_dof_target);
-      result.jointRotationRange = py::cast<mochi::DynamicArray<mochi::prefab::JointRotationRangeConstraintPrefab>>(joint_rotation_range);
-      result.jointRotationTracking = py::cast<mochi::DynamicArray<mochi::prefab::JointRotationTrackingConstraintPrefab>>(joint_rotation_tracking);
-      result.rigidPivotPosition = py::cast<mochi::DynamicArray<mochi::prefab::RigidPivotPositionConstraintPrefab>>(rigid_pivot_position);
-      result.rigidPivotToRigidTarget = py::cast<mochi::DynamicArray<mochi::prefab::RigidPivotToRigidTargetConstraintPrefab>>(rigid_pivot_to_rigid_target);
-      result.rigidPivotRotation = py::cast<mochi::DynamicArray<mochi::prefab::RigidPivotRotationConstraintPrefab>>(rigid_pivot_rotation);
-      result.rigidPrismaticJoint = py::cast<mochi::DynamicArray<mochi::prefab::RigidPrismaticJointConstraintPrefab>>(rigid_prismatic_joint);
-      result.rigidSphericalJoint = py::cast<mochi::DynamicArray<mochi::prefab::RigidSphericalJointConstraintPrefab>>(rigid_spherical_joint);
-      result.deformableNodePosition = py::cast<mochi::DynamicArray<mochi::prefab::DeformableNodePositionConstraintPrefab>>(deformable_node_position);
-      result.deformableNodeToRigid = py::cast<mochi::DynamicArray<mochi::prefab::DeformableNodeToRigidConstraintPrefab>>(deformable_node_to_rigid);
-      result.deformableNodeToDeformableNode = py::cast<mochi::DynamicArray<mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab>>(deformable_node_to_deformable_node);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("comment") = mochi::prefab::ConstraintLists{}.comment
-      , py::arg("articulated3d_rotation_range") = mochi::prefab::ConstraintLists{}.articulated3dRotationRange
-      , py::arg("articulated_single_dof_range") = mochi::prefab::ConstraintLists{}.articulatedSingleDofRange
-      , py::arg("articulated3d_rotation_target") = mochi::prefab::ConstraintLists{}.articulated3dRotationTarget
-      , py::arg("articulated_single_dof_target") = mochi::prefab::ConstraintLists{}.articulatedSingleDofTarget
-      , py::arg("joint_rotation_range") = mochi::prefab::ConstraintLists{}.jointRotationRange
-      , py::arg("joint_rotation_tracking") = mochi::prefab::ConstraintLists{}.jointRotationTracking
-      , py::arg("rigid_pivot_position") = mochi::prefab::ConstraintLists{}.rigidPivotPosition
-      , py::arg("rigid_pivot_to_rigid_target") = mochi::prefab::ConstraintLists{}.rigidPivotToRigidTarget
-      , py::arg("rigid_pivot_rotation") = mochi::prefab::ConstraintLists{}.rigidPivotRotation
-      , py::arg("rigid_prismatic_joint") = mochi::prefab::ConstraintLists{}.rigidPrismaticJoint
-      , py::arg("rigid_spherical_joint") = mochi::prefab::ConstraintLists{}.rigidSphericalJoint
-      , py::arg("deformable_node_position") = mochi::prefab::ConstraintLists{}.deformableNodePosition
-      , py::arg("deformable_node_to_rigid") = mochi::prefab::ConstraintLists{}.deformableNodeToRigid
-      , py::arg("deformable_node_to_deformable_node") = mochi::prefab::ConstraintLists{}.deformableNodeToDeformableNode
+    .def("__init__", [](mochi::prefab::ConstraintLists* self, nb::object comment, nb::object articulated3d_rotation_range, nb::object articulated_single_dof_range, nb::object articulated3d_rotation_target, nb::object articulated_single_dof_target, nb::object joint_rotation_range, nb::object joint_rotation_tracking, nb::object rigid_pivot_position, nb::object rigid_pivot_to_rigid_target, nb::object rigid_pivot_rotation, nb::object rigid_prismatic_joint, nb::object rigid_spherical_joint, nb::object deformable_node_position, nb::object deformable_node_to_rigid, nb::object deformable_node_to_deformable_node) {
+      mochi::prefab::ConstraintLists result{};
+      result.comment = nb::cast<std::optional<mochi::DynamicString>>(comment);
+      result.articulated3dRotationRange = nb::cast<mochi::DynamicArray<mochi::prefab::Articulated3dRotationRangeConstraintPrefab>>(articulated3d_rotation_range);
+      result.articulatedSingleDofRange = nb::cast<mochi::DynamicArray<mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab>>(articulated_single_dof_range);
+      result.articulated3dRotationTarget = nb::cast<mochi::DynamicArray<mochi::prefab::Articulated3dRotationTargetConstraintPrefab>>(articulated3d_rotation_target);
+      result.articulatedSingleDofTarget = nb::cast<mochi::DynamicArray<mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab>>(articulated_single_dof_target);
+      result.jointRotationRange = nb::cast<mochi::DynamicArray<mochi::prefab::JointRotationRangeConstraintPrefab>>(joint_rotation_range);
+      result.jointRotationTracking = nb::cast<mochi::DynamicArray<mochi::prefab::JointRotationTrackingConstraintPrefab>>(joint_rotation_tracking);
+      result.rigidPivotPosition = nb::cast<mochi::DynamicArray<mochi::prefab::RigidPivotPositionConstraintPrefab>>(rigid_pivot_position);
+      result.rigidPivotToRigidTarget = nb::cast<mochi::DynamicArray<mochi::prefab::RigidPivotToRigidTargetConstraintPrefab>>(rigid_pivot_to_rigid_target);
+      result.rigidPivotRotation = nb::cast<mochi::DynamicArray<mochi::prefab::RigidPivotRotationConstraintPrefab>>(rigid_pivot_rotation);
+      result.rigidPrismaticJoint = nb::cast<mochi::DynamicArray<mochi::prefab::RigidPrismaticJointConstraintPrefab>>(rigid_prismatic_joint);
+      result.rigidSphericalJoint = nb::cast<mochi::DynamicArray<mochi::prefab::RigidSphericalJointConstraintPrefab>>(rigid_spherical_joint);
+      result.deformableNodePosition = nb::cast<mochi::DynamicArray<mochi::prefab::DeformableNodePositionConstraintPrefab>>(deformable_node_position);
+      result.deformableNodeToRigid = nb::cast<mochi::DynamicArray<mochi::prefab::DeformableNodeToRigidConstraintPrefab>>(deformable_node_to_rigid);
+      result.deformableNodeToDeformableNode = nb::cast<mochi::DynamicArray<mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab>>(deformable_node_to_deformable_node);
+      new (self) mochi::prefab::ConstraintLists(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("comment").sig("...") = mochi::prefab::ConstraintLists{}.comment
+      , nb::arg("articulated3d_rotation_range").sig("...") = mochi::prefab::ConstraintLists{}.articulated3dRotationRange
+      , nb::arg("articulated_single_dof_range").sig("...") = mochi::prefab::ConstraintLists{}.articulatedSingleDofRange
+      , nb::arg("articulated3d_rotation_target").sig("...") = mochi::prefab::ConstraintLists{}.articulated3dRotationTarget
+      , nb::arg("articulated_single_dof_target").sig("...") = mochi::prefab::ConstraintLists{}.articulatedSingleDofTarget
+      , nb::arg("joint_rotation_range").sig("...") = mochi::prefab::ConstraintLists{}.jointRotationRange
+      , nb::arg("joint_rotation_tracking").sig("...") = mochi::prefab::ConstraintLists{}.jointRotationTracking
+      , nb::arg("rigid_pivot_position").sig("...") = mochi::prefab::ConstraintLists{}.rigidPivotPosition
+      , nb::arg("rigid_pivot_to_rigid_target").sig("...") = mochi::prefab::ConstraintLists{}.rigidPivotToRigidTarget
+      , nb::arg("rigid_pivot_rotation").sig("...") = mochi::prefab::ConstraintLists{}.rigidPivotRotation
+      , nb::arg("rigid_prismatic_joint").sig("...") = mochi::prefab::ConstraintLists{}.rigidPrismaticJoint
+      , nb::arg("rigid_spherical_joint").sig("...") = mochi::prefab::ConstraintLists{}.rigidSphericalJoint
+      , nb::arg("deformable_node_position").sig("...") = mochi::prefab::ConstraintLists{}.deformableNodePosition
+      , nb::arg("deformable_node_to_rigid").sig("...") = mochi::prefab::ConstraintLists{}.deformableNodeToRigid
+      , nb::arg("deformable_node_to_deformable_node").sig("...") = mochi::prefab::ConstraintLists{}.deformableNodeToDeformableNode
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::ConstraintLists const& self) { return mochi::prefab::ConstraintLists(self); })
-    .def("__deepcopy__", [](mochi::prefab::ConstraintLists const& self, py::dict) { return mochi::prefab::ConstraintLists(self); })
-    .def_readwrite("comment", &mochi::prefab::ConstraintLists::comment, "Optional serialized comment.")
-    .def_property("articulated3d_rotation_range", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::Articulated3dRotationRangeConstraintPrefab>& { return self.articulated3dRotationRange; }, [](mochi::prefab::ConstraintLists& self, py::object val) { self.articulated3dRotationRange = py::cast<mochi::DynamicArray<mochi::prefab::Articulated3dRotationRangeConstraintPrefab>>(val); }, py::return_value_policy::reference_internal, "3D rotation range constraints on articulated actors.")
-    .def_property("articulated_single_dof_range", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab>& { return self.articulatedSingleDofRange; }, [](mochi::prefab::ConstraintLists& self, py::object val) { self.articulatedSingleDofRange = py::cast<mochi::DynamicArray<mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab>>(val); }, py::return_value_policy::reference_internal, "Single-DoF range constraints on articulated actors.")
-    .def_property("articulated3d_rotation_target", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::Articulated3dRotationTargetConstraintPrefab>& { return self.articulated3dRotationTarget; }, [](mochi::prefab::ConstraintLists& self, py::object val) { self.articulated3dRotationTarget = py::cast<mochi::DynamicArray<mochi::prefab::Articulated3dRotationTargetConstraintPrefab>>(val); }, py::return_value_policy::reference_internal, "3D rotation target constraints on articulated actors.")
-    .def_property("articulated_single_dof_target", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab>& { return self.articulatedSingleDofTarget; }, [](mochi::prefab::ConstraintLists& self, py::object val) { self.articulatedSingleDofTarget = py::cast<mochi::DynamicArray<mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab>>(val); }, py::return_value_policy::reference_internal, "Single-DoF target constraints on articulated actors.")
-    .def_property("joint_rotation_range", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::JointRotationRangeConstraintPrefab>& { return self.jointRotationRange; }, [](mochi::prefab::ConstraintLists& self, py::object val) { self.jointRotationRange = py::cast<mochi::DynamicArray<mochi::prefab::JointRotationRangeConstraintPrefab>>(val); }, py::return_value_policy::reference_internal, "Joint rotation range constraints.")
-    .def_property("joint_rotation_tracking", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::JointRotationTrackingConstraintPrefab>& { return self.jointRotationTracking; }, [](mochi::prefab::ConstraintLists& self, py::object val) { self.jointRotationTracking = py::cast<mochi::DynamicArray<mochi::prefab::JointRotationTrackingConstraintPrefab>>(val); }, py::return_value_policy::reference_internal, "Joint rotation tracking constraints.")
-    .def_property("rigid_pivot_position", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::RigidPivotPositionConstraintPrefab>& { return self.rigidPivotPosition; }, [](mochi::prefab::ConstraintLists& self, py::object val) { self.rigidPivotPosition = py::cast<mochi::DynamicArray<mochi::prefab::RigidPivotPositionConstraintPrefab>>(val); }, py::return_value_policy::reference_internal, "Position constraints on a rigid actor's pivot point.")
-    .def_property("rigid_pivot_to_rigid_target", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::RigidPivotToRigidTargetConstraintPrefab>& { return self.rigidPivotToRigidTarget; }, [](mochi::prefab::ConstraintLists& self, py::object val) { self.rigidPivotToRigidTarget = py::cast<mochi::DynamicArray<mochi::prefab::RigidPivotToRigidTargetConstraintPrefab>>(val); }, py::return_value_policy::reference_internal, "Position constraints attaching a rigid actor's pivot point to a rigid target.")
-    .def_property("rigid_pivot_rotation", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::RigidPivotRotationConstraintPrefab>& { return self.rigidPivotRotation; }, [](mochi::prefab::ConstraintLists& self, py::object val) { self.rigidPivotRotation = py::cast<mochi::DynamicArray<mochi::prefab::RigidPivotRotationConstraintPrefab>>(val); }, py::return_value_policy::reference_internal, "Rotation constraints on a rigid actor's pivot frame.")
-    .def_property("rigid_prismatic_joint", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::RigidPrismaticJointConstraintPrefab>& { return self.rigidPrismaticJoint; }, [](mochi::prefab::ConstraintLists& self, py::object val) { self.rigidPrismaticJoint = py::cast<mochi::DynamicArray<mochi::prefab::RigidPrismaticJointConstraintPrefab>>(val); }, py::return_value_policy::reference_internal, "Prismatic joint constraints between two rigid actors.")
-    .def_property("rigid_spherical_joint", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::RigidSphericalJointConstraintPrefab>& { return self.rigidSphericalJoint; }, [](mochi::prefab::ConstraintLists& self, py::object val) { self.rigidSphericalJoint = py::cast<mochi::DynamicArray<mochi::prefab::RigidSphericalJointConstraintPrefab>>(val); }, py::return_value_policy::reference_internal, "Spherical joint constraints between two rigid actors.")
-    .def_property("deformable_node_position", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::DeformableNodePositionConstraintPrefab>& { return self.deformableNodePosition; }, [](mochi::prefab::ConstraintLists& self, py::object val) { self.deformableNodePosition = py::cast<mochi::DynamicArray<mochi::prefab::DeformableNodePositionConstraintPrefab>>(val); }, py::return_value_policy::reference_internal, "Position constraints on a deformable actor node.")
-    .def_property("deformable_node_to_rigid", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::DeformableNodeToRigidConstraintPrefab>& { return self.deformableNodeToRigid; }, [](mochi::prefab::ConstraintLists& self, py::object val) { self.deformableNodeToRigid = py::cast<mochi::DynamicArray<mochi::prefab::DeformableNodeToRigidConstraintPrefab>>(val); }, py::return_value_policy::reference_internal, "Constraints connecting a deformable node to a rigid actor.")
-    .def_property("deformable_node_to_deformable_node", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab>& { return self.deformableNodeToDeformableNode; }, [](mochi::prefab::ConstraintLists& self, py::object val) { self.deformableNodeToDeformableNode = py::cast<mochi::DynamicArray<mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab>>(val); }, py::return_value_policy::reference_internal, "Constraints connecting two deformable actor nodes.")
+    .def("__deepcopy__", [](mochi::prefab::ConstraintLists const& self, nb::dict) { return mochi::prefab::ConstraintLists(self); })
+    .def_prop_rw("comment", [](mochi::prefab::ConstraintLists& self) -> std::optional<mochi::DynamicString>& { return self.comment; }, [](mochi::prefab::ConstraintLists& self, nb::handle val) { self.comment = val.is_none() ? std::optional<mochi::DynamicString>{} : nb::cast<std::optional<mochi::DynamicString>>(val); }, "Optional serialized comment.", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("articulated3d_rotation_range", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::Articulated3dRotationRangeConstraintPrefab>& { return self.articulated3dRotationRange; }, [](mochi::prefab::ConstraintLists& self, nb::object val) { self.articulated3dRotationRange = nb::cast<mochi::DynamicArray<mochi::prefab::Articulated3dRotationRangeConstraintPrefab>>(val); }, "3D rotation range constraints on articulated actors.")
+    .def_prop_rw("articulated_single_dof_range", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab>& { return self.articulatedSingleDofRange; }, [](mochi::prefab::ConstraintLists& self, nb::object val) { self.articulatedSingleDofRange = nb::cast<mochi::DynamicArray<mochi::prefab::ArticulatedSingleDofRangeConstraintPrefab>>(val); }, "Single-DoF range constraints on articulated actors.")
+    .def_prop_rw("articulated3d_rotation_target", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::Articulated3dRotationTargetConstraintPrefab>& { return self.articulated3dRotationTarget; }, [](mochi::prefab::ConstraintLists& self, nb::object val) { self.articulated3dRotationTarget = nb::cast<mochi::DynamicArray<mochi::prefab::Articulated3dRotationTargetConstraintPrefab>>(val); }, "3D rotation target constraints on articulated actors.")
+    .def_prop_rw("articulated_single_dof_target", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab>& { return self.articulatedSingleDofTarget; }, [](mochi::prefab::ConstraintLists& self, nb::object val) { self.articulatedSingleDofTarget = nb::cast<mochi::DynamicArray<mochi::prefab::ArticulatedSingleDofTargetConstraintPrefab>>(val); }, "Single-DoF target constraints on articulated actors.")
+    .def_prop_rw("joint_rotation_range", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::JointRotationRangeConstraintPrefab>& { return self.jointRotationRange; }, [](mochi::prefab::ConstraintLists& self, nb::object val) { self.jointRotationRange = nb::cast<mochi::DynamicArray<mochi::prefab::JointRotationRangeConstraintPrefab>>(val); }, "Joint rotation range constraints.")
+    .def_prop_rw("joint_rotation_tracking", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::JointRotationTrackingConstraintPrefab>& { return self.jointRotationTracking; }, [](mochi::prefab::ConstraintLists& self, nb::object val) { self.jointRotationTracking = nb::cast<mochi::DynamicArray<mochi::prefab::JointRotationTrackingConstraintPrefab>>(val); }, "Joint rotation tracking constraints.")
+    .def_prop_rw("rigid_pivot_position", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::RigidPivotPositionConstraintPrefab>& { return self.rigidPivotPosition; }, [](mochi::prefab::ConstraintLists& self, nb::object val) { self.rigidPivotPosition = nb::cast<mochi::DynamicArray<mochi::prefab::RigidPivotPositionConstraintPrefab>>(val); }, "Position constraints on a rigid actor's pivot point.")
+    .def_prop_rw("rigid_pivot_to_rigid_target", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::RigidPivotToRigidTargetConstraintPrefab>& { return self.rigidPivotToRigidTarget; }, [](mochi::prefab::ConstraintLists& self, nb::object val) { self.rigidPivotToRigidTarget = nb::cast<mochi::DynamicArray<mochi::prefab::RigidPivotToRigidTargetConstraintPrefab>>(val); }, "Position constraints attaching a rigid actor's pivot point to a rigid target.")
+    .def_prop_rw("rigid_pivot_rotation", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::RigidPivotRotationConstraintPrefab>& { return self.rigidPivotRotation; }, [](mochi::prefab::ConstraintLists& self, nb::object val) { self.rigidPivotRotation = nb::cast<mochi::DynamicArray<mochi::prefab::RigidPivotRotationConstraintPrefab>>(val); }, "Rotation constraints on a rigid actor's pivot frame.")
+    .def_prop_rw("rigid_prismatic_joint", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::RigidPrismaticJointConstraintPrefab>& { return self.rigidPrismaticJoint; }, [](mochi::prefab::ConstraintLists& self, nb::object val) { self.rigidPrismaticJoint = nb::cast<mochi::DynamicArray<mochi::prefab::RigidPrismaticJointConstraintPrefab>>(val); }, "Prismatic joint constraints between two rigid actors.")
+    .def_prop_rw("rigid_spherical_joint", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::RigidSphericalJointConstraintPrefab>& { return self.rigidSphericalJoint; }, [](mochi::prefab::ConstraintLists& self, nb::object val) { self.rigidSphericalJoint = nb::cast<mochi::DynamicArray<mochi::prefab::RigidSphericalJointConstraintPrefab>>(val); }, "Spherical joint constraints between two rigid actors.")
+    .def_prop_rw("deformable_node_position", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::DeformableNodePositionConstraintPrefab>& { return self.deformableNodePosition; }, [](mochi::prefab::ConstraintLists& self, nb::object val) { self.deformableNodePosition = nb::cast<mochi::DynamicArray<mochi::prefab::DeformableNodePositionConstraintPrefab>>(val); }, "Position constraints on a deformable actor node.")
+    .def_prop_rw("deformable_node_to_rigid", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::DeformableNodeToRigidConstraintPrefab>& { return self.deformableNodeToRigid; }, [](mochi::prefab::ConstraintLists& self, nb::object val) { self.deformableNodeToRigid = nb::cast<mochi::DynamicArray<mochi::prefab::DeformableNodeToRigidConstraintPrefab>>(val); }, "Constraints connecting a deformable node to a rigid actor.")
+    .def_prop_rw("deformable_node_to_deformable_node", [](mochi::prefab::ConstraintLists& self) -> mochi::DynamicArray<mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab>& { return self.deformableNodeToDeformableNode; }, [](mochi::prefab::ConstraintLists& self, nb::object val) { self.deformableNodeToDeformableNode = nb::cast<mochi::DynamicArray<mochi::prefab::DeformableNodeToDeformableNodeConstraintPrefab>>(val); }, "Constraints connecting two deformable actor nodes.")
   ;
 
   registry.GetClass<mochi::prefab::PoseControllerPrefab>()
-    .def(py::init([](py::object comment, py::object articulated_actor, py::object link_pos_tracking, py::object link_rot_tracking, py::object joint_tracking) {
-      mochi::prefab::PoseControllerPrefab result;
-      result.comment = py::cast<std::optional<mochi::DynamicString>>(comment);
-      result.articulatedActor = py::cast<mochi::DynamicString>(articulated_actor);
-      result.linkPosTracking = py::cast<mochi::DynamicArray<mochi::PoseTrackingParams>>(link_pos_tracking);
-      result.linkRotTracking = py::cast<mochi::DynamicArray<mochi::PoseTrackingParams>>(link_rot_tracking);
-      result.jointTracking = py::cast<mochi::DynamicArray<mochi::PoseTrackingParams>>(joint_tracking);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("comment") = mochi::prefab::PoseControllerPrefab{}.comment
-      , py::arg("articulated_actor") = mochi::prefab::PoseControllerPrefab{}.articulatedActor
-      , py::arg("link_pos_tracking") = mochi::prefab::PoseControllerPrefab{}.linkPosTracking
-      , py::arg("link_rot_tracking") = mochi::prefab::PoseControllerPrefab{}.linkRotTracking
-      , py::arg("joint_tracking") = mochi::prefab::PoseControllerPrefab{}.jointTracking
+    .def("__init__", [](mochi::prefab::PoseControllerPrefab* self, nb::object comment, nb::object articulated_actor, nb::object link_pos_tracking, nb::object link_rot_tracking, nb::object joint_tracking) {
+      mochi::prefab::PoseControllerPrefab result{};
+      result.comment = nb::cast<std::optional<mochi::DynamicString>>(comment);
+      result.articulatedActor = nb::cast<mochi::DynamicString>(articulated_actor);
+      result.linkPosTracking = nb::cast<mochi::DynamicArray<mochi::PoseTrackingParams>>(link_pos_tracking);
+      result.linkRotTracking = nb::cast<mochi::DynamicArray<mochi::PoseTrackingParams>>(link_rot_tracking);
+      result.jointTracking = nb::cast<mochi::DynamicArray<mochi::PoseTrackingParams>>(joint_tracking);
+      new (self) mochi::prefab::PoseControllerPrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("comment").sig("...") = mochi::prefab::PoseControllerPrefab{}.comment
+      , nb::arg("articulated_actor") = mochi::prefab::PoseControllerPrefab{}.articulatedActor
+      , nb::arg("link_pos_tracking").sig("...") = mochi::prefab::PoseControllerPrefab{}.linkPosTracking
+      , nb::arg("link_rot_tracking").sig("...") = mochi::prefab::PoseControllerPrefab{}.linkRotTracking
+      , nb::arg("joint_tracking").sig("...") = mochi::prefab::PoseControllerPrefab{}.jointTracking
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::PoseControllerPrefab const& self) { return mochi::prefab::PoseControllerPrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::PoseControllerPrefab const& self, py::dict) { return mochi::prefab::PoseControllerPrefab(self); })
-    .def_readwrite("comment", &mochi::prefab::PoseControllerPrefab::comment, "Optional serialized comment.")
-    .def_readwrite("articulated_actor", &mochi::prefab::PoseControllerPrefab::articulatedActor, "Name or hierarchy path of the articulated actor to control.\n\nNote:\n    A name like \"myArticulation\" refers to an articulated actor in the same\n    prefab. A name like \"myPrefab/myArticulation\" refers to an articulated actor\n    in a nested prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`.")
-    .def_property("link_pos_tracking", [](mochi::prefab::PoseControllerPrefab& self) -> mochi::DynamicArray<mochi::PoseTrackingParams>& { return self.linkPosTracking; }, [](mochi::prefab::PoseControllerPrefab& self, py::object val) { self.linkPosTracking = py::cast<mochi::DynamicArray<mochi::PoseTrackingParams>>(val); }, py::return_value_policy::reference_internal, "Per-link position tracking parameters.")
-    .def_property("link_rot_tracking", [](mochi::prefab::PoseControllerPrefab& self) -> mochi::DynamicArray<mochi::PoseTrackingParams>& { return self.linkRotTracking; }, [](mochi::prefab::PoseControllerPrefab& self, py::object val) { self.linkRotTracking = py::cast<mochi::DynamicArray<mochi::PoseTrackingParams>>(val); }, py::return_value_policy::reference_internal, "Per-link rotation tracking parameters.")
-    .def_property("joint_tracking", [](mochi::prefab::PoseControllerPrefab& self) -> mochi::DynamicArray<mochi::PoseTrackingParams>& { return self.jointTracking; }, [](mochi::prefab::PoseControllerPrefab& self, py::object val) { self.jointTracking = py::cast<mochi::DynamicArray<mochi::PoseTrackingParams>>(val); }, py::return_value_policy::reference_internal, "Per-joint pose tracking parameters.")
+    .def("__deepcopy__", [](mochi::prefab::PoseControllerPrefab const& self, nb::dict) { return mochi::prefab::PoseControllerPrefab(self); })
+    .def_prop_rw("comment", [](mochi::prefab::PoseControllerPrefab& self) -> std::optional<mochi::DynamicString>& { return self.comment; }, [](mochi::prefab::PoseControllerPrefab& self, nb::handle val) { self.comment = val.is_none() ? std::optional<mochi::DynamicString>{} : nb::cast<std::optional<mochi::DynamicString>>(val); }, "Optional serialized comment.", nb::for_setter(nb::arg("value").none()))
+    .def_rw("articulated_actor", &mochi::prefab::PoseControllerPrefab::articulatedActor, "Name or hierarchy path of the articulated actor to control.\n\nNote:\n    A name like \"myArticulation\" refers to an articulated actor in the same\n    prefab. A name like \"myPrefab/myArticulation\" refers to an articulated actor\n    in a nested prefab.\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`.")
+    .def_prop_rw("link_pos_tracking", [](mochi::prefab::PoseControllerPrefab& self) -> mochi::DynamicArray<mochi::PoseTrackingParams>& { return self.linkPosTracking; }, [](mochi::prefab::PoseControllerPrefab& self, nb::object val) { self.linkPosTracking = nb::cast<mochi::DynamicArray<mochi::PoseTrackingParams>>(val); }, "Per-link position tracking parameters.")
+    .def_prop_rw("link_rot_tracking", [](mochi::prefab::PoseControllerPrefab& self) -> mochi::DynamicArray<mochi::PoseTrackingParams>& { return self.linkRotTracking; }, [](mochi::prefab::PoseControllerPrefab& self, nb::object val) { self.linkRotTracking = nb::cast<mochi::DynamicArray<mochi::PoseTrackingParams>>(val); }, "Per-link rotation tracking parameters.")
+    .def_prop_rw("joint_tracking", [](mochi::prefab::PoseControllerPrefab& self) -> mochi::DynamicArray<mochi::PoseTrackingParams>& { return self.jointTracking; }, [](mochi::prefab::PoseControllerPrefab& self, nb::object val) { self.jointTracking = nb::cast<mochi::DynamicArray<mochi::PoseTrackingParams>>(val); }, "Per-joint pose tracking parameters.")
   ;
 
   registry.GetClass<mochi::prefab::PrefabReference>()
-    .def(py::init([](py::object comment, py::object name, py::object path, py::object scale, py::object rotation, py::object translation) {
-      mochi::prefab::PrefabReference result;
-      result.comment = py::cast<std::optional<mochi::DynamicString>>(comment);
-      result.name = py::cast<mochi::DynamicString>(name);
-      result.path = py::cast<mochi::DynamicString>(path);
-      result.scale = py::cast<mochi::real>(scale);
-      result.rotation = py::cast<mochi::Quaternion>(rotation);
-      result.translation = py::cast<mochi::Real3>(translation);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("comment") = mochi::prefab::PrefabReference{}.comment
-      , py::arg("name") = mochi::prefab::PrefabReference{}.name
-      , py::arg("path") = mochi::prefab::PrefabReference{}.path
-      , py::arg("scale") = mochi::prefab::PrefabReference{}.scale
-      , py::arg("rotation") = mochi::prefab::PrefabReference{}.rotation
-      , py::arg("translation") = mochi::prefab::PrefabReference{}.translation
+    .def("__init__", [](mochi::prefab::PrefabReference* self, nb::object comment, nb::object name, nb::object path, nb::object scale, nb::object rotation, nb::object translation) {
+      mochi::prefab::PrefabReference result{};
+      result.comment = nb::cast<std::optional<mochi::DynamicString>>(comment);
+      result.name = nb::cast<mochi::DynamicString>(name);
+      result.path = nb::cast<mochi::DynamicString>(path);
+      result.scale = nb::cast<mochi::real>(scale);
+      result.rotation = nb::cast<mochi::Quaternion>(rotation);
+      result.translation = nb::cast<mochi::Real3>(translation);
+      new (self) mochi::prefab::PrefabReference(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("comment").sig("...") = mochi::prefab::PrefabReference{}.comment
+      , nb::arg("name") = mochi::prefab::PrefabReference{}.name
+      , nb::arg("path") = mochi::prefab::PrefabReference{}.path
+      , nb::arg("scale") = mochi::prefab::PrefabReference{}.scale
+      , nb::arg("rotation").sig("...") = mochi::prefab::PrefabReference{}.rotation
+      , nb::arg("translation").sig("...") = mochi::prefab::PrefabReference{}.translation
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::PrefabReference const& self) { return mochi::prefab::PrefabReference(self); })
-    .def("__deepcopy__", [](mochi::prefab::PrefabReference const& self, py::dict) { return mochi::prefab::PrefabReference(self); })
-    .def_readwrite("comment", &mochi::prefab::PrefabReference::comment, "Optional serialized comment.")
-    .def_readwrite("name", &mochi::prefab::PrefabReference::name, "Name of the nested prefab instance. Used to format the names of nested actors in\nthe form \"prefabName/actorName\".\n\nNote:\n    Name-reference ambiguity is evaluated per nested subtree. A nested prefab's\n    own name-based references resolve within its own instance first, so a name\n    reused across independent sibling instances is not ambiguous for each\n    instance's internal references. It becomes ambiguous only for a reference\n    written at the enclosing (parent) scope or above.")
-    .def_readwrite("path", &mochi::prefab::PrefabReference::path, "Path to the nested prefab file.\n\nIf non-empty, :func:`~superdex.physics.prefab.load_nested_prefabs` reloads the\nprefab from this path on every call.\n:func:`~superdex.physics.prefab.ensure_fully_loaded` loads it from this path\nonly if the reference does not already contain a loaded prefab. If empty, both\nfunctions require the reference to already contain a loaded prefab; they keep\nthat prefab and load all prefabs nested within it.\n\nNote:\n    A reference created with the Python constructor needs a non-empty path\n    before loading because the constructor cannot accept a loaded prefab. C++\n    callers may instead assign a loaded prefab directly and leave this path\n    empty.\n\nWarning:\n    The loaded prefab is not serialized. After deserialization, an empty-path\n    reference has no loaded prefab and is rejected by\n    :func:`~superdex.physics.prefab.load_nested_prefabs` and\n    :func:`~superdex.physics.prefab.ensure_fully_loaded`. Set a non-empty path\n    before saving if the reference must remain loadable after deserialization.")
-    .def_readwrite("scale", &mochi::prefab::PrefabReference::scale, "Uniform scale of the nested prefab, relative to the parent prefab.\n\nThe scale applied to this nested prefab is this value multiplied by\n:attr:`~superdex.physics.prefab.PrefabParams.scale` and each enclosing\n:attr:`~superdex.physics.prefab.PrefabReference.scale`. See\n:attr:`~superdex.physics.prefab.PrefabParams.scale` for what scaling affects.\n\nNote:\n    Set this value before loading shapes. If changed later, call\n    :func:`~superdex.physics.prefab.load_shapes` on the top-level\n    :class:`~superdex.physics.prefab.ScenePrefab` before adding it to a\n    :class:`~superdex.physics.Scene`.\n\nNote:\n    Must be strictly positive and finite. Negative or zero scale is invalid and\n    rejected at :func:`~superdex.physics.prefab.add_to_scene`.\n\nSee Also:\n    :attr:`~superdex.physics.prefab.PrefabParams.scale`")
-    .def_property("rotation", [](mochi::prefab::PrefabReference& self) -> mochi::Quaternion& { return self.rotation; }, [](mochi::prefab::PrefabReference& self, py::object val) { self.rotation = py::cast<mochi::Quaternion>(val); }, py::return_value_policy::reference_internal, "Rotation quaternion [x, y, z, w] of the nested prefab in the parent's local\nspace.\n\nNote:\n    Must be finite and non-zero.")
-    .def_property("translation", [](mochi::prefab::PrefabReference& self) -> mochi::Real3& { return self.translation; }, [](mochi::prefab::PrefabReference& self, py::object val) { self.translation = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Translation [x, y, z] of the nested prefab in the parent's local space.\n\nNote:\n    Must be finite.")
+    .def("__deepcopy__", [](mochi::prefab::PrefabReference const& self, nb::dict) { return mochi::prefab::PrefabReference(self); })
+    .def_prop_rw("comment", [](mochi::prefab::PrefabReference& self) -> std::optional<mochi::DynamicString>& { return self.comment; }, [](mochi::prefab::PrefabReference& self, nb::handle val) { self.comment = val.is_none() ? std::optional<mochi::DynamicString>{} : nb::cast<std::optional<mochi::DynamicString>>(val); }, "Optional serialized comment.", nb::for_setter(nb::arg("value").none()))
+    .def_rw("name", &mochi::prefab::PrefabReference::name, "Name of the nested prefab instance. Used to format the names of nested actors in\nthe form \"prefabName/actorName\".\n\nNote:\n    Name-reference ambiguity is evaluated per nested subtree. A nested prefab's\n    own name-based references resolve within its own instance first, so a name\n    reused across independent sibling instances is not ambiguous for each\n    instance's internal references. It becomes ambiguous only for a reference\n    written at the enclosing (parent) scope or above.")
+    .def_rw("path", &mochi::prefab::PrefabReference::path, "Path to the nested prefab file.\n\nIf non-empty, :func:`~superdex.physics.prefab.load_nested_prefabs` reloads the\nprefab from this path on every call.\n:func:`~superdex.physics.prefab.ensure_fully_loaded` loads it from this path\nonly if the reference does not already contain a loaded prefab. If empty, both\nfunctions require the reference to already contain a loaded prefab; they keep\nthat prefab and load all prefabs nested within it.\n\nNote:\n    A reference created with the Python constructor needs a non-empty path\n    before loading because the constructor cannot accept a loaded prefab. C++\n    callers may instead assign a loaded prefab directly and leave this path\n    empty.\n\nWarning:\n    The loaded prefab is not serialized. After deserialization, an empty-path\n    reference has no loaded prefab and is rejected by\n    :func:`~superdex.physics.prefab.load_nested_prefabs` and\n    :func:`~superdex.physics.prefab.ensure_fully_loaded`. Set a non-empty path\n    before saving if the reference must remain loadable after deserialization.")
+    .def_rw("scale", &mochi::prefab::PrefabReference::scale, "Uniform scale of the nested prefab, relative to the parent prefab.\n\nThe scale applied to this nested prefab is this value multiplied by\n:attr:`~superdex.physics.prefab.PrefabParams.scale` and each enclosing\n:attr:`~superdex.physics.prefab.PrefabReference.scale`. See\n:attr:`~superdex.physics.prefab.PrefabParams.scale` for what scaling affects.\n\nNote:\n    Set this value before loading shapes. If changed later, call\n    :func:`~superdex.physics.prefab.load_shapes` on the top-level\n    :class:`~superdex.physics.prefab.ScenePrefab` before adding it to a\n    :class:`~superdex.physics.Scene`.\n\nNote:\n    Must be strictly positive and finite. Negative or zero scale is invalid and\n    rejected at :func:`~superdex.physics.prefab.add_to_scene`.\n\nSee Also:\n    :attr:`~superdex.physics.prefab.PrefabParams.scale`")
+    .def_prop_rw("rotation", [](mochi::prefab::PrefabReference& self) -> mochi::Quaternion& { return self.rotation; }, [](mochi::prefab::PrefabReference& self, nb::object val) { self.rotation = nb::cast<mochi::Quaternion>(val); }, "Rotation quaternion [x, y, z, w] of the nested prefab in the parent's local\nspace.\n\nNote:\n    Must be finite and non-zero.")
+    .def_prop_rw("translation", [](mochi::prefab::PrefabReference& self) -> mochi::Real3& { return self.translation; }, [](mochi::prefab::PrefabReference& self, nb::object val) { self.translation = nb::cast<mochi::Real3>(val); }, "Translation [x, y, z] of the nested prefab in the parent's local space.\n\nNote:\n    Must be finite.")
   ;
 
   registry.GetClass<mochi::prefab::ActorContactEntry>()
-    .def(py::init([](py::object enable, py::object actors, py::object include_nested_actors) {
-      mochi::prefab::ActorContactEntry result;
-      result.enable = py::cast<bool>(enable);
-      result.actors = py::cast<mochi::DynamicArray<mochi::DynamicString>>(actors);
-      result.includeNestedActors = py::cast<bool>(include_nested_actors);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("enable") = mochi::prefab::ActorContactEntry{}.enable
-      , py::arg("actors") = mochi::prefab::ActorContactEntry{}.actors
-      , py::arg("include_nested_actors") = mochi::prefab::ActorContactEntry{}.includeNestedActors
+    .def("__init__", [](mochi::prefab::ActorContactEntry* self, nb::object enable, nb::object actors, nb::object include_nested_actors) {
+      mochi::prefab::ActorContactEntry result{};
+      result.enable = nb::cast<bool>(enable);
+      result.actors = nb::cast<mochi::DynamicArray<mochi::DynamicString>>(actors);
+      result.includeNestedActors = nb::cast<bool>(include_nested_actors);
+      new (self) mochi::prefab::ActorContactEntry(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("enable") = mochi::prefab::ActorContactEntry{}.enable
+      , nb::arg("actors").sig("...") = mochi::prefab::ActorContactEntry{}.actors
+      , nb::arg("include_nested_actors") = mochi::prefab::ActorContactEntry{}.includeNestedActors
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::prefab::ActorContactEntry const& self) { return mochi::prefab::ActorContactEntry(self); })
-    .def("__deepcopy__", [](mochi::prefab::ActorContactEntry const& self, py::dict) { return mochi::prefab::ActorContactEntry(self); })
-    .def_readwrite("enable", &mochi::prefab::ActorContactEntry::enable, "Enable (true) or disable (false) contact for the specified pair of actors.\n\nNote:\n    Contact is enabled for all actor pairs by default, except that automatic\n    contact filtering disables adjacent links in articulated and soft-skinned\n    actors. Therefore, you should usually only list additional pairs of actors\n    for which contact should be explicitly disabled.\n\nSee Also:\n    :class:`~superdex.physics.prefab.ContactFilter`")
-    .def_property("actors", [](mochi::prefab::ActorContactEntry& self) -> mochi::DynamicArray<mochi::DynamicString>& { return self.actors; }, [](mochi::prefab::ActorContactEntry& self, py::object val) { self.actors = py::cast<mochi::DynamicArray<mochi::DynamicString>>(val); }, py::return_value_policy::reference_internal, "Identifies two actors by name or hierarchy path.\n\nIf the actor is in this prefab, then reference it by name, e.g., \"myActor\". If\nthe actor is in a nested prefab, then reference it by hierarchy path, e.g.,\n\"myPrefab/myActor\".\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`.\n\nNote:\n    Parent actor expansion is controlled by\n    :attr:`~superdex.physics.prefab.ActorContactEntry.include_nested_actors`.\n\nNote:\n    Order matters when contact settings are applied asymmetrically. In that\n    case, the first actor is the \"colliding\" actor and the second actor is the\n    \"collider\". When contact is enabled, the first actor's contact sample points\n    will be tested against the second actor's collider geometry.\n\nNote:\n    If both actors are the same, then the setting affects self-contact within\n    the actor.\n\nWarning:\n    Must contain exactly 2 elements.")
-    .def_readwrite("include_nested_actors", &mochi::prefab::ActorContactEntry::includeNestedActors, "Whether expandable parent actor names should include nested actors.\n\nWhen true, a parent actor name resolves to the parent actor plus nested actors.\nThe contact setting is applied to every ordered pair in the cross-product of the\ntwo resolved actor sets; no pairs outside that cross-product are affected. If\nthe resolved sets overlap, pairs in the overlap, including self-pairs, are\naffected. When false, the contact setting applies only to the exact named\nactors.\n\nNote:\n    Actors without nested actors are affected as exact actors irrespective of\n    this setting.\n\nNote:\n    Default contact filtering disables contact between adjacent links in\n    articulated and soft-skinned actors. Actor-contact entries override those\n    defaults for pairs included in the resolved actor sets. If\n    :attr:`~superdex.physics.prefab.ActorContactEntry.include_nested_actors` is\n    true and both actor names resolve to the same parent actor, the entry also\n    covers pairs between that parent's nested actors, including adjacent links.")
+    .def("__deepcopy__", [](mochi::prefab::ActorContactEntry const& self, nb::dict) { return mochi::prefab::ActorContactEntry(self); })
+    .def_rw("enable", &mochi::prefab::ActorContactEntry::enable, "Enable (true) or disable (false) contact for the specified pair of actors.\n\nNote:\n    Contact is enabled for all actor pairs by default, except that automatic\n    contact filtering disables adjacent links in articulated and soft-skinned\n    actors. Therefore, you should usually only list additional pairs of actors\n    for which contact should be explicitly disabled.\n\nSee Also:\n    :class:`~superdex.physics.prefab.ContactFilter`")
+    .def_prop_rw("actors", [](mochi::prefab::ActorContactEntry& self) -> mochi::DynamicArray<mochi::DynamicString>& { return self.actors; }, [](mochi::prefab::ActorContactEntry& self, nb::object val) { self.actors = nb::cast<mochi::DynamicArray<mochi::DynamicString>>(val); }, "Identifies two actors by name or hierarchy path.\n\nIf the actor is in this prefab, then reference it by name, e.g., \"myActor\". If\nthe actor is in a nested prefab, then reference it by hierarchy path, e.g.,\n\"myPrefab/myActor\".\n\nNote:\n    A referenced actor name must identify exactly one existing actor. Actor\n    names need not be unique, but referencing a name shared by more than one\n    actor, or a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`.\n\nNote:\n    Parent actor expansion is controlled by\n    :attr:`~superdex.physics.prefab.ActorContactEntry.include_nested_actors`.\n\nNote:\n    Order matters when contact settings are applied asymmetrically. In that\n    case, the first actor is the \"colliding\" actor and the second actor is the\n    \"collider\". When contact is enabled, the first actor's contact sample points\n    will be tested against the second actor's collider geometry.\n\nNote:\n    If both actors are the same, then the setting affects self-contact within\n    the actor.\n\nWarning:\n    Must contain exactly 2 elements.")
+    .def_rw("include_nested_actors", &mochi::prefab::ActorContactEntry::includeNestedActors, "Whether expandable parent actor names should include nested actors.\n\nWhen true, a parent actor name resolves to the parent actor plus nested actors.\nThe contact setting is applied to every ordered pair in the cross-product of the\ntwo resolved actor sets; no pairs outside that cross-product are affected. If\nthe resolved sets overlap, pairs in the overlap, including self-pairs, are\naffected. When false, the contact setting applies only to the exact named\nactors.\n\nNote:\n    Actors without nested actors are affected as exact actors irrespective of\n    this setting.\n\nNote:\n    Default contact filtering disables contact between adjacent links in\n    articulated and soft-skinned actors. Actor-contact entries override those\n    defaults for pairs included in the resolved actor sets. If\n    :attr:`~superdex.physics.prefab.ActorContactEntry.include_nested_actors` is\n    true and both actor names resolve to the same parent actor, the entry also\n    covers pairs between that parent's nested actors, including adjacent links.")
   ;
 
   registry.GetClass<mochi::prefab::ContactPairParamsOverrideEntry>()
-    .def(py::init([](py::object actors, py::object params_override) {
-      mochi::prefab::ContactPairParamsOverrideEntry result;
-      result.actors = py::cast<mochi::DynamicArray<mochi::DynamicString>>(actors);
-      result.paramsOverride = py::cast<mochi::ContactPairParamsOverride>(params_override);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("actors") = mochi::prefab::ContactPairParamsOverrideEntry{}.actors
-      , py::arg("params_override") = mochi::prefab::ContactPairParamsOverrideEntry{}.paramsOverride
+    .def("__init__", [](mochi::prefab::ContactPairParamsOverrideEntry* self, nb::object actors, nb::object params_override) {
+      mochi::prefab::ContactPairParamsOverrideEntry result{};
+      result.actors = nb::cast<mochi::DynamicArray<mochi::DynamicString>>(actors);
+      result.paramsOverride = nb::cast<mochi::ContactPairParamsOverride>(params_override);
+      new (self) mochi::prefab::ContactPairParamsOverrideEntry(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("actors").sig("...") = mochi::prefab::ContactPairParamsOverrideEntry{}.actors
+      , nb::arg("params_override").sig("...") = mochi::prefab::ContactPairParamsOverrideEntry{}.paramsOverride
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::prefab::ContactPairParamsOverrideEntry const& self) { return mochi::prefab::ContactPairParamsOverrideEntry(self); })
-    .def("__deepcopy__", [](mochi::prefab::ContactPairParamsOverrideEntry const& self, py::dict) { return mochi::prefab::ContactPairParamsOverrideEntry(self); })
-    .def_property("actors", [](mochi::prefab::ContactPairParamsOverrideEntry& self) -> mochi::DynamicArray<mochi::DynamicString>& { return self.actors; }, [](mochi::prefab::ContactPairParamsOverrideEntry& self, py::object val) { self.actors = py::cast<mochi::DynamicArray<mochi::DynamicString>>(val); }, py::return_value_policy::reference_internal, "Identifies two actors by name or hierarchy path.\n\nIf the actor is in this prefab, reference it by name, e.g., \"myActor\". If the\nactor is in a nested prefab, reference it by hierarchy path, e.g.,\n\"myPrefab/myActor\".\n\nNote:\n    Each referenced name must identify exactly one existing actor. Actor names\n    need not be unique, but referencing a name shared by more than one actor, or\n    a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`.\n\nNote:\n    Both referenced actors must have contact parameters.\n\nNote:\n    Parent actor names identify only the parent. Name nested actors explicitly\n    to override their contact pairs.\n\nNote:\n    If both names identify the same actor, the entry applies to that actor's\n    self-pair.\n\nWarning:\n    Must contain exactly 2 elements.")
-    .def_readwrite("params_override", &mochi::prefab::ContactPairParamsOverrideEntry::paramsOverride, "Partial contact parameter override for the actor pair.\n\nNote:\n    At least one field must be present.")
+    .def("__deepcopy__", [](mochi::prefab::ContactPairParamsOverrideEntry const& self, nb::dict) { return mochi::prefab::ContactPairParamsOverrideEntry(self); })
+    .def_prop_rw("actors", [](mochi::prefab::ContactPairParamsOverrideEntry& self) -> mochi::DynamicArray<mochi::DynamicString>& { return self.actors; }, [](mochi::prefab::ContactPairParamsOverrideEntry& self, nb::object val) { self.actors = nb::cast<mochi::DynamicArray<mochi::DynamicString>>(val); }, "Identifies two actors by name or hierarchy path.\n\nIf the actor is in this prefab, reference it by name, e.g., \"myActor\". If the\nactor is in a nested prefab, reference it by hierarchy path, e.g.,\n\"myPrefab/myActor\".\n\nNote:\n    Each referenced name must identify exactly one existing actor. Actor names\n    need not be unique, but referencing a name shared by more than one actor, or\n    a name that matches no actor, is invalid and rejected at\n    :func:`~superdex.physics.prefab.add_to_scene`.\n\nNote:\n    Both referenced actors must have contact parameters.\n\nNote:\n    Parent actor names identify only the parent. Name nested actors explicitly\n    to override their contact pairs.\n\nNote:\n    If both names identify the same actor, the entry applies to that actor's\n    self-pair.\n\nWarning:\n    Must contain exactly 2 elements.")
+    .def_rw("params_override", &mochi::prefab::ContactPairParamsOverrideEntry::paramsOverride, "Partial contact parameter override for the actor pair.\n\nNote:\n    At least one field must be present.")
   ;
 
   registry.GetClass<mochi::prefab::LayerContactEntry>()
-    .def(py::init([](py::object enable, py::object layers) {
-      mochi::prefab::LayerContactEntry result;
-      result.enable = py::cast<bool>(enable);
-      result.layers = py::cast<mochi::DynamicArray<mochi::DynamicString>>(layers);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("enable") = mochi::prefab::LayerContactEntry{}.enable
-      , py::arg("layers") = mochi::prefab::LayerContactEntry{}.layers
+    .def("__init__", [](mochi::prefab::LayerContactEntry* self, nb::object enable, nb::object layers) {
+      mochi::prefab::LayerContactEntry result{};
+      result.enable = nb::cast<bool>(enable);
+      result.layers = nb::cast<mochi::DynamicArray<mochi::DynamicString>>(layers);
+      new (self) mochi::prefab::LayerContactEntry(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("enable") = mochi::prefab::LayerContactEntry{}.enable
+      , nb::arg("layers").sig("...") = mochi::prefab::LayerContactEntry{}.layers
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::prefab::LayerContactEntry const& self) { return mochi::prefab::LayerContactEntry(self); })
-    .def("__deepcopy__", [](mochi::prefab::LayerContactEntry const& self, py::dict) { return mochi::prefab::LayerContactEntry(self); })
-    .def_readwrite("enable", &mochi::prefab::LayerContactEntry::enable, "Enable (true) or disable (false) contact for the specified pair of contact layer\nnames.\n\nNote:\n    Contact is enabled for any pair of layers by default. Therefore, you should\n    usually only list pairs of layers for which contact should be explicitly\n    disabled.\n\nSee Also:\n    :class:`~superdex.physics.prefab.ContactFilter`")
-    .def_property("layers", [](mochi::prefab::LayerContactEntry& self) -> mochi::DynamicArray<mochi::DynamicString>& { return self.layers; }, [](mochi::prefab::LayerContactEntry& self, py::object val) { self.layers = py::cast<mochi::DynamicArray<mochi::DynamicString>>(val); }, py::return_value_policy::reference_internal, "Identifies two contact layer names.\n\nNote:\n    Order matters when contact settings are applied asymmetrically. In that\n    case, the first layer is the \"colliding\" layer and the second layer is the\n    \"collider\". When contact is enabled, the contact sample points on an actor\n    in the first layer will be tested against the collider geometry of an actor\n    in the second layer.\n\nNote:\n    Both layer names can be the same. In that case, the setting applies between\n    actors within the same layer.\n\nWarning:\n    Must contain exactly 2 elements.")
+    .def("__deepcopy__", [](mochi::prefab::LayerContactEntry const& self, nb::dict) { return mochi::prefab::LayerContactEntry(self); })
+    .def_rw("enable", &mochi::prefab::LayerContactEntry::enable, "Enable (true) or disable (false) contact for the specified pair of contact layer\nnames.\n\nNote:\n    Contact is enabled for any pair of layers by default. Therefore, you should\n    usually only list pairs of layers for which contact should be explicitly\n    disabled.\n\nSee Also:\n    :class:`~superdex.physics.prefab.ContactFilter`")
+    .def_prop_rw("layers", [](mochi::prefab::LayerContactEntry& self) -> mochi::DynamicArray<mochi::DynamicString>& { return self.layers; }, [](mochi::prefab::LayerContactEntry& self, nb::object val) { self.layers = nb::cast<mochi::DynamicArray<mochi::DynamicString>>(val); }, "Identifies two contact layer names.\n\nNote:\n    Order matters when contact settings are applied asymmetrically. In that\n    case, the first layer is the \"colliding\" layer and the second layer is the\n    \"collider\". When contact is enabled, the contact sample points on an actor\n    in the first layer will be tested against the collider geometry of an actor\n    in the second layer.\n\nNote:\n    Both layer names can be the same. In that case, the setting applies between\n    actors within the same layer.\n\nWarning:\n    Must contain exactly 2 elements.")
   ;
 
   registry.GetClass<mochi::prefab::ContactFilter>()
-    .def(py::init([](py::object comment, py::object actor_contact_asymmetric, py::object actor_contact_symmetric, py::object layer_contact_asymmetric, py::object layer_contact_symmetric) {
-      mochi::prefab::ContactFilter result;
-      result.comment = py::cast<std::optional<mochi::DynamicString>>(comment);
-      result.actorContactAsymmetric = py::cast<std::optional<mochi::DynamicArray<mochi::prefab::ActorContactEntry>>>(actor_contact_asymmetric);
-      result.actorContactSymmetric = py::cast<std::optional<mochi::DynamicArray<mochi::prefab::ActorContactEntry>>>(actor_contact_symmetric);
-      result.layerContactAsymmetric = py::cast<std::optional<mochi::DynamicArray<mochi::prefab::LayerContactEntry>>>(layer_contact_asymmetric);
-      result.layerContactSymmetric = py::cast<std::optional<mochi::DynamicArray<mochi::prefab::LayerContactEntry>>>(layer_contact_symmetric);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("comment") = mochi::prefab::ContactFilter{}.comment
-      , py::arg("actor_contact_asymmetric") = mochi::prefab::ContactFilter{}.actorContactAsymmetric
-      , py::arg("actor_contact_symmetric") = mochi::prefab::ContactFilter{}.actorContactSymmetric
-      , py::arg("layer_contact_asymmetric") = mochi::prefab::ContactFilter{}.layerContactAsymmetric
-      , py::arg("layer_contact_symmetric") = mochi::prefab::ContactFilter{}.layerContactSymmetric
+    .def("__init__", [](mochi::prefab::ContactFilter* self, nb::object comment, nb::object actor_contact_asymmetric, nb::object actor_contact_symmetric, nb::object layer_contact_asymmetric, nb::object layer_contact_symmetric) {
+      mochi::prefab::ContactFilter result{};
+      result.comment = nb::cast<std::optional<mochi::DynamicString>>(comment);
+      result.actorContactAsymmetric = nb::cast<std::optional<mochi::DynamicArray<mochi::prefab::ActorContactEntry>>>(actor_contact_asymmetric);
+      result.actorContactSymmetric = nb::cast<std::optional<mochi::DynamicArray<mochi::prefab::ActorContactEntry>>>(actor_contact_symmetric);
+      result.layerContactAsymmetric = nb::cast<std::optional<mochi::DynamicArray<mochi::prefab::LayerContactEntry>>>(layer_contact_asymmetric);
+      result.layerContactSymmetric = nb::cast<std::optional<mochi::DynamicArray<mochi::prefab::LayerContactEntry>>>(layer_contact_symmetric);
+      new (self) mochi::prefab::ContactFilter(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("comment").sig("...") = mochi::prefab::ContactFilter{}.comment
+      , nb::arg("actor_contact_asymmetric").sig("...") = mochi::prefab::ContactFilter{}.actorContactAsymmetric
+      , nb::arg("actor_contact_symmetric").sig("...") = mochi::prefab::ContactFilter{}.actorContactSymmetric
+      , nb::arg("layer_contact_asymmetric").sig("...") = mochi::prefab::ContactFilter{}.layerContactAsymmetric
+      , nb::arg("layer_contact_symmetric").sig("...") = mochi::prefab::ContactFilter{}.layerContactSymmetric
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::prefab::ContactFilter const& self) { return mochi::prefab::ContactFilter(self); })
-    .def("__deepcopy__", [](mochi::prefab::ContactFilter const& self, py::dict) { return mochi::prefab::ContactFilter(self); })
-    .def_readwrite("comment", &mochi::prefab::ContactFilter::comment, "Optional serialized comment.")
-    .def_property("actor_contact_asymmetric", [](mochi::prefab::ContactFilter& self) -> std::optional<mochi::DynamicArray<mochi::prefab::ActorContactEntry>>& { return self.actorContactAsymmetric; }, [](mochi::prefab::ContactFilter& self, py::object val) { self.actorContactAsymmetric = py::cast<std::optional<mochi::DynamicArray<mochi::prefab::ActorContactEntry>>>(val); }, py::return_value_policy::reference_internal, "Enables or disables contact asymmetrically for each ordered pair of actors.\n\nSee Also:\n    :class:`~superdex.physics.prefab.ContactFilter`,\n    :class:`~superdex.physics.prefab.ActorContactEntry`,\n    :meth:`~superdex.physics.Scene.enable_actor_contact_asymmetric`")
-    .def_property("actor_contact_symmetric", [](mochi::prefab::ContactFilter& self) -> std::optional<mochi::DynamicArray<mochi::prefab::ActorContactEntry>>& { return self.actorContactSymmetric; }, [](mochi::prefab::ContactFilter& self, py::object val) { self.actorContactSymmetric = py::cast<std::optional<mochi::DynamicArray<mochi::prefab::ActorContactEntry>>>(val); }, py::return_value_policy::reference_internal, "Enables or disables contact symmetrically for each pair of actors.\n\nSee Also:\n    :class:`~superdex.physics.prefab.ContactFilter`,\n    :class:`~superdex.physics.prefab.ActorContactEntry`,\n    :meth:`~superdex.physics.Scene.enable_actor_contact_symmetric`")
-    .def_property("layer_contact_asymmetric", [](mochi::prefab::ContactFilter& self) -> std::optional<mochi::DynamicArray<mochi::prefab::LayerContactEntry>>& { return self.layerContactAsymmetric; }, [](mochi::prefab::ContactFilter& self, py::object val) { self.layerContactAsymmetric = py::cast<std::optional<mochi::DynamicArray<mochi::prefab::LayerContactEntry>>>(val); }, py::return_value_policy::reference_internal, "Enables or disables contact asymmetrically for each ordered pair of layers.\n\nSee Also:\n    :class:`~superdex.physics.prefab.ContactFilter`,\n    :class:`~superdex.physics.prefab.LayerContactEntry`,\n    :meth:`~superdex.physics.Scene.enable_layer_contact_asymmetric`")
-    .def_property("layer_contact_symmetric", [](mochi::prefab::ContactFilter& self) -> std::optional<mochi::DynamicArray<mochi::prefab::LayerContactEntry>>& { return self.layerContactSymmetric; }, [](mochi::prefab::ContactFilter& self, py::object val) { self.layerContactSymmetric = py::cast<std::optional<mochi::DynamicArray<mochi::prefab::LayerContactEntry>>>(val); }, py::return_value_policy::reference_internal, "Enables or disables contact symmetrically for each pair of layers.\n\nSee Also:\n    :class:`~superdex.physics.prefab.ContactFilter`,\n    :class:`~superdex.physics.prefab.LayerContactEntry`,\n    :meth:`~superdex.physics.Scene.enable_layer_contact_symmetric`")
+    .def("__deepcopy__", [](mochi::prefab::ContactFilter const& self, nb::dict) { return mochi::prefab::ContactFilter(self); })
+    .def_prop_rw("comment", [](mochi::prefab::ContactFilter& self) -> std::optional<mochi::DynamicString>& { return self.comment; }, [](mochi::prefab::ContactFilter& self, nb::handle val) { self.comment = val.is_none() ? std::optional<mochi::DynamicString>{} : nb::cast<std::optional<mochi::DynamicString>>(val); }, "Optional serialized comment.", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("actor_contact_asymmetric", [](mochi::prefab::ContactFilter& self) -> std::optional<mochi::DynamicArray<mochi::prefab::ActorContactEntry>>& { return self.actorContactAsymmetric; }, [](mochi::prefab::ContactFilter& self, nb::handle val) { self.actorContactAsymmetric = val.is_none() ? std::optional<mochi::DynamicArray<mochi::prefab::ActorContactEntry>>{} : nb::cast<std::optional<mochi::DynamicArray<mochi::prefab::ActorContactEntry>>>(val); }, "Enables or disables contact asymmetrically for each ordered pair of actors.\n\nSee Also:\n    :class:`~superdex.physics.prefab.ContactFilter`,\n    :class:`~superdex.physics.prefab.ActorContactEntry`,\n    :meth:`~superdex.physics.Scene.enable_actor_contact_asymmetric`", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("actor_contact_symmetric", [](mochi::prefab::ContactFilter& self) -> std::optional<mochi::DynamicArray<mochi::prefab::ActorContactEntry>>& { return self.actorContactSymmetric; }, [](mochi::prefab::ContactFilter& self, nb::handle val) { self.actorContactSymmetric = val.is_none() ? std::optional<mochi::DynamicArray<mochi::prefab::ActorContactEntry>>{} : nb::cast<std::optional<mochi::DynamicArray<mochi::prefab::ActorContactEntry>>>(val); }, "Enables or disables contact symmetrically for each pair of actors.\n\nSee Also:\n    :class:`~superdex.physics.prefab.ContactFilter`,\n    :class:`~superdex.physics.prefab.ActorContactEntry`,\n    :meth:`~superdex.physics.Scene.enable_actor_contact_symmetric`", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("layer_contact_asymmetric", [](mochi::prefab::ContactFilter& self) -> std::optional<mochi::DynamicArray<mochi::prefab::LayerContactEntry>>& { return self.layerContactAsymmetric; }, [](mochi::prefab::ContactFilter& self, nb::handle val) { self.layerContactAsymmetric = val.is_none() ? std::optional<mochi::DynamicArray<mochi::prefab::LayerContactEntry>>{} : nb::cast<std::optional<mochi::DynamicArray<mochi::prefab::LayerContactEntry>>>(val); }, "Enables or disables contact asymmetrically for each ordered pair of layers.\n\nSee Also:\n    :class:`~superdex.physics.prefab.ContactFilter`,\n    :class:`~superdex.physics.prefab.LayerContactEntry`,\n    :meth:`~superdex.physics.Scene.enable_layer_contact_asymmetric`", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("layer_contact_symmetric", [](mochi::prefab::ContactFilter& self) -> std::optional<mochi::DynamicArray<mochi::prefab::LayerContactEntry>>& { return self.layerContactSymmetric; }, [](mochi::prefab::ContactFilter& self, nb::handle val) { self.layerContactSymmetric = val.is_none() ? std::optional<mochi::DynamicArray<mochi::prefab::LayerContactEntry>>{} : nb::cast<std::optional<mochi::DynamicArray<mochi::prefab::LayerContactEntry>>>(val); }, "Enables or disables contact symmetrically for each pair of layers.\n\nSee Also:\n    :class:`~superdex.physics.prefab.ContactFilter`,\n    :class:`~superdex.physics.prefab.LayerContactEntry`,\n    :meth:`~superdex.physics.Scene.enable_layer_contact_symmetric`", nb::for_setter(nb::arg("value").none()))
   ;
 
   registry.GetClass<mochi::prefab::ScenePrefab>()
-    .def(py::init([](py::object comment, py::object actors, py::object constraints, py::object controllers, py::object prefabs, py::object scene, py::object contact_filter, py::object contact_pair_params_overrides) {
-      mochi::prefab::ScenePrefab result;
-      result.comment = py::cast<std::optional<mochi::DynamicString>>(comment);
-      result.actors = py::cast<mochi::prefab::ActorLists>(actors);
-      result.constraints = py::cast<mochi::prefab::ConstraintLists>(constraints);
-      result.controllers = py::cast<mochi::DynamicArray<mochi::prefab::PoseControllerPrefab>>(controllers);
-      result.prefabs = py::cast<mochi::DynamicArray<mochi::prefab::PrefabReference>>(prefabs);
-      result.scene = py::cast<std::optional<mochi::prefab::SceneParams>>(scene);
-      result.contactFilter = py::cast<std::optional<mochi::prefab::ContactFilter>>(contact_filter);
-      result.contactPairParamsOverrides = py::cast<std::optional<mochi::DynamicArray<mochi::prefab::ContactPairParamsOverrideEntry>>>(contact_pair_params_overrides);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("comment") = mochi::prefab::ScenePrefab{}.comment
-      , py::arg("actors") = mochi::prefab::ScenePrefab{}.actors
-      , py::arg("constraints") = mochi::prefab::ScenePrefab{}.constraints
-      , py::arg("controllers") = mochi::prefab::ScenePrefab{}.controllers
-      , py::arg("prefabs") = mochi::prefab::ScenePrefab{}.prefabs
-      , py::arg("scene") = mochi::prefab::ScenePrefab{}.scene
-      , py::arg("contact_filter") = mochi::prefab::ScenePrefab{}.contactFilter
-      , py::arg("contact_pair_params_overrides") = mochi::prefab::ScenePrefab{}.contactPairParamsOverrides
+    .def("__init__", [](mochi::prefab::ScenePrefab* self, nb::object comment, nb::object actors, nb::object constraints, nb::object controllers, nb::object prefabs, nb::object scene, nb::object contact_filter, nb::object contact_pair_params_overrides) {
+      mochi::prefab::ScenePrefab result{};
+      result.comment = nb::cast<std::optional<mochi::DynamicString>>(comment);
+      result.actors = nb::cast<mochi::prefab::ActorLists>(actors);
+      result.constraints = nb::cast<mochi::prefab::ConstraintLists>(constraints);
+      result.controllers = nb::cast<mochi::DynamicArray<mochi::prefab::PoseControllerPrefab>>(controllers);
+      result.prefabs = nb::cast<mochi::DynamicArray<mochi::prefab::PrefabReference>>(prefabs);
+      result.scene = nb::cast<std::optional<mochi::prefab::SceneParams>>(scene);
+      result.contactFilter = nb::cast<std::optional<mochi::prefab::ContactFilter>>(contact_filter);
+      result.contactPairParamsOverrides = nb::cast<std::optional<mochi::DynamicArray<mochi::prefab::ContactPairParamsOverrideEntry>>>(contact_pair_params_overrides);
+      new (self) mochi::prefab::ScenePrefab(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("comment").sig("...") = mochi::prefab::ScenePrefab{}.comment
+      , nb::arg("actors").sig("...") = mochi::prefab::ScenePrefab{}.actors
+      , nb::arg("constraints").sig("...") = mochi::prefab::ScenePrefab{}.constraints
+      , nb::arg("controllers").sig("...") = mochi::prefab::ScenePrefab{}.controllers
+      , nb::arg("prefabs").sig("...") = mochi::prefab::ScenePrefab{}.prefabs
+      , nb::arg("scene").sig("...") = mochi::prefab::ScenePrefab{}.scene
+      , nb::arg("contact_filter").sig("...") = mochi::prefab::ScenePrefab{}.contactFilter
+      , nb::arg("contact_pair_params_overrides").sig("...") = mochi::prefab::ScenePrefab{}.contactPairParamsOverrides
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::ScenePrefab const& self) { return mochi::prefab::ScenePrefab(self); })
-    .def("__deepcopy__", [](mochi::prefab::ScenePrefab const& self, py::dict) { return mochi::prefab::ScenePrefab(self); })
-    .def_readwrite("comment", &mochi::prefab::ScenePrefab::comment, "Optional serialized comment.")
-    .def_readwrite("actors", &mochi::prefab::ScenePrefab::actors, "Lists of actors by type.")
-    .def_readwrite("constraints", &mochi::prefab::ScenePrefab::constraints, "Lists of constraints by type.")
-    .def_property("controllers", [](mochi::prefab::ScenePrefab& self) -> mochi::DynamicArray<mochi::prefab::PoseControllerPrefab>& { return self.controllers; }, [](mochi::prefab::ScenePrefab& self, py::object val) { self.controllers = py::cast<mochi::DynamicArray<mochi::prefab::PoseControllerPrefab>>(val); }, py::return_value_policy::reference_internal, "List of pose controllers.")
-    .def_property("prefabs", [](mochi::prefab::ScenePrefab& self) -> mochi::DynamicArray<mochi::prefab::PrefabReference>& { return self.prefabs; }, [](mochi::prefab::ScenePrefab& self, py::object val) { self.prefabs = py::cast<mochi::DynamicArray<mochi::prefab::PrefabReference>>(val); }, py::return_value_policy::reference_internal, "List of nested prefab references.")
-    .def_readwrite("scene", &mochi::prefab::ScenePrefab::scene, "Global scene parameters (top-level prefab only).")
-    .def_readwrite("contact_filter", &mochi::prefab::ScenePrefab::contactFilter, "Contact filter settings for selective contact filtering.")
-    .def_property("contact_pair_params_overrides", [](mochi::prefab::ScenePrefab& self) -> std::optional<mochi::DynamicArray<mochi::prefab::ContactPairParamsOverrideEntry>>& { return self.contactPairParamsOverrides; }, [](mochi::prefab::ScenePrefab& self, py::object val) { self.contactPairParamsOverrides = py::cast<std::optional<mochi::DynamicArray<mochi::prefab::ContactPairParamsOverrideEntry>>>(val); }, py::return_value_policy::reference_internal, "Optional actor-pair contact parameter overrides.\n\nEntries are applied in array order after all actors in their prefab have been\ncreated. A later entry for the same unordered actor pair replaces the earlier\noverride rather than merging with it. Nested child prefab entries are applied\nbefore parent entries.")
+    .def("__deepcopy__", [](mochi::prefab::ScenePrefab const& self, nb::dict) { return mochi::prefab::ScenePrefab(self); })
+    .def_prop_rw("comment", [](mochi::prefab::ScenePrefab& self) -> std::optional<mochi::DynamicString>& { return self.comment; }, [](mochi::prefab::ScenePrefab& self, nb::handle val) { self.comment = val.is_none() ? std::optional<mochi::DynamicString>{} : nb::cast<std::optional<mochi::DynamicString>>(val); }, "Optional serialized comment.", nb::for_setter(nb::arg("value").none()))
+    .def_rw("actors", &mochi::prefab::ScenePrefab::actors, "Lists of actors by type.")
+    .def_rw("constraints", &mochi::prefab::ScenePrefab::constraints, "Lists of constraints by type.")
+    .def_prop_rw("controllers", [](mochi::prefab::ScenePrefab& self) -> mochi::DynamicArray<mochi::prefab::PoseControllerPrefab>& { return self.controllers; }, [](mochi::prefab::ScenePrefab& self, nb::object val) { self.controllers = nb::cast<mochi::DynamicArray<mochi::prefab::PoseControllerPrefab>>(val); }, "List of pose controllers.")
+    .def_prop_rw("prefabs", [](mochi::prefab::ScenePrefab& self) -> mochi::DynamicArray<mochi::prefab::PrefabReference>& { return self.prefabs; }, [](mochi::prefab::ScenePrefab& self, nb::object val) { self.prefabs = nb::cast<mochi::DynamicArray<mochi::prefab::PrefabReference>>(val); }, "List of nested prefab references.")
+    .def_prop_rw("scene", [](mochi::prefab::ScenePrefab& self) -> std::optional<mochi::prefab::SceneParams>& { return self.scene; }, [](mochi::prefab::ScenePrefab& self, nb::handle val) { self.scene = val.is_none() ? std::optional<mochi::prefab::SceneParams>{} : nb::cast<std::optional<mochi::prefab::SceneParams>>(val); }, "Global scene parameters (top-level prefab only).", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("contact_filter", [](mochi::prefab::ScenePrefab& self) -> std::optional<mochi::prefab::ContactFilter>& { return self.contactFilter; }, [](mochi::prefab::ScenePrefab& self, nb::handle val) { self.contactFilter = val.is_none() ? std::optional<mochi::prefab::ContactFilter>{} : nb::cast<std::optional<mochi::prefab::ContactFilter>>(val); }, "Contact filter settings for selective contact filtering.", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("contact_pair_params_overrides", [](mochi::prefab::ScenePrefab& self) -> std::optional<mochi::DynamicArray<mochi::prefab::ContactPairParamsOverrideEntry>>& { return self.contactPairParamsOverrides; }, [](mochi::prefab::ScenePrefab& self, nb::handle val) { self.contactPairParamsOverrides = val.is_none() ? std::optional<mochi::DynamicArray<mochi::prefab::ContactPairParamsOverrideEntry>>{} : nb::cast<std::optional<mochi::DynamicArray<mochi::prefab::ContactPairParamsOverrideEntry>>>(val); }, "Optional actor-pair contact parameter overrides.\n\nEntries are applied in array order after all actors in their prefab have been\ncreated. A later entry for the same unordered actor pair replaces the earlier\noverride rather than merging with it. Nested child prefab entries are applied\nbefore parent entries.", nb::for_setter(nb::arg("value").none()))
   ;
 
   registry.GetClass<mochi::prefab::PrefabParams>()
-    .def(py::init([](py::object name, py::object scale, py::object rotation, py::object translation, py::object apply_scene_settings) {
-      mochi::prefab::PrefabParams result;
-      result.name = py::cast<mochi::DynamicString>(name);
-      result.scale = py::cast<mochi::real>(scale);
-      result.rotation = py::cast<mochi::Quaternion>(rotation);
-      result.translation = py::cast<mochi::Real3>(translation);
-      result.applySceneSettings = py::cast<bool>(apply_scene_settings);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("name") = mochi::prefab::PrefabParams{}.name
-      , py::arg("scale") = mochi::prefab::PrefabParams{}.scale
-      , py::arg("rotation") = mochi::prefab::PrefabParams{}.rotation
-      , py::arg("translation") = mochi::prefab::PrefabParams{}.translation
-      , py::arg("apply_scene_settings") = mochi::prefab::PrefabParams{}.applySceneSettings
+    .def("__init__", [](mochi::prefab::PrefabParams* self, nb::object name, nb::object scale, nb::object rotation, nb::object translation, nb::object apply_scene_settings) {
+      mochi::prefab::PrefabParams result{};
+      result.name = nb::cast<mochi::DynamicString>(name);
+      result.scale = nb::cast<mochi::real>(scale);
+      result.rotation = nb::cast<mochi::Quaternion>(rotation);
+      result.translation = nb::cast<mochi::Real3>(translation);
+      result.applySceneSettings = nb::cast<bool>(apply_scene_settings);
+      new (self) mochi::prefab::PrefabParams(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("name") = mochi::prefab::PrefabParams{}.name
+      , nb::arg("scale") = mochi::prefab::PrefabParams{}.scale
+      , nb::arg("rotation").sig("...") = mochi::prefab::PrefabParams{}.rotation
+      , nb::arg("translation").sig("...") = mochi::prefab::PrefabParams{}.translation
+      , nb::arg("apply_scene_settings") = mochi::prefab::PrefabParams{}.applySceneSettings
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::prefab::PrefabParams const& self) { return mochi::prefab::PrefabParams(self); })
-    .def("__deepcopy__", [](mochi::prefab::PrefabParams const& self, py::dict) { return mochi::prefab::PrefabParams(self); })
-    .def_readwrite("name", &mochi::prefab::PrefabParams::name, "Optional name prefix for created actors.\n\nActor names are formatted based on their hierarchy paths. If this string is not\nempty, it will be used as the first token in the path (\"prefabName/actorName\",\n\"prefabName/nestedPrefabName/actorName\", etc.)")
-    .def_readwrite("scale", &mochi::prefab::PrefabParams::scale, "Uniform scale of the new prefab in world-space.\n\nComposes multiplicatively with any nested\n:attr:`~superdex.physics.prefab.PrefabReference.scale` and any per-actor scale\n(e.g. :attr:`~superdex.physics.prefab.ArticulatedActorPrefab.scale`) to give the\ncumulative \"effective scale\" baked into each actor when the prefab is\ninstantiated.\n\nThe effective scale is applied to:\n\n- Mesh geometry (link / actor shapes are loaded at the cumulative scale)\n- Joint and link translations, cycle joint anchors\n- Prismatic joint position limits (Real3, in meters)\n- Constraint geometric target and limit distances [m], including rigid prismatic\n  joint limits, world-space position targets, rigid actor-local pivot/joint\n  positions in\n  :class:`~superdex.physics.prefab.RigidPivotPositionConstraintPrefab`,\n  :class:`~superdex.physics.prefab.RigidPivotToRigidTargetConstraintPrefab`, and\n  :class:`~superdex.physics.prefab.RigidSphericalJointConstraintPrefab`; the\n  rigid-local attachment/search point in\n  :class:`~superdex.physics.prefab.DeformableNodeToRigidConstraintPrefab`; and\n  translational single-DoF target/range values in\n  :class:`~superdex.physics.prefab.ArticulatedSingleDofTargetConstraintPrefab`\n  and\n  :class:`~superdex.physics.prefab.ArticulatedSingleDofRangeConstraintPrefab`.\n  Actor-local constraint distances use the referenced actor's prefab metric\n  scale, so standalone rigid/soft shape-bake scale fields are not applied again.\n- User-supplied inertia overrides on rigid and articulated link actors: center\n  of mass scales componentwise by the signed effective scale, mass scales by the\n  absolute effective volume scale, moment of inertia uses the corresponding\n  diagonal inertia transform. For a purely uniform effective scale s, this\n  reduces to:\n\n  ::\n\n      centerOfMass *= s\n      mass *= s^3\n      momentOfInertia *= s^5\n\nThe mass and moment of inertia formulas preserve the user's authored density.\n\nThe effective scale is NOT applied to:\n\n- density (intrinsic material property; mass/density are mutually exclusive in\n  the prefab API, so no double-application)\n- linearVelocity / angularVelocity / jointVelocities\n- Contact-pair parameter overrides, whose authored values are preserved\n- Constraint stiffness/damping coefficients and saturation thresholds inherited\n  from :class:`~superdex.physics.ConstraintParams`. These parameters define the\n  constraint's response, not just geometry: different goals (preserving material\n  behavior, damping ratio, actuator limits, or closed-loop response) imply\n  different scale laws, so prefab scaling preserves authored values.\n- Joint inertia, friction, limit stiffness/damping, cycle joint stiffness\n  (characterized actuator / tuned-penalty parameters; bring your own actuator\n  model when scaling a robot)\n- Revolute and spherical joint angular limits, rotation-valued targets and\n  ranges in\n  :class:`~superdex.physics.prefab.Articulated3dRotationTargetConstraintPrefab`\n  and\n  :class:`~superdex.physics.prefab.Articulated3dRotationRangeConstraintPrefab`,\n  and rotational single-DoF target/range values in\n  :class:`~superdex.physics.prefab.ArticulatedSingleDofTargetConstraintPrefab`\n  and\n  :class:`~superdex.physics.prefab.ArticulatedSingleDofRangeConstraintPrefab`\n  (scale invariant)\n\nNote:\n    Must be strictly positive and finite. Negative or zero scale is invalid and\n    rejected at :func:`~superdex.physics.prefab.add_to_scene`. The\n    :class:`~superdex.physics.prefab.ScenePrefab` overload additionally requires\n    scale == 1; use the file-path :func:`~superdex.physics.prefab.add_to_scene`\n    overload, nested :attr:`~superdex.physics.prefab.PrefabReference.scale`, or\n    per-actor scale for non-identity scaling.\n\nNote:\n    Authoring with :attr:`~superdex.physics.RigidActorParams.mass` = M is\n    equivalent to authoring with the implied density M / V_unit; under prefab\n    scale the density is preserved and mass scales with the absolute volume\n    scale, so the result is \"the same material at a bigger size.\" For a purely\n    uniform effective scale s, this mass factor is s^3. If you need a fixed mass\n    that does NOT scale with the prefab, set the mass at runtime via\n    :meth:`~superdex.physics.Actor.set_density` after the actor is instantiated.")
-    .def_property("rotation", [](mochi::prefab::PrefabParams& self) -> mochi::Quaternion& { return self.rotation; }, [](mochi::prefab::PrefabParams& self, py::object val) { self.rotation = py::cast<mochi::Quaternion>(val); }, py::return_value_policy::reference_internal, "Rotation quaternion [x, y, z, w] of the new prefab in world-space.\n\nNote:\n    Must be finite and non-zero.")
-    .def_property("translation", [](mochi::prefab::PrefabParams& self) -> mochi::Real3& { return self.translation; }, [](mochi::prefab::PrefabParams& self, py::object val) { self.translation = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Translation (position) of the new prefab in world-space.\n\nNote:\n    Must be finite.")
-    .def_readwrite("apply_scene_settings", &mochi::prefab::PrefabParams::applySceneSettings, "Whether to apply top-level scene settings.\n\nWhen true, :func:`~superdex.physics.prefab.add_to_scene` applies gravity and\nsolver overrides from the :class:`~superdex.physics.prefab.SceneParams` of the\ntop-level prefab. Omitted overrides preserve existing scene values. When false,\nneither override is applied. Scene settings from nested prefabs are always\nignored.")
+    .def("__deepcopy__", [](mochi::prefab::PrefabParams const& self, nb::dict) { return mochi::prefab::PrefabParams(self); })
+    .def_rw("name", &mochi::prefab::PrefabParams::name, "Optional name prefix for created actors.\n\nActor names are formatted based on their hierarchy paths. If this string is not\nempty, it will be used as the first token in the path (\"prefabName/actorName\",\n\"prefabName/nestedPrefabName/actorName\", etc.)")
+    .def_rw("scale", &mochi::prefab::PrefabParams::scale, "Uniform scale of the new prefab in world-space.\n\nComposes multiplicatively with any nested\n:attr:`~superdex.physics.prefab.PrefabReference.scale` and any per-actor scale\n(e.g. :attr:`~superdex.physics.prefab.ArticulatedActorPrefab.scale`) to give the\ncumulative \"effective scale\" baked into each actor when the prefab is\ninstantiated.\n\nThe effective scale is applied to:\n\n- Mesh geometry (link / actor shapes are loaded at the cumulative scale)\n- Joint and link translations, cycle joint anchors\n- Prismatic joint position limits (Real3, in meters)\n- Constraint geometric target and limit distances [m], including rigid prismatic\n  joint limits, world-space position targets, rigid actor-local pivot/joint\n  positions in\n  :class:`~superdex.physics.prefab.RigidPivotPositionConstraintPrefab`,\n  :class:`~superdex.physics.prefab.RigidPivotToRigidTargetConstraintPrefab`, and\n  :class:`~superdex.physics.prefab.RigidSphericalJointConstraintPrefab`; the\n  rigid-local attachment/search point in\n  :class:`~superdex.physics.prefab.DeformableNodeToRigidConstraintPrefab`; and\n  translational single-DoF target/range values in\n  :class:`~superdex.physics.prefab.ArticulatedSingleDofTargetConstraintPrefab`\n  and\n  :class:`~superdex.physics.prefab.ArticulatedSingleDofRangeConstraintPrefab`.\n  Actor-local constraint distances use the referenced actor's prefab metric\n  scale, so standalone rigid/soft shape-bake scale fields are not applied again.\n- User-supplied inertia overrides on rigid and articulated link actors: center\n  of mass scales componentwise by the signed effective scale, mass scales by the\n  absolute effective volume scale, moment of inertia uses the corresponding\n  diagonal inertia transform. For a purely uniform effective scale s, this\n  reduces to:\n\n  ::\n\n      centerOfMass *= s\n      mass *= s^3\n      momentOfInertia *= s^5\n\nThe mass and moment of inertia formulas preserve the user's authored density.\n\nThe effective scale is NOT applied to:\n\n- density (intrinsic material property; mass/density are mutually exclusive in\n  the prefab API, so no double-application)\n- linearVelocity / angularVelocity / jointVelocities\n- Contact-pair parameter overrides, whose authored values are preserved\n- Constraint stiffness/damping coefficients and saturation thresholds inherited\n  from :class:`~superdex.physics.ConstraintParams`. These parameters define the\n  constraint's response, not just geometry: different goals (preserving material\n  behavior, damping ratio, actuator limits, or closed-loop response) imply\n  different scale laws, so prefab scaling preserves authored values.\n- Joint inertia, friction, limit stiffness/damping, cycle joint stiffness\n  (characterized actuator / tuned-penalty parameters; bring your own actuator\n  model when scaling a robot)\n- Revolute and spherical joint angular limits, rotation-valued targets and\n  ranges in\n  :class:`~superdex.physics.prefab.Articulated3dRotationTargetConstraintPrefab`\n  and\n  :class:`~superdex.physics.prefab.Articulated3dRotationRangeConstraintPrefab`,\n  and rotational single-DoF target/range values in\n  :class:`~superdex.physics.prefab.ArticulatedSingleDofTargetConstraintPrefab`\n  and\n  :class:`~superdex.physics.prefab.ArticulatedSingleDofRangeConstraintPrefab`\n  (scale invariant)\n\nNote:\n    Must be strictly positive and finite. Negative or zero scale is invalid and\n    rejected at :func:`~superdex.physics.prefab.add_to_scene`. The\n    :class:`~superdex.physics.prefab.ScenePrefab` overload additionally requires\n    scale == 1; use the file-path :func:`~superdex.physics.prefab.add_to_scene`\n    overload, nested :attr:`~superdex.physics.prefab.PrefabReference.scale`, or\n    per-actor scale for non-identity scaling.\n\nNote:\n    Authoring with :attr:`~superdex.physics.RigidActorParams.mass` = M is\n    equivalent to authoring with the implied density M / V_unit; under prefab\n    scale the density is preserved and mass scales with the absolute volume\n    scale, so the result is \"the same material at a bigger size.\" For a purely\n    uniform effective scale s, this mass factor is s^3. If you need a fixed mass\n    that does NOT scale with the prefab, set the mass at runtime via\n    :meth:`~superdex.physics.Actor.set_density` after the actor is instantiated.")
+    .def_prop_rw("rotation", [](mochi::prefab::PrefabParams& self) -> mochi::Quaternion& { return self.rotation; }, [](mochi::prefab::PrefabParams& self, nb::object val) { self.rotation = nb::cast<mochi::Quaternion>(val); }, "Rotation quaternion [x, y, z, w] of the new prefab in world-space.\n\nNote:\n    Must be finite and non-zero.")
+    .def_prop_rw("translation", [](mochi::prefab::PrefabParams& self) -> mochi::Real3& { return self.translation; }, [](mochi::prefab::PrefabParams& self, nb::object val) { self.translation = nb::cast<mochi::Real3>(val); }, "Translation (position) of the new prefab in world-space.\n\nNote:\n    Must be finite.")
+    .def_rw("apply_scene_settings", &mochi::prefab::PrefabParams::applySceneSettings, "Whether to apply top-level scene settings.\n\nWhen true, :func:`~superdex.physics.prefab.add_to_scene` applies gravity and\nsolver overrides from the :class:`~superdex.physics.prefab.SceneParams` of the\ntop-level prefab. Omitted overrides preserve existing scene values. When false,\nneither override is applied. Scene settings from nested prefabs are always\nignored.")
   ;
 
   registry.GetClass<mochi::prefab::AddToSceneResult>()
-    .def(py::init([](py::object actors, py::object constraints) {
-      mochi::prefab::AddToSceneResult result;
-      result.actors = py::cast<mochi::DynamicArray<mochi::Actor*>>(actors);
-      result.constraints = py::cast<mochi::DynamicArray<mochi::Constraint*>>(constraints);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("actors") = mochi::prefab::AddToSceneResult{}.actors
-      , py::arg("constraints") = mochi::prefab::AddToSceneResult{}.constraints
+    .def("__init__", [](mochi::prefab::AddToSceneResult* self, nb::object actors, nb::object constraints) {
+      mochi::prefab::AddToSceneResult result{};
+      result.actors = nb::cast<mochi::DynamicArray<mochi::Actor*>>(actors);
+      result.constraints = nb::cast<mochi::DynamicArray<mochi::Constraint*>>(constraints);
+      new (self) mochi::prefab::AddToSceneResult(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("actors").sig("...") = mochi::prefab::AddToSceneResult{}.actors
+      , nb::arg("constraints").sig("...") = mochi::prefab::AddToSceneResult{}.constraints
     )
-    .def(py::init<>())
-    .def("__copy__", [](mochi::prefab::AddToSceneResult const&) { throw py::type_error("AddToSceneResult cannot be copied because it contains non-owning members (Span, StringView, or pointer)."); })
-    .def("__deepcopy__", [](mochi::prefab::AddToSceneResult const&, py::dict) { throw py::type_error("AddToSceneResult cannot be copied because it contains non-owning members (Span, StringView, or pointer). Shallow copy is not currently allowed either, to prevent mistakes."); })
-    .def_property("actors", [](mochi::prefab::AddToSceneResult& self) -> mochi::DynamicArray<mochi::Actor*>& { return self.actors; }, [](mochi::prefab::AddToSceneResult& self, py::object val) { self.actors = py::cast<mochi::DynamicArray<mochi::Actor*>>(val); }, py::return_value_policy::reference_internal, "All newly created actors.\n\nNote:\n    Order is not guaranteed except that actors from nested prefabs will be\n    listed before actors from the top-level prefab.\n\nNote:\n    Contains only top-level actors. Articulated actors' nested link actors and\n    soft-skinned actors' nested link actors and nested soft actors are created\n    but not listed here. Reach them via\n    :meth:`~superdex.physics.Actor.get_nested_link_actors` and\n    :meth:`~superdex.physics.Actor.get_nested_soft_actors`.\n\nSee Also:\n    :meth:`~superdex.physics.prefab.AddToSceneResult.filter`")
-    .def_property("constraints", [](mochi::prefab::AddToSceneResult& self) -> mochi::DynamicArray<mochi::Constraint*>& { return self.constraints; }, [](mochi::prefab::AddToSceneResult& self, py::object val) { self.constraints = py::cast<mochi::DynamicArray<mochi::Constraint*>>(val); }, py::return_value_policy::reference_internal, "All newly created constraints.\n\nNote:\n    Order is not guaranteed except that constraints from nested prefabs will be\n    listed before constraints from the top-level prefab.\n\nSee Also:\n    :meth:`~superdex.physics.prefab.AddToSceneResult.filter`")
-    .def("filter", py::overload_cast<mochi::ActorType>(&mochi::prefab::AddToSceneResult::Filter, py::const_)
-      , py::arg("type")
+    .def(nb::init<>())
+    .def("__copy__", [](mochi::prefab::AddToSceneResult const&) { throw nb::type_error("AddToSceneResult cannot be copied because it contains non-owning members (Span, StringView, or pointer)."); })
+    .def("__deepcopy__", [](mochi::prefab::AddToSceneResult const&, nb::dict) { throw nb::type_error("AddToSceneResult cannot be copied because it contains non-owning members (Span, StringView, or pointer). Shallow copy is not currently allowed either, to prevent mistakes."); })
+    .def_prop_rw("actors", [](mochi::prefab::AddToSceneResult& self) -> mochi::DynamicArray<mochi::Actor*>& { return self.actors; }, [](mochi::prefab::AddToSceneResult& self, nb::object val) { self.actors = nb::cast<mochi::DynamicArray<mochi::Actor*>>(val); }, "All newly created actors.\n\nNote:\n    Order is not guaranteed except that actors from nested prefabs will be\n    listed before actors from the top-level prefab.\n\nNote:\n    Contains only top-level actors. Articulated actors' nested link actors and\n    soft-skinned actors' nested link actors and nested soft actors are created\n    but not listed here. Reach them via\n    :meth:`~superdex.physics.Actor.get_nested_link_actors` and\n    :meth:`~superdex.physics.Actor.get_nested_soft_actors`.\n\nSee Also:\n    :meth:`~superdex.physics.prefab.AddToSceneResult.filter`")
+    .def_prop_rw("constraints", [](mochi::prefab::AddToSceneResult& self) -> mochi::DynamicArray<mochi::Constraint*>& { return self.constraints; }, [](mochi::prefab::AddToSceneResult& self, nb::object val) { self.constraints = nb::cast<mochi::DynamicArray<mochi::Constraint*>>(val); }, "All newly created constraints.\n\nNote:\n    Order is not guaranteed except that constraints from nested prefabs will be\n    listed before constraints from the top-level prefab.\n\nSee Also:\n    :meth:`~superdex.physics.prefab.AddToSceneResult.filter`")
+    .def("filter", nb::overload_cast<mochi::ActorType>(&mochi::prefab::AddToSceneResult::Filter, nb::const_)
+      , nb::arg("type")
       , "Return all the newly created actors of a particular type, in order.\n\nArgs:\n    type (ActorType | int): Type of actor to return.\n\nReturns:\n    List of actors of the specified type.\n\nNote:\n    If there were nested prefabs, then actors will be listed in depth-first\n    order.\n\nNote:\n    For a single prefab (no nested prefabs) whose actors have no nested link\n    actors or nested soft actors, the result is 1-to-1 with the prefab's actors\n    of that type (same size, same order). Nested link actors and nested soft\n    actors are not listed, and soft-skinned actors are reported under\n    :class:`ARTICULATED <superdex.physics.ActorType>`."
     )
-    .def("filter", py::overload_cast<mochi::ConstraintType>(&mochi::prefab::AddToSceneResult::Filter, py::const_)
-      , py::arg("type")
+    .def("filter", nb::overload_cast<mochi::ConstraintType>(&mochi::prefab::AddToSceneResult::Filter, nb::const_)
+      , nb::arg("type")
       , "Return all the newly created constraints of a particular type, in order.\n\nArgs:\n    type (ConstraintType | int): Type of constraint to return.\n\nReturns:\n    List of constraints of the specified type.\n\nNote:\n    If there were nested prefabs, then constraints will be listed in depth-first\n    order.\n\nNote:\n    For a single prefab (no nested prefabs), the result will be 1-to-1 with the\n    constraint list in the prefab (same size, same order)."
     )
   ;
@@ -1233,8 +1233,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] py::module_& 
       }
       return result;
     }
-      , py::arg("prefab_path")
-      , py::arg("root_path")
+      , nb::arg("prefab_path")
+      , nb::arg("root_path")
       , "Fully load a :class:`~superdex.physics.prefab.ScenePrefab` from a file,\nincluding all nested prefabs and shapes.\n\nArgs:\n    prefab_path (str): File path to the prefab file.\n    root_path (str): Root directory for resolving relative paths, except those\n        resolved against a prefab file.\n\nReturns:\n    The fully loaded :class:`~superdex.physics.prefab.ScenePrefab`, or a\n    default-constructed :class:`~superdex.physics.prefab.ScenePrefab` on error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Prefab files are in JSON format.\n\nNote:\n    A prefab must not reference itself, directly or indirectly.\n\nSee Also:\n    :func:`~superdex.physics.prefab.load_from_json_string`,\n    :func:`~superdex.physics.prefab.shallow_load_from_file`,\n    :func:`~superdex.physics.prefab.shallow_load_from_json_string`"
     );
 
@@ -1247,8 +1247,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] py::module_& 
       }
       return result;
     }
-      , py::arg("json")
-      , py::arg("root_path")
+      , nb::arg("json")
+      , nb::arg("root_path")
       , "Fully load a :class:`~superdex.physics.prefab.ScenePrefab` from a JSON string,\nincluding all nested prefabs and shapes.\n\nArgs:\n    json (str): JSON string containing the serialized prefab.\n    root_path (str): Root directory for resolving relative paths, except those\n        resolved against a prefab file.\n\nReturns:\n    The fully loaded :class:`~superdex.physics.prefab.ScenePrefab`, or a\n    default-constructed :class:`~superdex.physics.prefab.ScenePrefab` on error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The top-level prefab has no source file, so prefab-relative (\"./\"-prefixed)\n    nested prefab and shape paths written in ``json`` resolve against\n    ``root_path``, not against a prefab directory. Nested prefabs that are\n    loaded from files resolve their own \"./\"-prefixed paths relative to the\n    directory containing the nested prefab file. Use\n    :func:`~superdex.physics.prefab.load_from_file` if you need prefab-relative\n    resolution at the top level.\n\nNote:\n    A prefab must not reference itself, directly or indirectly.\n\nSee Also:\n    :func:`~superdex.physics.prefab.load_from_file`,\n    :func:`~superdex.physics.prefab.shallow_load_from_file`,\n    :func:`~superdex.physics.prefab.shallow_load_from_json_string`"
     );
 
@@ -1259,8 +1259,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] py::module_& 
         throw MochiErrorException(error);
       }
     }
-      , py::arg("prefab")
-      , py::arg("path")
+      , nb::arg("prefab")
+      , nb::arg("path")
       , "Serialize a :class:`~superdex.physics.prefab.ScenePrefab` to a JSON file.\n\nArgs:\n    prefab (ScenePrefab): The :class:`~superdex.physics.prefab.ScenePrefab` to\n        serialize.\n    path (str): Output file path.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Does NOT serialize nested prefabs. Only the top-level prefab data is\n    written.\n\nNote:\n    Automatically creates the output directory path, as needed.\n\nSee Also:\n    :func:`~superdex.physics.prefab.save_to_json_string`"
     );
 
@@ -1272,7 +1272,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] py::module_& 
       }
       return result;
     }
-      , py::arg("prefab")
+      , nb::arg("prefab")
       , "Serialize a :class:`~superdex.physics.prefab.ScenePrefab` to a JSON string.\n\nArgs:\n    prefab (ScenePrefab): The :class:`~superdex.physics.prefab.ScenePrefab` to\n        serialize.\n\nReturns:\n    The JSON string, or an empty string on error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Does NOT serialize nested prefabs. Only the top-level prefab data is\n    written.\n\nSee Also:\n    :func:`~superdex.physics.prefab.save_to_json_file`"
     );
 
@@ -1284,9 +1284,9 @@ void mochi::DefineMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] py::module_& 
       }
       return result;
     }
-      , py::arg("prefab")
-      , py::arg("scene")
-      , py::arg("params")
+      , nb::arg("prefab")
+      , nb::arg("scene").none()
+      , nb::arg("params")
       , "Instantiate a :class:`~superdex.physics.prefab.ScenePrefab` and add it to a\n:class:`~superdex.physics.Scene`.\n\nCreates the prefab's actors, constraints, and controllers, applies any scene\nsettings enabled by\n:attr:`~superdex.physics.prefab.PrefabParams.apply_scene_settings`, contact\nfilter entries, and contact-pair parameter overrides.\n\nArgs:\n    prefab (ScenePrefab): The fully loaded\n        :class:`~superdex.physics.prefab.ScenePrefab` to instantiate.\n    scene (Scene): The :class:`~superdex.physics.Scene` to add things to.\n    params (PrefabParams): Parameters for how and where to instantiate the\n        prefab. Can optionally be omitted in Python.\n\nReturns:\n    An :class:`~superdex.physics.prefab.AddToSceneResult` containing pointers to\n    all created actors and constraints.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    The prefab must be fully loaded (nested prefabs and shapes) before calling\n    this function. If you're not sure, then call\n    :func:`~superdex.physics.prefab.ensure_fully_loaded`.\n\nWarning:\n    This function is not transactional. If it returns an error, the prefab may\n    have been partially instantiated in the scene.\n\nWarning:\n    Only supported with :attr:`~superdex.physics.prefab.PrefabParams.scale` = 1.\n    To instantiate at a non-identity scale, use the file-path\n    :func:`~superdex.physics.prefab.add_to_scene` overload or a nested\n    :attr:`~superdex.physics.prefab.PrefabReference.scale`.\n\nSee Also:\n    :func:`~superdex.physics.prefab.load_from_file`,\n    :func:`~superdex.physics.prefab.ensure_fully_loaded`,\n    :class:`~superdex.physics.prefab.PrefabParams`"
     );
     m_prefab.def("add_to_scene", [](mochi::prefab::ScenePrefab const& prefab, mochi::Scene* scene) {
@@ -1297,8 +1297,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] py::module_& 
       }
       return result;
     }
-      , py::arg("prefab")
-      , py::arg("scene")
+      , nb::arg("prefab")
+      , nb::arg("scene").none()
       , "Overload of :func:`~superdex.physics.prefab.add_to_scene` that instantiates a\n:class:`~superdex.physics.prefab.ScenePrefab` using default\n:class:`~superdex.physics.prefab.PrefabParams`.\n\nArgs:\n    prefab (ScenePrefab): The fully loaded\n        :class:`~superdex.physics.prefab.ScenePrefab` to instantiate.\n    scene (Scene): The :class:`~superdex.physics.Scene` to add things to.\n\nReturns:\n    An :class:`~superdex.physics.prefab.AddToSceneResult` containing pointers to\n    all created actors and constraints.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nWarning:\n    This function is not transactional. If it returns an error, the prefab may\n    have been partially instantiated in the scene.\n\nSee Also:\n    :func:`~superdex.physics.prefab.add_to_scene`"
     );
     m_prefab.def("add_to_scene", [](std::string_view prefab_path, std::string_view root_path, mochi::Scene* scene, mochi::prefab::PrefabParams const& params) {
@@ -1309,10 +1309,10 @@ void mochi::DefineMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] py::module_& 
       }
       return result;
     }
-      , py::arg("prefab_path")
-      , py::arg("root_path")
-      , py::arg("scene")
-      , py::arg("params")
+      , nb::arg("prefab_path")
+      , nb::arg("root_path")
+      , nb::arg("scene").none()
+      , nb::arg("params")
       , "Load a scene prefab from a file and create an instance of it in the\n:class:`~superdex.physics.Scene`.\n\nThis is a convenience function that loads the prefab, including all nested\nprefabs and shapes, and immediately adds it to the scene. All loaded shape\nhandles are released automatically afterward.\n\nArgs:\n    prefab_path (str): File path to the prefab file.\n    root_path (str): Root directory for resolving relative paths, except those\n        resolved against a prefab file.\n    scene (Scene): The :class:`~superdex.physics.Scene` to add things to.\n    params (PrefabParams): Parameters for how and where to instantiate the\n        prefab.\n\nReturns:\n    An :class:`~superdex.physics.prefab.AddToSceneResult` containing pointers to\n    all created actors and constraints.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    If you intend to add multiple copies of the prefab to a scene, or to\n    multiple scenes, then consider using\n    :func:`~superdex.physics.prefab.load_from_file` to load a\n    :class:`~superdex.physics.prefab.ScenePrefab` object. You can use that\n    :class:`~superdex.physics.prefab.ScenePrefab` multiple times.\n\nNote:\n    Unlike the :class:`~superdex.physics.prefab.ScenePrefab` overload, this\n    overload supports non-identity\n    :attr:`~superdex.physics.prefab.PrefabParams.scale` by baking it into actor\n    geometry during load.\n\nWarning:\n    This function is not transactional. If it returns an error, the prefab may\n    have been partially instantiated in the scene.\n\nSee Also:\n    :func:`~superdex.physics.prefab.load_from_file`,\n    :func:`~superdex.physics.prefab.add_to_scene`,\n    :class:`~superdex.physics.prefab.PrefabParams`"
     );
     m_prefab.def("add_to_scene", [](std::string_view prefab_path, std::string_view root_path, mochi::Scene* scene) {
@@ -1323,16 +1323,16 @@ void mochi::DefineMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] py::module_& 
       }
       return result;
     }
-      , py::arg("prefab_path")
-      , py::arg("root_path")
-      , py::arg("scene")
+      , nb::arg("prefab_path")
+      , nb::arg("root_path")
+      , nb::arg("scene").none()
       , "Overload of :func:`~superdex.physics.prefab.add_to_scene` that loads a prefab\nfrom a file and instantiates it using default\n:class:`~superdex.physics.prefab.PrefabParams`.\n\nArgs:\n    prefab_path (str): File path to the prefab file.\n    root_path (str): Root directory for resolving relative paths, except those\n        resolved against a prefab file.\n    scene (Scene): The :class:`~superdex.physics.Scene` to add things to.\n\nReturns:\n    An :class:`~superdex.physics.prefab.AddToSceneResult` containing pointers to\n    all created actors and constraints.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nWarning:\n    This function is not transactional. If it returns an error, the prefab may\n    have been partially instantiated in the scene.\n\nSee Also:\n    :func:`~superdex.physics.prefab.add_to_scene`"
     );
 
     m_prefab.def("get_prefab_full_path", &mochi::prefab::GetPrefabFullPath
-      , py::arg("input_path")
-      , py::arg("root_for_relative_path")
-      , py::arg("prefab_file_path")
+      , nb::arg("input_path")
+      , nb::arg("root_for_relative_path")
+      , nb::arg("prefab_file_path")
       , "Resolve a path referenced inside a prefab to a full path.\n\nArgs:\n    input_path (str): The path to resolve, as stored in the prefab (may be\n        prefixed with \"./\" to indicate it is relative to the prefab file).\n    root_for_relative_path (str): Root directory used to resolve paths that are\n        not prefixed with \"./\".\n    prefab_file_path (str): Path to the prefab file that references inputPath,\n        used to resolve \"./\"-prefixed paths relative to its location.\n\nReturns:\n    The resolved full path.\n\nNote:\n    Absolute paths are returned unchanged. Paths starting with \"./\" are resolved\n    relative to the directory containing ``prefab_file_path`` when provided.\n    Other relative paths are resolved against ``root_for_relative_path``."
     );
 
@@ -1344,7 +1344,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] py::module_& 
       }
       return result;
     }
-      , py::arg("path")
+      , nb::arg("path")
       , "Deserialize a single :class:`~superdex.physics.prefab.ScenePrefab` from a file,\nwithout loading any nested files.\n\nArgs:\n    path (str): File path to the prefab file.\n\nReturns:\n    The deserialized :class:`~superdex.physics.prefab.ScenePrefab`, or a\n    default-constructed :class:`~superdex.physics.prefab.ScenePrefab` on error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Use this if you want to modify the\n    :class:`~superdex.physics.prefab.ScenePrefab` data before nested content is\n    loaded, or if you simply want to edit and re-save the prefab file.\n\nNote:\n    If you intend to add the :class:`~superdex.physics.prefab.ScenePrefab` to a\n    :class:`~superdex.physics.Scene`, then you will need to load any nested\n    prefabs and shapes first.\n\nSee Also:\n    :func:`~superdex.physics.prefab.ensure_fully_loaded`,\n    :func:`~superdex.physics.prefab.load_nested_prefabs`,\n    :func:`~superdex.physics.prefab.load_shapes`,\n    :func:`~superdex.physics.prefab.shallow_load_from_json_string`"
     );
 
@@ -1356,7 +1356,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] py::module_& 
       }
       return result;
     }
-      , py::arg("json")
+      , nb::arg("json")
       , "Deserialize a single :class:`~superdex.physics.prefab.ScenePrefab` from a JSON\nstring, without loading any nested files.\n\nArgs:\n    json (str): JSON string containing the serialized prefab.\n\nReturns:\n    The deserialized :class:`~superdex.physics.prefab.ScenePrefab`, or a\n    default-constructed :class:`~superdex.physics.prefab.ScenePrefab` on error.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Same as :func:`~superdex.physics.prefab.shallow_load_from_file` except that\n    the JSON string is provided in memory.\n\nNote:\n    Unlike :func:`~superdex.physics.prefab.shallow_load_from_file`, this\n    function is not given a source file for the top-level prefab. Its\n    \"./\"-prefixed nested prefab and shape paths therefore resolve against the\n    root path passed to :func:`~superdex.physics.prefab.load_nested_prefabs`,\n    :func:`~superdex.physics.prefab.load_shapes`, or\n    :func:`~superdex.physics.prefab.ensure_fully_loaded`. Pass the prefab\n    directory as the root path to preserve prefab-relative resolution.\n\nSee Also:\n    :func:`~superdex.physics.prefab.shallow_load_from_file`,\n    :func:`~superdex.physics.prefab.load_from_json_string`"
     );
 
@@ -1367,8 +1367,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] py::module_& 
         throw MochiErrorException(error);
       }
     }
-      , py::arg("prefab")
-      , py::arg("root_path")
+      , nb::arg("prefab")
+      , nb::arg("root_path")
       , "Load nested prefab files recursively.\n\nArgs:\n    prefab (ScenePrefab): The :class:`~superdex.physics.prefab.ScenePrefab`\n        whose nested prefab references will be loaded.\n    root_path (str): Root directory for resolving relative paths, except those\n        resolved against a prefab file.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Use this if the file was loaded via\n    :func:`~superdex.physics.prefab.shallow_load_from_file` or\n    :func:`~superdex.physics.prefab.shallow_load_from_json_string` or if the\n    :class:`~superdex.physics.prefab.ScenePrefab` was created procedurally.\n\nNote:\n    You do not need to call this after\n    :func:`~superdex.physics.prefab.load_from_file` or\n    :func:`~superdex.physics.prefab.load_from_json_string` because they load all\n    nested content for you.\n\nNote:\n    A reference with a non-empty path is reloaded from its file on every call. A\n    reference with an empty path must already contain a loaded prefab; this\n    function keeps that prefab and loads all prefabs nested within it. See\n    :attr:`~superdex.physics.prefab.PrefabReference.path` for when a path is\n    required. Use :func:`~superdex.physics.prefab.ensure_fully_loaded` to avoid\n    reloading prefabs that are already loaded.\n\nNote:\n    A prefab must not reference itself, directly or indirectly.\n\nWarning:\n    If this function returns an error, the input prefab may remain partially\n    loaded. A reference with a non-empty path keeps its previously loaded prefab\n    if its file or any prefab nested within it fails to load; if it had no\n    loaded prefab, it remains unloaded.\n\nSee Also:\n    :func:`~superdex.physics.prefab.ensure_fully_loaded`,\n    :func:`~superdex.physics.prefab.load_shapes`"
     );
 
@@ -1380,8 +1380,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] py::module_& 
         throw MochiErrorException(error);
       }
     }
-      , py::arg("prefab")
-      , py::arg("root_path")
+      , nb::arg("prefab")
+      , nb::arg("root_path")
       , "Load shape files referenced by ``prefab`` and its loaded nested prefabs.\n\nArgs:\n    prefab (ScenePrefab): The :class:`~superdex.physics.prefab.ScenePrefab`\n        whose shape references will be loaded.\n    root_path (str): Root directory for resolving relative paths, except those\n        resolved against a prefab file.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Returns an error if the input prefab or any loaded nested prefab references\n    itself, directly or indirectly.\n\nNote:\n    Use this if the file was loaded via\n    :func:`~superdex.physics.prefab.shallow_load_from_file` or\n    :func:`~superdex.physics.prefab.shallow_load_from_json_string` or if the\n    :class:`~superdex.physics.prefab.ScenePrefab` was created procedurally.\n\nNote:\n    You do not need to call this after\n    :func:`~superdex.physics.prefab.load_from_file` or\n    :func:`~superdex.physics.prefab.load_from_json_string` because they load all\n    nested content for you.\n\nNote:\n    Calling this function again reloads previously loaded shapes to reflect\n    changes to shape file paths or transforms. Use\n    :func:`~superdex.physics.prefab.ensure_fully_loaded` to avoid reloading\n    them.\n\nWarning:\n    Shapes are loaded from nested prefabs only if those prefabs are already\n    loaded. Use :func:`~superdex.physics.prefab.ensure_fully_loaded` if any\n    nested prefabs may be unloaded.\n\nSee Also:\n    :func:`~superdex.physics.prefab.ensure_fully_loaded`,\n    :func:`~superdex.physics.prefab.load_nested_prefabs`,\n    :func:`~superdex.physics.prefab.add_to_scene`"
     );
 
@@ -1393,8 +1393,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] py::module_& 
         throw MochiErrorException(error);
       }
     }
-      , py::arg("prefab")
-      , py::arg("root_path")
+      , nb::arg("prefab")
+      , nb::arg("root_path")
       , "Ensure that all nested prefabs and shape files are loaded, skipping any that are\nalready loaded.\n\nArgs:\n    prefab (ScenePrefab): The :class:`~superdex.physics.prefab.ScenePrefab`\n        whose nested prefabs and shapes will be loaded.\n    root_path (str): Root directory for resolving relative paths, except those\n        resolved against a prefab file.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Use this if the file was loaded via\n    :func:`~superdex.physics.prefab.shallow_load_from_file` or\n    :func:`~superdex.physics.prefab.shallow_load_from_json_string` or if the\n    :class:`~superdex.physics.prefab.ScenePrefab` was created procedurally.\n\nNote:\n    You do not need to call this after\n    :func:`~superdex.physics.prefab.load_from_file` or\n    :func:`~superdex.physics.prefab.load_from_json_string` because they load all\n    nested content for you.\n\nNote:\n    A prefab must not reference itself, directly or indirectly.\n\nNote:\n    If a reference already contains a loaded prefab, this function does not\n    reload its file, even when its path is non-empty; it still loads any missing\n    nested prefabs. A reference with neither a path nor a loaded prefab is\n    invalid. See :attr:`~superdex.physics.prefab.PrefabReference.path` for when\n    a path is required.\n\nWarning:\n    If this function returns an error, the input prefab may remain partially\n    loaded. A reference that was unloaded when the call began remains unloaded\n    if its file or any prefab nested within it fails to load.\n\nSee Also:\n    :func:`~superdex.physics.prefab.load_nested_prefabs`,\n    :func:`~superdex.physics.prefab.load_shapes`,\n    :func:`~superdex.physics.prefab.add_to_scene`"
     );
 
@@ -1405,9 +1405,9 @@ void mochi::DefineMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] py::module_& 
         throw MochiErrorException(error);
       }
     }
-      , py::arg("scene")
-      , py::arg("export_name")
-      , py::arg("output_dir")
+      , nb::arg("scene").none()
+      , nb::arg("export_name")
+      , nb::arg("output_dir")
       , "Export a :class:`~superdex.physics.Scene` to a folder containing a prefab file\nand all generated mesh files.\n\nArgs:\n    scene (Scene): The :class:`~superdex.physics.Scene` to export.\n    export_name (str): Name for the exported prefab. Used both for the export\n        subdirectory and for the prefab filename (``<exportName>.mochi_scene``).\n    output_dir (str): Directory where the export folder will be created. The\n        subdirectories ``<outputDir>/<exportName>`` and\n        ``<outputDir>/<exportName>/generated_assets`` are created automatically.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Generated mesh files (.mochi.h5) are written under generated_assets/ and\n    referenced from the prefab using \"./generated_assets/\" paths.\n\nNote:\n    Exported actor names are made unique: when two actors share a name, later\n    ones receive a numeric suffix (e.g. \"box\", \"box1\"), so an exported name may\n    differ from the runtime name.\n\nNote:\n    Scene export reconstructs supported creation and configuration data from\n    effective runtime state. It is not a lossless or structure-preserving round\n    trip of any prefab used to create the scene.\n\nWarning:\n    Currently exports only rigid, soft, articulated, and soft-skinned actors.\n    Constraints, pose controllers, shell, rod actors, and implicit (non-mesh)\n    shapes are NOT exported.\n\nWarning:\n    For articulated actors, current joint pose and joint velocities are NOT\n    exported.\n\nWarning:\n    Scene export does not record explicit settings that enable contact between\n    actor pairs. If such a setting enables contact between adjacent links of an\n    articulated or soft-skinned actor, adding the exported prefab to a scene\n    applies automatic adjacent-link filtering and disables contact for that pair\n    again. To preserve this behavior, add an equivalent enabling entry to the\n    exported prefab or re-enable the pair after adding the prefab to a scene.\n\nSee Also:\n    :func:`~superdex.physics.prefab.export_scene_excluding`,\n    :func:`~superdex.physics.prefab.export_actor`"
     );
 
@@ -1418,10 +1418,10 @@ void mochi::DefineMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] py::module_& 
         throw MochiErrorException(error);
       }
     }
-      , py::arg("scene")
-      , py::arg("export_name")
-      , py::arg("output_dir")
-      , py::arg("exclude_actors")
+      , nb::arg("scene").none()
+      , nb::arg("export_name")
+      , nb::arg("output_dir")
+      , nb::arg("exclude_actors")
       , "Export a :class:`~superdex.physics.Scene` to a folder containing a prefab file\nand all generated mesh files, omitting a caller-provided set of actors.\n\nArgs:\n    scene (Scene): The :class:`~superdex.physics.Scene` to export.\n    export_name (str): Name for the exported prefab. Used both for the export\n        subdirectory and for the prefab filename (``<exportName>.mochi_scene``).\n    output_dir (str): Directory where the export folder will be created. The\n        subdirectories ``<outputDir>/<exportName>`` and\n        ``<outputDir>/<exportName>/generated_assets`` are created automatically.\n    exclude_actors (ArrayLikeActorHandle): Handles of actors that should not be\n        exported. Excluding an articulated actor also excludes all of its nested\n        link actors. Excluding a soft-skinned actor also excludes all of its\n        nested link actors and nested soft actors. Any contact filter or\n        contact-pair parameter override entries that reference excluded actors\n        are dropped.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Generated mesh files (.mochi.h5) are written under generated_assets/ and\n    referenced from the prefab using \"./generated_assets/\" paths.\n\nNote:\n    Exported actor names are made unique: when two actors share a name, later\n    ones receive a numeric suffix (e.g. \"box\", \"box1\"), so an exported name may\n    differ from the runtime name.\n\nWarning:\n    Currently exports only rigid, soft, articulated, and soft-skinned actors.\n    Constraints, pose controllers, shell, rod actors, and implicit (non-mesh)\n    shapes are NOT exported.\n\nWarning:\n    For articulated actors, current joint pose and joint velocities are NOT\n    exported.\n\nWarning:\n    Scene export does not record explicit settings that enable contact between\n    actor pairs. If such a setting enables contact between adjacent links of an\n    articulated or soft-skinned actor, adding the exported prefab to a scene\n    applies automatic adjacent-link filtering and disables contact for that pair\n    again. To preserve this behavior, add an equivalent enabling entry to the\n    exported prefab or re-enable the pair after adding the prefab to a scene.\n\nSee Also:\n    :func:`~superdex.physics.prefab.export_scene`,\n    :func:`~superdex.physics.prefab.export_actor`"
     );
 
@@ -1432,9 +1432,9 @@ void mochi::DefineMochiPhysics_MochiPhysicsPrefab([[maybe_unused]] py::module_& 
         throw MochiErrorException(error);
       }
     }
-      , py::arg("actor")
-      , py::arg("export_name")
-      , py::arg("output_dir")
+      , nb::arg("actor").none()
+      , nb::arg("export_name")
+      , nb::arg("output_dir")
       , "Export a single actor to a prefab file under\n``outputDir/exportName/<exportName>.mochi_scene``.\n\nExtracts creation parameters from the actor and writes the prefab plus any\ngenerated mesh assets to disk.\n\nArgs:\n    actor (Actor): The actor to export. Must not be None.\n    export_name (str): Label used for the actor's name, the export subdirectory,\n        and the prefab filename (``<exportName>.mochi_scene``).\n    output_dir (str): Parent directory for the export. The subdirectories\n        ``<outputDir>/<exportName>`` and\n        ``<outputDir>/<exportName>/generated_assets`` are created automatically.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Any limitations documented in :func:`~superdex.physics.prefab.export_scene`\n    also apply here.\n\nNote:\n    When exporting an articulated actor, pass the articulated actor itself (the\n    one returned by :meth:`~superdex.physics.Scene.create_articulated_actor` or\n    by :meth:`~superdex.physics.Actor.get_articulated_actor` on a nested link),\n    not a nested actor.\n\nNote:\n    Generated mesh files (.mochi.h5) are written under generated_assets/ and\n    referenced from the prefab using \"./generated_assets/\" paths.\n\nWarning:\n    Only supported for standalone rigid actors, standalone soft actors, and\n    articulated actors. Soft-skinned actors are not supported.\n\nWarning:\n    Scene-level contact-filter settings and contact-pair parameter overrides are\n    not exported. Adding an exported articulated actor to a scene applies\n    automatic adjacent-link filtering, even if contact between adjacent links\n    was explicitly enabled before export. To preserve this behavior, add an\n    equivalent enabling entry to the exported prefab or re-enable the pair after\n    adding the prefab to a scene.\n\nSee Also:\n    :func:`~superdex.physics.prefab.export_scene`,\n    :func:`~superdex.physics.prefab.export_scene_excluding`"
     );
 

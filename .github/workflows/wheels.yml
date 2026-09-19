@@ -4,8 +4,8 @@
 # Run it by hand from the Actions tab. The defaults build everything and check it, which is what
 # producing a release set means; narrow the inputs when you are chasing one toolchain problem.
 #
-#   distribution   which wheel. `superdex_python` is the stable build selector for the
-#                  `superdex-physics` wheel. `pure` is the two py3-none-any wheels together.
+#   distribution   which artifact set. `superdex_python` builds `superdex-physics`; `pure`
+#                  builds the two py3-none-any wheels and the SuperDex Lab sdist.
 #   platform       which runner. `all` fans out to the three.
 #   verify         run the check stage. Only meaningful on a full matrix, because
 #                  `check_wheels.py` judges the wheelhouse as a set and a partial one fails its
@@ -32,17 +32,17 @@
 # install, so a moved tag is a supply-chain hole. A SHA is the only immutable name GitHub
 # offers. This satisfies `sha_pinning_required`, which zizmor audits as `unpinned-uses`.
 #
-# No Dependabot yet, deliberately. It maintains pins by opening pull requests, and this
-# repository is a one-way ShipIt export with no PR-import path, so its output would be
-# unmergeable. Add `.github/dependabot.yml` once that path exists. Until then these are all
-# first-party GitHub actions, so review the pins when one ships a major version.
+# No Dependabot yet, deliberately. It maintains pins by opening pull requests, which this
+# repository cannot accept, so its output would be unmergeable. Add `.github/dependabot.yml`
+# once pull requests can be merged here. Until then these are all first-party GitHub
+# actions, so review the pins when one ships a major version.
 name: wheels
 
 on:
   workflow_dispatch:
     inputs:
       distribution:
-        description: 'Wheel to build (superdex_python selects superdex-physics)'
+        description: 'Artifact set (pure includes the separate SuperDex Lab sdist)'
         type: choice
         default: all
         options:
@@ -79,9 +79,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Matches third-party/pypi/cibuildwheel in fbsource, so CI and an internal build resolve the
-  # same tool. Bump both together.
+  # Pin cibuildwheel so this workflow and any other build of this project resolve the same
+  # tool. Keep this version in sync with the one used elsewhere in the source tree.
   CIBUILDWHEEL_VERSION: 4.1.1
+  # Build once against the oldest supported CPython. The resulting binding wheels use abi3;
+  # the verification matrix below installs the same artifacts on every supported minor.
   PYTHON_VERSION: '3.12'
 
 jobs:
@@ -252,7 +254,7 @@ jobs:
         run: python -m pip install --upgrade pip build
 
       # Platform-independent, so one job builds them and all three verify jobs consume them.
-      - name: Build
+      - name: Build wheels
         shell: bash
         run: |
           python tools/build_wheels.py \
@@ -260,10 +262,31 @@ jobs:
             --only superdex_lab \
             --only superdex_meta
 
+      - name: Build the SuperDex Lab source distribution
+        shell: bash
+        run: python -m build --sdist --outdir lab-sdist superdex_lab
+      - name: Check the SuperDex Lab artifacts
+        shell: bash
+        run: |
+          shopt -s nullglob
+          lab_wheels=(wheelhouse/superdex_lab-*.whl)
+          lab_sdists=(lab-sdist/superdex_lab-*.tar.gz)
+          if (( ${#lab_wheels[@]} != 1 || ${#lab_sdists[@]} != 1 )); then
+            echo "::error::expected one SuperDex Lab wheel and sdist; found ${#lab_wheels[@]} and ${#lab_sdists[@]}"
+            exit 1
+          fi
+          PYTHONPATH="$PWD/superdex_lab" python -m test.packaging.check_artifacts \
+            --wheel "${lab_wheels[0]}" \
+            --sdist "${lab_sdists[0]}"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: wheel-pure
           path: wheelhouse/*.whl
+          if-no-files-found: error
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: sdist-superdex-lab
+          path: lab-sdist/*.tar.gz
           if-no-files-found: error
 
   # Every wheel the run produced, flat, in one artifact, so `pip install --find-links` can be
@@ -299,7 +322,7 @@ jobs:
           if-no-files-found: error
 
   verify:
-    name: verify · ${{ matrix.os }}
+    name: verify · ${{ matrix.os }} · Python ${{ matrix.python }}
     needs: [plan, native, pure]
     # `always()` because the default is to skip a dependent job when any leg of a dependency
     # fails, and each verify leg only consumes its own platform's wheels -- a red Windows build
@@ -315,12 +338,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-22.04, macos-26, windows-2022]
+        python: ['3.12', '3.13', '3.14']
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ matrix.python }}
 
       # `check_wheels.py` prints `auditwheel show` for each native wheel, and silently skips it
       # when auditwheel is absent -- which it was on every run before this, so the linkage report

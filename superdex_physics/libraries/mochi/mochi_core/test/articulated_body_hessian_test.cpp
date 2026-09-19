@@ -98,10 +98,101 @@ struct ArticulatedBodyBundle {
     ApplyRandomDeltaPose();
   }
 
+  ColumnVector<real> RandomColumnVector(int size) {
+    ColumnVector<real> result(size);
+    SetRandom(generator, -1_r, 1_r, result.GetSpan());
+    return result;
+  }
+
   ColumnVector<real> GetRandomDof() {
-    ColumnVector<real> deltaReduced(props.reducedDofsDim);
-    SetRandom(generator, -1_r, 1_r, deltaReduced.GetSpan());
-    return deltaReduced;
+    return RandomColumnVector(props.reducedDofsDim);
+  }
+
+  RowMatrix<real> ComputeJacobian() const {
+    RowMatrix<real> result(props.fullDofsDim, props.reducedDofsDim);
+    Jacobian(
+        jointTypes,
+        parents,
+        jointAxes,
+        dofInfo,
+        restTransforms,
+        worldFromRoot,
+        jointTransforms,
+        linkTransforms,
+        result);
+    return result;
+  }
+
+  ArticulatedHessian ComputeHessian(RowMatrixView<real const> jacobian) const {
+    ArticulatedHessian result(
+        props.reducedDofsDim, RowMatrix<real>(props.fullDofsDim, props.reducedDofsDim));
+    Hessian(
+        dofInfo,
+        jointAxes,
+        parents,
+        restTransforms,
+        worldFromRoot,
+        jointTransforms,
+        linkTransforms,
+        jacobian,
+        result);
+    return result;
+  }
+
+  RowMatrix<real> ContractHessian(
+      Span<real const> contractedVector,
+      RowMatrixView<real const> jacobian) const {
+    RowMatrix<real> result = RowMatrix<real>::Zero(props.reducedDofsDim, props.reducedDofsDim);
+    HessianContract(
+        dofInfo,
+        jointAxes,
+        parents,
+        restTransforms,
+        worldFromRoot,
+        jointTransforms,
+        linkTransforms,
+        contractedVector,
+        jacobian,
+        result);
+    return result;
+  }
+
+  void AddHessianDoubleContract(
+      Span<real const> contractedVector,
+      RowMatrixView<real const> jacobian,
+      Span<real const> reducedVector,
+      ColumnVectorView<real> out) const {
+    HessianDoubleContract(
+        dofInfo,
+        jointAxes,
+        parents,
+        restTransforms,
+        worldFromRoot,
+        jointTransforms,
+        linkTransforms,
+        contractedVector,
+        jacobian,
+        reducedVector,
+        out);
+  }
+
+  void AddJacobianDerivativeDoubleContract(
+      Span<real const> contractedVector,
+      RowMatrixView<real const> jacobian,
+      Span<real const> reducedVector,
+      ColumnVectorView<real> out) const {
+    JacobianDerivativeDoubleContract(
+        dofInfo,
+        jointAxes,
+        parents,
+        restTransforms,
+        worldFromRoot,
+        jointTransforms,
+        linkTransforms,
+        contractedVector,
+        jacobian,
+        reducedVector,
+        out);
   }
 
   void ApplyRandomDeltaPose() {
@@ -130,6 +221,16 @@ struct ArticulatedBodyBundle {
     return props.reducedDofsDim * props.reducedDofsDim * props.numLinks * RigidSize::kDAll;
   }
 };
+
+static void ExpectVectorsNear(
+    ColumnVectorView<real const> expected,
+    ColumnVectorView<real const> actual,
+    real tolerance) {
+  ASSERT_EQ(expected.Rows(), actual.Rows());
+  for (int i = 0; i < expected.Rows(); ++i) {
+    EXPECT_NEAR_TOL(expected[i], actual[i], tolerance);
+  }
+}
 
 /*************************************************************************************************/
 static void FlatVector(
@@ -360,17 +461,7 @@ TEST(ArticulatedBody, FlatJacobian_Zero) {
       flatJacobian);
 
   // Normal Jacobian
-  RowMatrix<real> jacobian(bundle.props.fullDofsDim, bundle.props.reducedDofsDim);
-  Jacobian(
-      bundle.jointTypes,
-      bundle.parents,
-      bundle.jointAxes,
-      bundle.dofInfo,
-      bundle.restTransforms,
-      bundle.worldFromRoot,
-      bundle.jointTransforms,
-      bundle.linkTransforms,
-      jacobian);
+  RowMatrix<real> jacobian = bundle.ComputeJacobian();
 
   // Compare
   real tol = sizeof(real) == sizeof(float) ? 1e-2_r : 1e-3_r;
@@ -393,31 +484,8 @@ TEST(ArticulatedBody, Hessian_Consistency) {
       RowMatrix<real>(bundle.props.fullDofsDim, bundle.props.reducedDofsDim));
   HessianFD(bundle, hessianFD);
 
-  // Hessian
-  RowMatrix<real> jacobian(bundle.props.fullDofsDim, bundle.props.reducedDofsDim);
-  ArticulatedHessian hessian(
-      bundle.props.reducedDofsDim,
-      RowMatrix<real>(bundle.props.fullDofsDim, bundle.props.reducedDofsDim));
-  Jacobian(
-      bundle.jointTypes,
-      bundle.parents,
-      bundle.jointAxes,
-      bundle.dofInfo,
-      bundle.restTransforms,
-      bundle.worldFromRoot,
-      bundle.jointTransforms,
-      bundle.linkTransforms,
-      jacobian);
-  Hessian(
-      bundle.dofInfo,
-      bundle.jointAxes,
-      bundle.parents,
-      bundle.restTransforms,
-      bundle.worldFromRoot,
-      bundle.jointTransforms,
-      bundle.linkTransforms,
-      jacobian,
-      hessian);
+  RowMatrix<real> jacobian = bundle.ComputeJacobian();
+  ArticulatedHessian hessian = bundle.ComputeHessian(jacobian);
 
   real tol = sizeof(real) == sizeof(float) ? 1e-1_r : 1e-3_r;
   for (int d = 0; d < bundle.props.fullDofsDim; d++) {
@@ -443,30 +511,8 @@ TEST(ArticulatedBody, Hessian_Contract) {
   CreateComplexBody(bundle);
 
   // Hessian
-  RowMatrix<real> jacobian(bundle.props.fullDofsDim, bundle.props.reducedDofsDim);
-  ArticulatedHessian hessian(
-      bundle.props.reducedDofsDim,
-      RowMatrix<real>(bundle.props.fullDofsDim, bundle.props.reducedDofsDim));
-  Jacobian(
-      bundle.jointTypes,
-      bundle.parents,
-      bundle.jointAxes,
-      bundle.dofInfo,
-      bundle.restTransforms,
-      bundle.worldFromRoot,
-      bundle.jointTransforms,
-      bundle.linkTransforms,
-      jacobian);
-  Hessian(
-      bundle.dofInfo,
-      bundle.jointAxes,
-      bundle.parents,
-      bundle.restTransforms,
-      bundle.worldFromRoot,
-      bundle.jointTransforms,
-      bundle.linkTransforms,
-      jacobian,
-      hessian);
+  RowMatrix<real> jacobian = bundle.ComputeJacobian();
+  ArticulatedHessian hessian = bundle.ComputeHessian(jacobian);
 
   // Randomize contract data
   ColumnVector<real> contractedVector(bundle.props.numLinks * RigidSize::kDAll);
@@ -495,8 +541,7 @@ TEST(ArticulatedBody, Hessian_Contract) {
       bundle.linkTransforms,
       contractedVector,
       jacobian,
-      hessianContracted,
-      ColumnVectorView<real>());
+      hessianContracted);
 
   // Compare
   real tol = sizeof(real) == sizeof(float) ? 1e-1_r : 1e-3_r;
@@ -507,29 +552,138 @@ TEST(ArticulatedBody, Hessian_Contract) {
   }
 }
 
-// Check the contracted Gradient using two methods
-TEST(ArticulatedBody, Fast_Gradient_Contract) {
+TEST(ArticulatedBody, Hessian_DoubleContract) {
   ArticulatedBodyBundle bundle;
   CreateComplexBody(bundle);
 
-  // Hessian
-  RowMatrix<real> jacobian(bundle.props.fullDofsDim, bundle.props.reducedDofsDim);
-  Jacobian(
-      bundle.jointTypes,
-      bundle.parents,
-      bundle.jointAxes,
-      bundle.dofInfo,
-      bundle.restTransforms,
-      bundle.worldFromRoot,
-      bundle.jointTransforms,
-      bundle.linkTransforms,
-      jacobian);
+  RowMatrix<real> jacobian = bundle.ComputeJacobian();
+  ArticulatedHessian hessian = bundle.ComputeHessian(jacobian);
+
+  ColumnVector<real> contractedVector = bundle.RandomColumnVector(bundle.props.fullDofsDim);
+  ColumnVector<real> reducedVector = bundle.RandomColumnVector(bundle.props.reducedDofsDim);
+  ColumnVector<real> expected = bundle.RandomColumnVector(bundle.props.reducedDofsDim);
+  ColumnVector<real> seed = expected.Duplicate();
+  ColumnVector<real> result = seed.Duplicate();
+
+  for (int d = 0; d < bundle.props.fullDofsDim; ++d) {
+    for (int i = 0; i < bundle.props.reducedDofsDim; ++i) {
+      for (int j = 0; j < bundle.props.reducedDofsDim; ++j) {
+        expected[j] += contractedVector[d] * hessian[j](d, i) * reducedVector[i];
+      }
+    }
+  }
+
+  bundle.AddHessianDoubleContract(contractedVector, jacobian, reducedVector, result);
+
+  RowMatrix<real> hessianContracted = bundle.ContractHessian(contractedVector, jacobian);
+  ColumnVector<real> fromMatrix = hessianContracted.Transpose() * reducedVector;
+
+  real const bruteForceTolerance = sizeof(real) == sizeof(float) ? 1e-1_r : 1e-3_r;
+  real const sameKernelTolerance = sizeof(real) == sizeof(float) ? 1e-5_r : 1e-12_r;
+  for (int i = 0; i < bundle.props.reducedDofsDim; ++i) {
+    EXPECT_NEAR_TOL(expected[i], result[i], bruteForceTolerance);
+    EXPECT_NEAR_RTOL(result[i] - seed[i], fromMatrix[i], sameKernelTolerance);
+  }
+}
+
+TEST(ArticulatedBody, JacobianDerivative_DoubleContract) {
+  ArticulatedBodyBundle bundle;
+  CreateComplexBody(bundle);
+
+  RowMatrix<real> jacobian = bundle.ComputeJacobian();
+
+  ColumnVector<real> contractedVector = bundle.RandomColumnVector(bundle.props.fullDofsDim);
+  ColumnVector<real> reducedVector = bundle.RandomColumnVector(bundle.props.reducedDofsDim);
+  ColumnVector<real> expected = bundle.RandomColumnVector(bundle.props.reducedDofsDim);
+  ColumnVector<real> result = expected.Duplicate();
+
+  RowMatrix<real> hessianContracted = bundle.ContractHessian(contractedVector, jacobian);
+  expected += hessianContracted.Transpose() * reducedVector;
+  ColumnVector<real> reducedGradient = jacobian.Transpose() * contractedVector;
+
+  ColumnVector<real> linkVelocity = jacobian * reducedVector;
+  ColumnVector<real> outputTransportVector(bundle.props.fullDofsDim);
+  outputTransportVector.SetZero();
+  for (int link = 0; link < bundle.props.numLinks; ++link) {
+    int const offset = link * RigidSize::kDAll + RigidSize::kDTrans;
+    Real3 const omega{linkVelocity[offset], linkVelocity[offset + 1], linkVelocity[offset + 2]};
+    Real3 const lambda{
+        contractedVector[offset], contractedVector[offset + 1], contractedVector[offset + 2]};
+    Real3 const correction = 0.5_r * Cross(omega, lambda);
+    outputTransportVector.MiddleRows(offset, RigidSize::kDRot) = AsView(correction);
+  }
+  expected += jacobian.Transpose() * outputTransportVector;
+
+  for (auto const& jointDofs : bundle.dofInfo) {
+    if (jointDofs.rotSize != RigidSize::kDRot) {
+      continue;
+    }
+    int const offset = jointDofs.GetRotOffset();
+    Real3 const velocity{
+        reducedVector[offset], reducedVector[offset + 1], reducedVector[offset + 2]};
+    Real3 const gradient{
+        reducedGradient[offset], reducedGradient[offset + 1], reducedGradient[offset + 2]};
+    Real3 const correction = 0.5_r * Cross(velocity, gradient);
+    expected.MiddleRows(offset, RigidSize::kDRot) -= AsView(correction);
+  }
+
+  bundle.AddJacobianDerivativeDoubleContract(contractedVector, jacobian, reducedVector, result);
+
+  real const tol = sizeof(real) == sizeof(float) ? 1e-2_r : 1e-6_r;
+  ExpectVectorsNear(expected, result, tol);
+}
+
+TEST(ArticulatedBody, JacobianDerivative_DoubleContract_FiniteDifference) {
+  ArticulatedBodyBundle bundle;
+  CreateComplexBody(bundle);
+
+  RowMatrix<real> jacobian = bundle.ComputeJacobian();
+
+  ColumnVector<real> contractedVector = bundle.RandomColumnVector(bundle.props.fullDofsDim);
+  ColumnVector<real> reducedVector = bundle.RandomColumnVector(bundle.props.reducedDofsDim);
+  ColumnVector<real> result = bundle.RandomColumnVector(bundle.props.reducedDofsDim);
+  ColumnVector<real> expected = result.Duplicate();
+
+  bundle.AddJacobianDerivativeDoubleContract(contractedVector, jacobian, reducedVector, result);
+
+  real const eps = sizeof(real) == sizeof(float) ? 1e-3_r : 1e-5_r;
+  for (int j = 0; j < bundle.props.reducedDofsDim; ++j) {
+    ColumnVector<real> deltaPositive(bundle.props.reducedDofsDim);
+    ColumnVector<real> deltaNegative(bundle.props.reducedDofsDim);
+    deltaPositive.SetZero();
+    deltaNegative.SetZero();
+    deltaPositive[j] = eps;
+    deltaNegative[j] = -eps;
+
+    ArticulatedBodyBundle bundlePositive = bundle;
+    ArticulatedBodyBundle bundleNegative = bundle;
+    bundlePositive.ApplyRandomDeltaPose(deltaPositive);
+    bundleNegative.ApplyRandomDeltaPose(deltaNegative);
+
+    RowMatrix<real> jacobianPositive = bundlePositive.ComputeJacobian();
+    RowMatrix<real> jacobianNegative = bundleNegative.ComputeJacobian();
+
+    RowMatrix<real> jacobianDerivative = jacobianPositive - jacobianNegative;
+    jacobianDerivative /= 2_r * eps;
+    ColumnVector<real> velocityDerivative = jacobianDerivative * reducedVector;
+    for (int d = 0; d < bundle.props.fullDofsDim; ++d) {
+      expected[j] += contractedVector[d] * velocityDerivative[d];
+    }
+  }
+
+  real const tol = sizeof(real) == sizeof(float) ? 1e-2_r : 1e-5_r;
+  ExpectVectorsNear(expected, result, tol);
+}
+
+TEST(ArticulatedBody, Jacobian_TransposeContract) {
+  ArticulatedBodyBundle bundle;
+  CreateComplexBody(bundle);
+
+  RowMatrix<real> jacobian = bundle.ComputeJacobian();
 
   // Randomize contract data
-  ColumnVector<real> contractedVector(bundle.props.numLinks * RigidSize::kDAll);
-  ColumnVector<real> gradientContractedBF(bundle.props.reducedDofsDim);
-  SetRandom(bundle.generator, -1_r, 1_r, contractedVector.GetSpan());
-  SetRandom(bundle.generator, -1_r, 1_r, gradientContractedBF.GetSpan());
+  ColumnVector<real> contractedVector = bundle.RandomColumnVector(bundle.props.fullDofsDim);
+  ColumnVector<real> gradientContractedBF = bundle.RandomColumnVector(bundle.props.reducedDofsDim);
 
   // Contract brute-force
   ColumnVector<real> gradientContracted = gradientContractedBF.Duplicate();
@@ -539,23 +693,16 @@ TEST(ArticulatedBody, Fast_Gradient_Contract) {
     }
   }
 
-  // Contract using adjoint method
-  HessianContract(
+  // Contract using the articulated reverse pass.
+  JacobianTransposeContract(
       bundle.dofInfo,
-      bundle.jointAxes,
       bundle.parents,
-      bundle.restTransforms,
-      bundle.worldFromRoot,
-      bundle.jointTransforms,
       bundle.linkTransforms,
       contractedVector,
       jacobian,
-      RowMatrixView<real>(),
       gradientContracted);
 
   // Compare
   real tol = sizeof(real) == sizeof(float) ? 1e-1_r : 1e-3_r;
-  for (int i = 0; i < bundle.props.reducedDofsDim; i++) {
-    EXPECT_NEAR_TOL(gradientContractedBF[i], gradientContracted[i], tol);
-  }
+  ExpectVectorsNear(gradientContractedBF, gradientContracted, tol);
 }

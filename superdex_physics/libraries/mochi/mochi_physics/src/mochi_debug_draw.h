@@ -18,6 +18,7 @@
 
 #include "mochi_ecs.h"
 
+#include <mochi_core/utils/dynamic_array.h>
 #include <mochi_physics/mochi_physics.h>
 
 #include <functional>
@@ -240,5 +241,20 @@ inline void DebugDrawInternal::RegisterSystem(
         MakeSpan(onExcludedObservers));
   }
 }
+
+// Register every DebugDrawSystem on the given DebugDrawInternal. Implemented in
+// mochi_debug_draw_systems.cpp. Ends with a call to FinalizeSystems.
+void RegisterDebugDrawSystems(DebugDrawInternal& debugDraw);
+
+// Name and description of one debug draw feature.
+struct DebugDrawFeatureInfo {
+  std::string name;
+  std::string description;
+};
+
+// Return the debug draw feature catalog, in the same order that every Scene's DebugDraw reports
+// it. Registration is unconditional and sorted by name, so the catalog is identical for all
+// scenes and can be obtained without one.
+DynamicArray<DebugDrawFeatureInfo> GetDebugDrawFeatureCatalog();
 
 } // namespace mochi

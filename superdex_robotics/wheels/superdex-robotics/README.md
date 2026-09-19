@@ -10,12 +10,12 @@ Provides the `superdex.robotics` package: robot loading, compositing, control, a
 pip install superdex-robotics
 ```
 
-This wheel carries the single-precision native extension. For double precision, install the
-`double` extra -- which pulls in `superdex-robotics-fp64` -- and select it at import time:
+This wheel carries the FP32 native extension. For FP64, install the `fp64` extra -- which
+pulls in `superdex-robotics-fp64` -- and select it at import time:
 
 ```bash
-pip install 'superdex-robotics[double]'
-export SUPERDEX_PRECISION=double
+pip install 'superdex-robotics[fp64]'
+export SUPERDEX_PRECISION=fp64
 ```
 
 See the [repository README](https://github.com/facebookresearch/project_superdex#readme)

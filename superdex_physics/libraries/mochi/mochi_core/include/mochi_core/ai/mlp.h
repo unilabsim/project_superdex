@@ -108,6 +108,37 @@ struct ReLUActivation {
   }
 };
 
+/*
+ * f(z) = z * sigmoid(z) = z / (1 + exp(-z))
+ */
+template <typename T>
+struct SiLUActivation {
+  MOCHI_FORCE_INLINE void operator()(T& z) const {
+    z = z / (T(1) + std::exp(-z));
+  }
+
+  template <int N>
+  MOCHI_FORCE_INLINE void operator()(Simd<T, N>& z) const {
+    static_assert(Simd<T, N>::kIsSupported);
+    z = z / (Simd<T, N>(1) + Exp(-z));
+  }
+
+  MOCHI_FORCE_INLINE void operator()(T& z, T& dfdz) const {
+    T const sigmoid = T(1) / (T(1) + std::exp(-z));
+    dfdz = sigmoid * (T(1) + z * (T(1) - sigmoid));
+    z = z * sigmoid;
+  }
+
+  template <int N>
+  MOCHI_FORCE_INLINE void operator()(Simd<T, N>& z, Simd<T, N>& dfdz) const {
+    static_assert(Simd<T, N>::kIsSupported);
+    Simd<T, N> const one(1);
+    Simd<T, N> const sigmoid = one / (one + Exp(-z));
+    dfdz = sigmoid * (one + z * (one - sigmoid));
+    z = z * sigmoid;
+  }
+};
+
 namespace details {
 
 template <typename T, typename SimdFunctor, typename ScalarFunctor>
@@ -247,7 +278,8 @@ void ActivationInPlace(ActivationFunctor const& f, Input&& Z, ActivationDerivati
 }
 
 template <typename T>
-using AnyActivation = std::variant<IdentityActivation<T>, ELUActivation<T>, ReLUActivation<T>>;
+using AnyActivation =
+    std::variant<IdentityActivation<T>, ELUActivation<T>, ReLUActivation<T>, SiLUActivation<T>>;
 
 } // namespace details
 
@@ -381,6 +413,9 @@ class MlpLayer {
         break;
       case 2:
         details::ActivationInPlace(std::get<2>(_activation), Y, std::forward<Args>(args)...);
+        break;
+      case 3:
+        details::ActivationInPlace(std::get<3>(_activation), Y, std::forward<Args>(args)...);
         break;
       default:
         MOCHI_ASSERT(false, "Unsupported activation type.");

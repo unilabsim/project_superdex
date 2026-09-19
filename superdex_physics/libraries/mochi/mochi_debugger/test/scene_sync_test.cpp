@@ -120,6 +120,28 @@ class SceneSyncTest : public MochiDebuggerTest {
     return experimental::CreateRodActor(scene, params, test::ExpectOK{})->GetHandle();
   }
 
+  ActorHandle CreateActorWithContactSkinOnly(Scene* scene) {
+    ModelData model;
+    model.mesh.emplace();
+    model.mesh->nodesPerElement = 2;
+    model.mesh->coordinates = {0_r, 0_r, 0_r, 1_r, 0_r, 0_r};
+    model.mesh->connectivity = {0, 1};
+    model.elementFrameAxes = {0_r, 1_r, 0_r};
+    model.contactSkinMesh.emplace();
+    model.contactSkinMesh->nodesPerElement = 3;
+    model.contactSkinMesh->coordinates = {0.5_r, 0_r, 0_r, 0.5_r, 0.1_r, 0_r, 0.5_r, 0_r, 0.1_r};
+    model.contactSkinMesh->connectivity = {0, 1, 2};
+    model.contactSkinMesh->skinning.emplace();
+    model.contactSkinMesh->skinning->weightsPerNode = 1;
+    model.contactSkinMesh->skinning->indices = {0, 0, 0};
+    model.contactSkinMesh->skinning->weights = {1_r, 1_r, 1_r};
+
+    experimental::RodActorParams params;
+    params.name = "ContactSkinOnly";
+    params.shape = _context->CreateModelShape(model, test::ExpectOK{});
+    return experimental::CreateRodActor(scene, params, test::ExpectOK{})->GetHandle();
+  }
+
   ActorHandle CreateShellActorWithVisualMesh(Scene* scene) {
     experimental::ShellActorParams params;
     params.name = "ShellVisualMesh";
@@ -336,20 +358,10 @@ class SceneSyncTest : public MochiDebuggerTest {
     _client->SetSettings(settings);
   }
 
-  static void EnableDebugDrawFeature(Scene* scene, std::string_view name, bool enable) {
-    ASSERT_NE(nullptr, scene);
-    auto& debugDraw = scene->GetDebugDraw();
-    int index = debugDraw.FindFeature(name);
-    ASSERT_LE(0, index);
-    debugDraw.EnableFeature(index, enable);
-    EXPECT_EQ(enable, debugDraw.IsFeatureEnabled(index));
-  }
-
   // Enable debug draw features that depend on the positions of actors.
-  static void EnableActorDebugDraw(Scene* scene) {
-    scene->GetDebugDraw().Enable(true);
-    EnableDebugDrawFeature(scene, "Actor Mesh", true); // Draws lines
-    EnableDebugDrawFeature(scene, "Actor Contact Samples", true); // Draws spheres
+  void EnableActorDebugDraw() {
+    _client->EnableDebugDrawFeature("Actor Mesh", true); // Draws lines
+    _client->EnableDebugDrawFeature("Actor Contact Samples", true); // Draws spheres
   }
 };
 } // namespace
@@ -677,11 +689,11 @@ TEST_F(SceneSyncTest, SyncUpdatesWhenActorMoves) {
   ActorHandle actor = CreateRigidActor(scene);
 
   // Enable debug-draw features whose geometry depends on the actor's pose.
-  EnableActorDebugDraw(scene);
 
   StartServer();
   ConnectClient();
   test::WaitUntil([&] { return ClientHasScene(sceneHandle); });
+  EnableActorDebugDraw();
 
   // Sync both actors and debug draw.
   SceneSyncParams params;
@@ -730,11 +742,11 @@ TEST_F(SceneSyncTest, SyncDebugDraw) {
   Scene* scene = CreateSceneNoGravity();
   SceneHandle sceneHandle = scene->GetHandle();
   CreateRigidActor(scene);
-  EnableActorDebugDraw(scene);
 
   StartServer();
   ConnectClient();
   test::WaitUntil([&] { return ClientHasScene(sceneHandle); });
+  EnableActorDebugDraw();
 
   // Sync debug draw only.
   SceneSyncParams params;
@@ -763,15 +775,39 @@ TEST_F(SceneSyncTest, SyncDebugDraw) {
   EXPECT_EQ(data.spheres.radii.size(), data.spheres.colors.size() / 4);
 }
 
-TEST_F(SceneSyncTest, DisablingCategoryClearsDataSynchronously) {
+TEST_F(SceneSyncTest, SelectingSceneAppliesDebugDrawBeforeInitialSync) {
   Scene* scene = CreateSceneNoGravity();
-  SceneHandle sceneHandle = scene->GetHandle();
-  ActorHandle actor = CreateRigidActor(scene);
-  EnableActorDebugDraw(scene);
+  SceneHandle const sceneHandle = scene->GetHandle();
+  CreateRigidActor(scene);
 
   StartServer();
   ConnectClient();
   test::WaitUntil([&] { return ClientHasScene(sceneHandle); });
+
+  _client->SelectScene({});
+  _client->EnableDebugDrawFeature("Actor Root Transform", true);
+
+  SceneSyncParams params;
+  params.enabled = true;
+  params.syncInterval = 100.0f;
+  params.syncDebugDraw = true;
+  SetSceneSyncParams(params);
+
+  _client->SelectScene(sceneHandle);
+  uint64_t const baseCounter = GetSceneSyncData().counter;
+  auto const data = WaitForSync(scene, baseCounter + 1).debugDraw;
+  EXPECT_FALSE(data.lineVertices.positions.empty());
+}
+
+TEST_F(SceneSyncTest, DisablingCategoryClearsDataSynchronously) {
+  Scene* scene = CreateSceneNoGravity();
+  SceneHandle sceneHandle = scene->GetHandle();
+  ActorHandle actor = CreateRigidActor(scene);
+
+  StartServer();
+  ConnectClient();
+  test::WaitUntil([&] { return ClientHasScene(sceneHandle); });
+  EnableActorDebugDraw();
 
   // Sync both actors and debug draw.
   SceneSyncParams params = ActorSyncParams();
@@ -1080,6 +1116,31 @@ TEST_F(SceneSyncTest, SwitchMeshSourceResendsCompleteMeshesWithoutStepping) {
   EXPECT_GT(
       ExpectActorMeshTopologyMatches(shellHandle, shellActor->GetVisualMesh()),
       shellSurfaceRevision);
+}
+
+TEST_F(SceneSyncTest, ContactSkinOnlyRodSyncsAsSurfaceMesh) {
+  Scene* scene = CreateSceneNoGravity();
+  SceneHandle const sceneHandle = scene->GetHandle();
+  ActorHandle const rodHandle = CreateActorWithContactSkinOnly(scene);
+  Actor* const rod = scene->GetActor(rodHandle);
+  ASSERT_NE(nullptr, rod);
+  ASSERT_TRUE(rod->GetVisualMesh().IsEmpty());
+  ASSERT_FALSE(rod->GetSurfaceMesh().IsEmpty());
+
+  StartServer();
+  ConnectClient();
+  test::WaitUntil([&] { return ClientHasScene(sceneHandle); });
+
+  SetSceneSyncParams(MeshSyncParams());
+  _client->SelectScene(sceneHandle);
+  uint64_t const baseCounter = GetSceneSyncData().counter;
+  WaitForSync(scene, baseCounter + 1);
+  uint64_t const revision = ExpectActorMeshMatches(rodHandle, rod->GetSurfaceMesh());
+  EXPECT_GT(revision, 0);
+
+  scene->Step(kTimeStep);
+  WaitForSync(scene, baseCounter + 2);
+  EXPECT_EQ(revision, ExpectActorMeshTopologyMatches(rodHandle, rod->GetSurfaceMesh()));
 }
 
 TEST_F(SceneSyncTest, SyncActorMeshes) {

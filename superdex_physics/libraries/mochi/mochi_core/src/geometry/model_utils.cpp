@@ -306,9 +306,14 @@ DynamicString mochi::model::SaveToJsonString(ModelData const& data, Error& error
   return DynamicString{json.c_str(), json.size()};
 }
 
-static void
-ValidateSkinning(SkinningDataView const& data, int numNodes, int maxSkinningIndex, Error& error) {
+void mochi::model::ValidateSkinning(
+    SkinningDataView const& data,
+    int numNodes,
+    int numSkinningSources,
+    Error& error) {
   MOCHI_ERROR_RETURN(error);
+  MOCHI_ERROR_IF(numNodes < 1, error, "Skinning must contain at least one node.");
+  MOCHI_ERROR_IF(numSkinningSources < 1, error, "Skinning must use at least one source.");
   MOCHI_ERROR_IF(
       data.weightsPerNode < 1,
       error,
@@ -332,7 +337,7 @@ ValidateSkinning(SkinningDataView const& data, int numNodes, int maxSkinningInde
   MOCHI_ERROR_RETURN(error);
   auto const [minIdx, maxIdx] = MinMax(MakeConstSpan(data.indices));
   MOCHI_ERROR_IF(
-      (minIdx < 0) || (maxIdx > maxSkinningIndex),
+      (minIdx < 0) || (maxIdx >= numSkinningSources),
       error,
       "Mesh skinning contains one or more out-of-bounds indices.");
   MOCHI_ERROR_RETURN(error);
@@ -423,7 +428,7 @@ void mochi::model::ValidatePolylineGeometry(
   }
 }
 
-static void ValidateMesh(MeshDataView const& data, int maxSkinningIndex, Error& error) {
+static void ValidateMesh(MeshDataView const& data, int numSkinningSources, Error& error) {
   MOCHI_ERROR_RETURN(error);
   MOCHI_ERROR_IF(
       data.nodesPerElement != 2 && data.nodesPerElement != 3 && data.nodesPerElement != 4,
@@ -474,7 +479,8 @@ static void ValidateMesh(MeshDataView const& data, int maxSkinningIndex, Error& 
 
   // Skinning
   if (data.skinning) {
-    ValidateSkinning(*data.skinning, data.GetNumNodes(), maxSkinningIndex, error);
+    ValidateSkinning(*data.skinning, data.GetNumNodes(), numSkinningSources, error);
+    MOCHI_ERROR_RETURN(error);
   }
 
   // Additional checks for a polyline mesh
@@ -709,6 +715,20 @@ static void ValidateElementFrameAxes(
       error);
 }
 
+static int GetAuxiliaryMeshNumSkinningSources(std::optional<MeshDataView> const& primaryMesh) {
+  if (!primaryMesh) {
+    return INT_MAX;
+  }
+
+  int const numNodes = primaryMesh->GetNumNodes();
+  if (primaryMesh->nodesPerElement != 2) {
+    return numNodes;
+  }
+
+  bool const isClosedLoop = IsPolylineClosedLoop(*primaryMesh);
+  return isClosedLoop ? numNodes : numNodes - 1;
+}
+
 void mochi::model::Validate(ModelDataView const& data, Error& error) {
   MOCHI_ERROR_RETURN(error);
   int shapeTypesFound = (int)data.box.has_value() + (int)data.plane.has_value() +
@@ -717,27 +737,12 @@ void mochi::model::Validate(ModelDataView const& data, Error& error) {
   MOCHI_ERROR_RETURN(error);
 
   if (data.mesh) {
-    ValidateMesh(*data.mesh, /* maxSkinningIndex */ INT_MAX, error);
+    ValidateMesh(*data.mesh, /* numSkinningSources */ INT_MAX, error);
     MOCHI_ERROR_RETURN(error);
   }
 
   if (data.visualMesh) {
-    MOCHI_ERROR_RETURN(error);
-    // Polyline visual-mesh skinning indices reference *elements*, not *nodes*. An open polyline
-    // has (numNodes - 1) elements; a closed-loop polyline has numNodes elements. For triangular
-    // and tetrahedral simulation meshes, skinning indices reference *nodes*.
-    int maxSkinningIndex = INT_MAX;
-    if (data.mesh) {
-      int const numNodes = data.mesh->GetNumNodes();
-      bool const isPolyline = (data.mesh->nodesPerElement == 2);
-      if (isPolyline) {
-        bool const isClosedLoop = IsPolylineClosedLoop(*data.mesh);
-        maxSkinningIndex = isClosedLoop ? numNodes - 1 : numNodes - 2;
-      } else {
-        maxSkinningIndex = numNodes - 1;
-      }
-    }
-    ValidateMesh(*data.visualMesh, maxSkinningIndex, error);
+    ValidateMesh(*data.visualMesh, GetAuxiliaryMeshNumSkinningSources(data.mesh), error);
     MOCHI_ERROR_IF(
         data.visualMesh->nodesPerElement != 3,
         error,
@@ -745,6 +750,16 @@ void mochi::model::Validate(ModelDataView const& data, Error& error) {
     MOCHI_ERROR_RETURN(error);
   }
 
+  if (data.contactSkinMesh) {
+    MOCHI_ERROR_IF_NOT(data.mesh, error, "Model has a contact skin but no primary mesh.");
+    MOCHI_ERROR_RETURN(error);
+    ValidateMesh(*data.contactSkinMesh, GetAuxiliaryMeshNumSkinningSources(data.mesh), error);
+    MOCHI_ERROR_IF(
+        data.contactSkinMesh->nodesPerElement != 3,
+        error,
+        "Contact skin mesh must have 3 nodes per element (triangles).");
+    MOCHI_ERROR_RETURN(error);
+  }
   if (data.blending) {
     MOCHI_ERROR_IF(!data.mesh, error, "Model has blending data but no simulation mesh.");
     MOCHI_ERROR_RETURN(error);
@@ -859,24 +874,26 @@ static void NormalizeWeights(SkinningData& data, Error& error) {
   }
 }
 
+static void AutoCorrectAuxiliaryMesh(std::optional<MeshData>& mesh, Error& error) {
+  if (!mesh) {
+    return;
+  }
+  if (mesh->connectivity.empty()) {
+    // Some old H5 files have empty auxiliary-mesh groups. Delete meshes like that.
+    mesh = std::nullopt;
+  } else if (mesh->skinning) {
+    NormalizeWeights(*mesh->skinning, error);
+  }
+}
+
 void mochi::model::AutoCorrect(ModelData& data, Error& error) {
   MOCHI_ERROR_RETURN(error);
-  if (data.mesh) {
-    if (data.mesh->skinning) {
-      NormalizeWeights(*data.mesh->skinning, error);
-    }
+  if (data.mesh && data.mesh->skinning) {
+    NormalizeWeights(*data.mesh->skinning, error);
   }
 
-  if (data.visualMesh) {
-    if (data.visualMesh->connectivity.empty()) {
-      // Some old H5 files have empty datasets for the visual mesh. We delete meshes like that.
-      data.visualMesh = std::nullopt;
-    } else {
-      if (data.visualMesh->skinning) {
-        NormalizeWeights(*data.visualMesh->skinning, error);
-      }
-    }
-  }
+  AutoCorrectAuxiliaryMesh(data.visualMesh, error);
+  AutoCorrectAuxiliaryMesh(data.contactSkinMesh, error);
 
   if (data.blending) {
     if (data.blending->empty()) {
@@ -1209,6 +1226,10 @@ static void BakeTransformImpl(ModelData& data, BakeTransformInput const& transfo
     BakeTransformMesh(*data.visualMesh, transform.matrix, error);
   }
 
+  if (data.contactSkinMesh) {
+    BakeTransformMesh(*data.contactSkinMesh, transform.matrix, error);
+  }
+
   if (data.sdf) {
     Error sdfError;
     BakeTransformSdf(*data.sdf, transform.scale, transform.rt, sdfError);
@@ -1251,7 +1272,7 @@ void mochi::model::BakeSdf(ModelData& data, GridSdfParams const& params, Error& 
   // This operation requires a valid mesh
   MOCHI_ERROR_IF(!data.mesh.has_value(), error, "Baking an SDF requires a mesh");
   MOCHI_ERROR_RETURN(error);
-  ValidateMesh(*data.mesh, /* maxSkinningIndex */ INT_MAX, error);
+  ValidateMesh(*data.mesh, /* numSkinningSources */ INT_MAX, error);
   MOCHI_ERROR_RETURN(error);
 
   // Get a triangle mesh from the model data.
@@ -1297,8 +1318,8 @@ void mochi::model::GenerateVisualMeshEmbedding(ModelData& data, Error& error) {
       error,
       "GenerateVisualMeshEmbedding requires a visual mesh with coordinates.");
   MOCHI_ERROR_RETURN(error);
-  ValidateMesh(*data.mesh, /* maxSkinningIndex */ INT_MAX, error);
-  ValidateMesh(*data.visualMesh, /* maxSkinningIndex */ INT_MAX, error);
+  ValidateMesh(*data.mesh, /* numSkinningSources */ INT_MAX, error);
+  ValidateMesh(*data.visualMesh, /* numSkinningSources */ INT_MAX, error);
   MOCHI_ERROR_RETURN(error);
 
   auto const tetCoords = Unflatten<Real3 const>(MakeConstSpan(data.mesh->coordinates));
@@ -1378,6 +1399,9 @@ void mochi::model::FlipWindingOrder(ModelData& data, Error& error) {
   }
   if (data.visualMesh) {
     FlipWindingOrder(*data.visualMesh, error);
+  }
+  if (data.contactSkinMesh) {
+    FlipWindingOrder(*data.contactSkinMesh, error);
   }
 }
 

@@ -84,8 +84,11 @@ static void LoadMeshData(GroupReader& reader, MeshData& outData, Error& error) {
   }
 }
 
-static void
-SaveMeshData(GroupWriter& writer, MeshDataView const& data, bool isVisualMesh, Error& error) {
+static void SaveMeshData(
+    GroupWriter& writer,
+    MeshDataView const& data,
+    char const* skinningGroupName,
+    Error& error) {
   MOCHI_ERROR_IF(
       data.nodesPerElement <= 0, error, "Mesh data must have at least one node per element.");
   MOCHI_ERROR_RETURN(error);
@@ -99,7 +102,7 @@ SaveMeshData(GroupWriter& writer, MeshDataView const& data, bool isVisualMesh, E
     writer.AddDataSet("connectivity", MakeConstSpan(data.connectivity), MakeConstSpan(dims), error);
   }
   if (data.skinning) {
-    auto group = writer.EnterGroup(isVisualMesh ? "embedding" : "skinning", error);
+    auto group = writer.EnterGroup(skinningGroupName, error);
     SaveSkinningData(writer, *data.skinning, error);
   }
 }
@@ -436,6 +439,38 @@ static bool HasExperimentalDataGroups(
   return hasExperimentalData;
 }
 
+static void LoadOptionalMeshData(
+    GroupReader& reader,
+    char const* groupName,
+    std::optional<MeshData>& outData,
+    Error& error) {
+  if (!reader.HasGroup(groupName)) {
+    return;
+  }
+  auto group = reader.EnterGroup(groupName, error);
+  MOCHI_ERROR_RETURN(error);
+  bool const isEmptyGroup = reader.GetDataSetNames(error).empty();
+  MOCHI_ERROR_RETURN(error);
+  if (isEmptyGroup) {
+    return;
+  }
+  outData.emplace();
+  LoadMeshData(reader, *outData, error);
+}
+
+static void SaveOptionalEmbeddedMeshData(
+    GroupWriter& writer,
+    char const* groupName,
+    std::optional<MeshDataView> const& data,
+    Error& error) {
+  if (!data) {
+    return;
+  }
+  auto group = writer.EnterGroup(groupName, error);
+  MOCHI_ERROR_RETURN(error);
+  SaveMeshData(writer, *data, "embedding", error);
+}
+
 static void LoadModelData(GroupReader& reader, ModelData& outData, Error& error) {
   MOCHI_ERROR_RETURN(error);
   outData = {};
@@ -471,18 +506,10 @@ static void LoadModelData(GroupReader& reader, ModelData& outData, Error& error)
     }
   }
 
-  if (reader.HasGroup("visual_mesh")) {
-    auto group = reader.EnterGroup("visual_mesh", error);
-
-    // A number of our assets have an empty group called "visual_mesh". These should be ignored.
-    // If a non-empty visual_mesh fails to load, then we should log about it.
-    bool isEmptyGroup = reader.GetDataSetNames(error).empty();
-    if (!isEmptyGroup) {
-      outData.visualMesh.emplace(MeshData{});
-      LoadMeshData(reader, *outData.visualMesh, error);
-      MOCHI_ERROR_RETURN(error);
-    }
-  }
+  LoadOptionalMeshData(reader, "visual_mesh", outData.visualMesh, error);
+  MOCHI_ERROR_RETURN(error);
+  LoadOptionalMeshData(reader, "contact_skin_mesh", outData.contactSkinMesh, error);
+  MOCHI_ERROR_RETURN(error);
 
   if (reader.HasGroup("sdf")) {
     auto group = reader.EnterGroup("sdf", error);
@@ -527,7 +554,7 @@ static void SaveModelData(GroupWriter& writer, ModelDataView const& data, Error&
 
   if (data.mesh) {
     auto group = writer.EnterGroup("mesh", error);
-    SaveMeshData(writer, *data.mesh, /*isVisualMesh*/ false, error);
+    SaveMeshData(writer, *data.mesh, "skinning", error);
     MOCHI_ERROR_RETURN(error);
     if (data.blending && !data.blending->empty()) {
       auto blendingGroup = writer.EnterGroup("blending", error);
@@ -546,11 +573,10 @@ static void SaveModelData(GroupWriter& writer, ModelDataView const& data, Error&
     }
   }
 
-  if (data.visualMesh) {
-    auto group = writer.EnterGroup("visual_mesh", error);
-    SaveMeshData(writer, *data.visualMesh, /*isVisualMesh*/ true, error);
-    MOCHI_ERROR_RETURN(error);
-  }
+  SaveOptionalEmbeddedMeshData(writer, "visual_mesh", data.visualMesh, error);
+  MOCHI_ERROR_RETURN(error);
+  SaveOptionalEmbeddedMeshData(writer, "contact_skin_mesh", data.contactSkinMesh, error);
+  MOCHI_ERROR_RETURN(error);
 
   if (data.sdf) {
     auto group = writer.EnterGroup("sdf", error);

@@ -132,6 +132,7 @@ class TestCoreTypes(MochiTestBase):
         self.assertEqual(0, a.size())
 
         # Conversion to numpy.array
+        self.assertEqual((0,), np.array(mochi.DynamicArrayInt()).shape)
         a = mochi.DynamicArrayInt([1, 2, 3])
         npa = np.array(a)
         self.assertEqual(3, len(npa))
@@ -167,7 +168,15 @@ class TestCoreTypes(MochiTestBase):
             mochi.DynamicArrayInt([1, 2, 3]), mochi.DynamicArrayInt([1, 2, 4])
         )
 
+        with self.assertRaises(TypeError):
+            mochi.DynamicArrayInt([1, object()])
+        self.assertEqual([4, 5], list(mochi.DynamicArrayInt([4, 5])))
+
         # pickle serialization
+        self.assertEqual(
+            mochi.DynamicArrayInt(),
+            pickle.loads(pickle.dumps(mochi.DynamicArrayInt())),
+        )
         a = mochi.DynamicArrayInt([1, 2, 3])
         serialized_data = pickle.dumps(a)
         a2 = pickle.loads(serialized_data)

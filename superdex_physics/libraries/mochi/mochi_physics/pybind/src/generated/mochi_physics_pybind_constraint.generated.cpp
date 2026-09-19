@@ -18,25 +18,25 @@
 
 // clang-format off
 
-#include <pybind11/pybind11.h>
+#include <limits>
+#include <nanobind/nanobind.h>
 #include "../pybind_include.h"
 
 using namespace mochi;
-namespace py = pybind11;
-using namespace pybind11::literals;
+namespace nb = nanobind;
 
 namespace mochi {
   // Forward declarations for the definitions below.
-  void DeclareMochiPhysics_MochiPhysicsConstraint(py::module_& m, PybindRegistry& registry);
-  void DefineMochiPhysics_MochiPhysicsConstraint(py::module_& m, PybindRegistry& registry);
+  void DeclareMochiPhysics_MochiPhysicsConstraint(nb::module_& m, PybindRegistry& registry);
+  void DefineMochiPhysics_MochiPhysicsConstraint(nb::module_& m, PybindRegistry& registry);
 } // namespace mochi
 
-void mochi::DeclareMochiPhysics_MochiPhysicsConstraint([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
-  registry.StoreClass(py::class_<mochi::Constraint, std::unique_ptr<mochi::Constraint, py::nodelete>>(m, "Constraint", "Represents a constraint that restricts the degrees of freedom of one or more\nactors.\n\nConstraints enforce relationships between actor degrees of freedom (DoFs), such\nas fixing positions, limiting joint angles, or tracking target poses. They apply\nforces to maintain desired configurations using spring-damper mechanics\ncontrolled by stiffness and damping parameters.\n\nNote:\n    Each constraint belongs to exactly one scene.\n\nNote:\n    Each constraint acts on the degrees of freedom of one or more actors.\n\nNote:\n    The type of constraint determines which methods are applicable.\n\nWarning:\n    Concurrent access to a constraint is illegal."));
+void mochi::DeclareMochiPhysics_MochiPhysicsConstraint([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+  registry.StoreClass(nb::class_<mochi::Constraint>(m, "Constraint", "Represents a constraint that restricts the degrees of freedom of one or more\nactors.\n\nConstraints enforce relationships between actor degrees of freedom (DoFs), such\nas fixing positions, limiting joint angles, or tracking target poses. They apply\nforces to maintain desired configurations using spring-damper mechanics\ncontrolled by stiffness and damping parameters.\n\nNote:\n    Each constraint belongs to exactly one scene.\n\nNote:\n    Each constraint acts on the degrees of freedom of one or more actors.\n\nNote:\n    The type of constraint determines which methods are applicable.\n\nWarning:\n    Concurrent access to a constraint is illegal.", nb::never_destruct()));
 }
 
-void mochi::DefineMochiPhysics_MochiPhysicsConstraint([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
-  registry.GetClass<mochi::Constraint, std::unique_ptr<mochi::Constraint, py::nodelete>>()
+void mochi::DefineMochiPhysics_MochiPhysicsConstraint([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+  registry.GetClass<mochi::Constraint>()
     .def("get_type", &mochi::Constraint::GetType
       , "Get the type of the constraint.\n\nReturns:\n    Type of the constraint.\n\nNote:\n    Some methods are only valid for certain constraint types.\n\nSee Also:\n    :class:`~superdex.physics.ConstraintType`"
     )
@@ -53,7 +53,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsConstraint([[maybe_unused]] py::modul
         throw MochiErrorException(error);
       }
     }
-      , py::arg("stiffness")
+      , nb::arg("stiffness")
       , "Set the constraint's stiffness parameter.\n\nArgs:\n    stiffness (float): Stiffness value. [N/m] for translation constraints,\n        [N·m/rad] for rotation constraints. Must be non-negative and finite.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :meth:`~superdex.physics.Constraint.get_stiffness`,\n    :meth:`~superdex.physics.Constraint.set_damping`,\n    :meth:`~superdex.physics.Constraint.set_saturation`"
     )
     .def("get_damping", &mochi::Constraint::GetDamping
@@ -66,7 +66,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsConstraint([[maybe_unused]] py::modul
         throw MochiErrorException(error);
       }
     }
-      , py::arg("damping")
+      , nb::arg("damping")
       , "Set the constraint's damping parameter.\n\nArgs:\n    damping (float): Damping value. [N·s/m] for translation constraints,\n        [N·m·s/rad] for rotation constraints. Must be non-negative and finite.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nSee Also:\n    :meth:`~superdex.physics.Constraint.get_damping`,\n    :meth:`~superdex.physics.Constraint.set_stiffness`,\n    :meth:`~superdex.physics.Constraint.set_saturation`"
     )
     .def("get_saturation", &mochi::Constraint::GetSaturation
@@ -79,7 +79,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsConstraint([[maybe_unused]] py::modul
         throw MochiErrorException(error);
       }
     }
-      , py::arg("saturation")
+      , nb::arg("saturation")
       , "Set the constraint's saturation parameter.\n\nArgs:\n    saturation (float): Saturation distance [m] for translation constraints or\n        angle [rad] for rotation constraints, or any negative value to disable\n        saturation. Must be finite and non-zero.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    A positive value smoothly limits the magnitude of the elastic (stiffness)\n    contribution to stiffness * saturation. The damping contribution is separate\n    and is not limited by saturation.\n\nSee Also:\n    :meth:`~superdex.physics.Constraint.get_saturation`,\n    :meth:`~superdex.physics.Constraint.set_stiffness`,\n    :meth:`~superdex.physics.Constraint.set_damping`"
     )
     .def("get_deviation", &mochi::Constraint::GetDeviation
@@ -98,12 +98,13 @@ void mochi::DefineMochiPhysics_MochiPhysicsConstraint([[maybe_unused]] py::modul
     .def("get_num_actors", &mochi::Constraint::GetNumActors
       , "Get the number of actors affected by the constraint.\n\nReturns:\n    Number of actors affected by the constraint."
     )
-    .def("get_actor", py::overload_cast<int>(&mochi::Constraint::GetActor)
-      , py::arg("actor_index")
+    .def("get_actor", nb::overload_cast<int>(&mochi::Constraint::GetActor)
+      , nb::arg("actor_index")
       , "Get one of the actors affected by this constraint.\n\nArgs:\n    actor_index (int): Actor index in the range [0,\n        :meth:`~superdex.physics.Constraint.get_num_actors`).\n\nReturns:\n    Pointer to the actor.\n\nSee Also:\n    :meth:`~superdex.physics.Constraint.get_num_actors`"
+      , nb::rv_policy::reference
     )
     .def("get_dof_indices_for_actor", &mochi::Constraint::GetDofIndicesForActor
-      , py::arg("actor_index")
+      , nb::arg("actor_index")
       , "Get the degrees of freedom (DoF) indices affected by this constraint on a\nspecific actor.\n\nArgs:\n    actor_index (int): Actor index in the range [0,\n        :meth:`~superdex.physics.Constraint.get_num_actors`).\n\nReturns:\n    Span of DoF indices for the specified actor.\n\nSee Also:\n    :meth:`~superdex.physics.Constraint.get_num_actors`,\n    :meth:`~superdex.physics.Constraint.get_actor`"
     )
     .def("set_target_position", [](mochi::Constraint& self, mochi::Real3 const& position) {
@@ -113,7 +114,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsConstraint([[maybe_unused]] py::modul
         throw MochiErrorException(error);
       }
     }
-      , py::arg("position")
+      , nb::arg("position")
       , "Set the constraint's target position in world frame.\n\nArgs:\n    position (Real3Like): Target position [m] in world frame. Must be finite.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to position-target constraints: :class:`RIGID_PIVOT_POSITION\n    <superdex.physics.ConstraintType>`, :class:`DEFORMABLE_NODE_POSITION\n    <superdex.physics.ConstraintType>`, and :class:`RIGID_PIVOT_TO_RIGID_TARGET\n    <superdex.physics.ConstraintType>`. For :class:`RIGID_PIVOT_TO_RIGID_TARGET\n    <superdex.physics.ConstraintType>`, this updates only the translation of the\n    target center-of-mass transform.\n\nNote:\n    Also affects target velocity, which depends on the difference between\n    current and old target position.\n\nSee Also:\n    :meth:`~superdex.physics.Constraint.set_target_rotation`,\n    :meth:`~superdex.physics.Constraint.set_target_dof`"
     )
     .def("set_target_rotation", [](mochi::Constraint& self, mochi::Quaternion const& rotation) {
@@ -123,7 +124,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsConstraint([[maybe_unused]] py::modul
         throw MochiErrorException(error);
       }
     }
-      , py::arg("rotation")
+      , nb::arg("rotation")
       , "Set the constraint's target rotation.\n\nThe target is interpreted according to the constraint type. For\n:class:`RIGID_PIVOT_ROTATION <superdex.physics.ConstraintType>`, it is the\ntarget pivot-frame rotation in world coordinates. For\n:class:`RIGID_PIVOT_TO_RIGID_TARGET <superdex.physics.ConstraintType>`, it is\nthe rotation of the target center-of-mass transform in world coordinates. For\n:class:`ARTICULATED3D_ROTATION_TARGET <superdex.physics.ConstraintType>`, it is\nthe target joint-local rotation. For :class:`JOINT_ROTATION_TRACKING\n<superdex.physics.ConstraintType>`, it is the target rotation of\n:attr:`~superdex.physics.JointRotationTrackingConstraintParams.actor_b` relative\nto :attr:`~superdex.physics.JointRotationTrackingConstraintParams.actor_a`. For\n:class:`ROD_ELEMENT_ROTATION_TO_RIGID <superdex.physics.ConstraintType>`, it is\nthe target rotation of the constrained rod element relative to the rigid actor.\n\nArgs:\n    rotation (QuaternionLike): Target rotation quaternion [x, y, z, w]. Must be\n        finite and non-zero. Normalized before use.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Also affects target velocity, which depends on the difference between\n    current and old target rotation.\n\nSee Also:\n    :meth:`~superdex.physics.Constraint.set_target_position`,\n    :meth:`~superdex.physics.Constraint.set_target_dof`,\n    :meth:`~superdex.physics.Constraint.set_ref_relative_rotation`"
     )
     .def("set_target_dof", [](mochi::Constraint& self, mochi::real target) {
@@ -133,7 +134,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsConstraint([[maybe_unused]] py::modul
         throw MochiErrorException(error);
       }
     }
-      , py::arg("target")
+      , nb::arg("target")
       , "Set the constraint's target DoF.\n\nArgs:\n    target (float): Target DoF value. Units: [m] for translation DoFs, [rad] for\n        rotation DoFs.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to :class:`ARTICULATED_SINGLE_DOF_TARGET\n    <superdex.physics.ConstraintType>`.\n\nNote:\n    Also affects target velocity, which depends on the difference between\n    current and old target DoF.\n\nSee Also:\n    :meth:`~superdex.physics.Constraint.set_target_position`,\n    :meth:`~superdex.physics.Constraint.set_target_rotation`"
     )
     .def("update_old_target", [](mochi::Constraint& self) {
@@ -152,8 +153,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsConstraint([[maybe_unused]] py::modul
         throw MochiErrorException(error);
       }
     }
-      , py::arg("rotation_a")
-      , py::arg("rotation_b")
+      , nb::arg("rotation_a")
+      , nb::arg("rotation_b")
       , "Set a relative-rotation target from two rotations expressed in a common frame.\n\nSets the target to inverse(``rotation_a``) * ``rotation_b``.\n\nArgs:\n    rotation_a (QuaternionLike): First rotation. Represents\n        :attr:`~superdex.physics.JointRotationTrackingConstraintParams.actor_a`\n        for :class:`JOINT_ROTATION_TRACKING <superdex.physics.ConstraintType>`\n        and the rigid actor for :class:`ROD_ELEMENT_ROTATION_TO_RIGID\n        <superdex.physics.ConstraintType>`. Must be finite and non-zero.\n        Normalized before use.\n    rotation_b (QuaternionLike): Second rotation. Represents\n        :attr:`~superdex.physics.JointRotationTrackingConstraintParams.actor_b`\n        for :class:`JOINT_ROTATION_TRACKING <superdex.physics.ConstraintType>`\n        and the selected rod element for :class:`ROD_ELEMENT_ROTATION_TO_RIGID\n        <superdex.physics.ConstraintType>`. Must be finite and non-zero.\n        Normalized before use.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to :class:`JOINT_ROTATION_TRACKING\n    <superdex.physics.ConstraintType>` and :class:`ROD_ELEMENT_ROTATION_TO_RIGID\n    <superdex.physics.ConstraintType>`.\n\nNote:\n    Also affects target velocity, which depends on the difference between\n    current and old target relative rotation.\n\nSee Also:\n    :meth:`~superdex.physics.Constraint.set_target_rotation`,\n    :meth:`~superdex.physics.Constraint.update_old_target`"
     )
     .def("get_limit_min_values", [](mochi::Constraint& self) {
@@ -184,15 +185,15 @@ void mochi::DefineMochiPhysics_MochiPhysicsConstraint([[maybe_unused]] py::modul
       }
       return result;
     }
-      , py::arg("type")
+      , nb::arg("type")
       , "Register a query to compute data for this constraint.\n\nArgs:\n    type (QueryType | int): Type of query to register.\n\nReturns:\n    :class:`~superdex.physics.QueryHandle` for the registered query.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Queries may add substantial computational overhead. Use only when necessary.\n\nNote:\n    Data becomes available after the next simulation step (even if the time-step\n    is zero).\n\nNote:\n    Call :meth:`~superdex.physics.Constraint.cancel_query` when the query is not\n    needed again in the future.\n\nNote:\n    Queries are reference counted internally, so they will be available as long\n    as there is one outstanding :class:`~superdex.physics.QueryHandle`.\n\nSee Also:\n    :meth:`~superdex.physics.Constraint.cancel_query`,\n    :meth:`~superdex.physics.Constraint.is_query_supported`,\n    :meth:`~superdex.physics.Actor.register_query`"
     )
     .def("cancel_query", &mochi::Constraint::CancelQuery
-      , py::arg("handle")
+      , nb::arg("handle")
       , "Cancel a previously registered query.\n\nArgs:\n    handle (QueryHandle): :class:`~superdex.physics.QueryHandle` from a previous\n        :meth:`~superdex.physics.Constraint.register_query` call.\n\nNote:\n    Cancelling queries may improve memory usage and/or performance if the query\n    is no longer needed.\n\nSee Also:\n    :meth:`~superdex.physics.Constraint.register_query`,\n    :meth:`~superdex.physics.Actor.cancel_query`"
     )
     .def("is_query_supported", &mochi::Constraint::IsQuerySupported
-      , py::arg("type")
+      , nb::arg("type")
       , "Check whether a query type is supported for this constraint.\n\nArgs:\n    type (QueryType | int): Type of query to check.\n\nReturns:\n    True if :meth:`~superdex.physics.Constraint.register_query` would succeed\n    for this query type, false otherwise.\n\nSee Also:\n    :meth:`~superdex.physics.Constraint.register_query`"
     )
   ;

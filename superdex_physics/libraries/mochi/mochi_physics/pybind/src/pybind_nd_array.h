@@ -26,85 +26,83 @@ MOCHI_WARNING_PUSH()
 MOCHI_WARNING_IGNORE_CLANG(clang diagnostic ignored "-Wself-assign-overloaded")
 
 template <class T, int N>
-inline auto DefNdArray(pybind11::module& m, char const* pyName, char const* doc) {
+inline auto DefNdArray(nanobind::module_& m, char const* pyName, char const* doc) {
+  namespace nb = nanobind;
   using NdArrayT = NdArray<T, N>;
-  auto c = pybind11::class_<NdArrayT>(m, pyName, doc);
-  c.def(pybind11::init<>());
-  c.def(pybind11::init([pyName](pybind11::sequence seq) {
-    if (pybind11::len(seq) != N) {
+  auto c = nb::class_<NdArrayT>(m, pyName, doc);
+  c.def(nb::init<>());
+  c.def("__init__", [pyName](NdArrayT* self, nb::sequence seq) {
+    if (nb::len(seq) != N) {
       throw std::runtime_error(Format("%s requires exactly %d elements", pyName, N));
     }
-    auto* arr = new NdArrayT;
+    new (self) NdArrayT;
     for (int i = 0; i < N; ++i) {
-      (*arr)[i] = pybind11::cast<T>(seq[i]);
+      (*self)[i] = nb::cast<T>(seq[i]);
     }
-    return arr;
-  }));
+  });
   c.def(
       "__array__",
-      [](NdArrayT const& self,
-         pybind11::object dtype,
-         pybind11::object /*copy*/) -> pybind11::object {
-        auto result = pybind11::array_t<T>(self.size());
-        pybind11::buffer_info buf = result.request();
-        T* ptr = static_cast<T*>(buf.ptr);
-        for (size_t i = 0; i < self.size(); ++i) {
-          ptr[i] = self[i];
+      [](NdArrayT const& self, nb::object dtype, nb::object /*copy*/) -> nb::object {
+        nb::object result = MakeOwningNumpy1D<T>(self.data(), self.size());
+        if (!dtype.is_none()) {
+          result = result.attr("astype")(dtype);
         }
-        if (dtype.is_none()) {
-          return result;
-        } else {
-          return pybind11::cast<pybind11::array>(result).attr("astype")(dtype);
-        }
+        return result;
       },
-      pybind11::arg("dtype") = pybind11::none(),
-      pybind11::arg("copy") = pybind11::none());
+      nb::arg("dtype") = nb::none(),
+      nb::arg("copy") = nb::none());
   c.def("__getitem__", [](NdArrayT const& self, size_t index) -> T {
     if (index >= N) {
-      throw pybind11::index_error();
+      throw nb::index_error();
     }
     return self[index];
   });
   c.def("__setitem__", [](NdArrayT& self, size_t index, T value) {
     if (index >= N) {
-      throw pybind11::index_error();
+      throw nb::index_error();
     }
     self[index] = value;
   });
   c.def("__len__", [](NdArrayT const& /*self*/) { return size_t(N); });
   c.def("__reduce__", [pyName](NdArrayT const& self) {
-    // Create a numpy array that shares the same memory (no copy)
-    auto array = pybind11::array_t<T>(self.size(), self.data(), pybind11::cast(self));
-    return pybind11::make_tuple(
-        pybind11::module::import(MOCHI_PHYSICS_MODULE_NAME_STR).attr(pyName),
-        pybind11::make_tuple(array));
+    nb::list values;
+    for (auto const& v : self) {
+      values.append(v);
+    }
+    return nb::make_tuple(
+        nb::module_::import_(MOCHI_PHYSICS_MODULE_NAME_STR).attr(pyName), nb::make_tuple(values));
   });
   c.def("__repr__", [](NdArrayT const& self) { return ToPyReplString(self); });
   c.def("__str__", [](NdArrayT const& self) { return ToPyString(self); });
   c.def("tolist", [](NdArrayT const& self) { return std::vector<real>(self.begin(), self.end()); });
-  c.def(pybind11::self + pybind11::self);
-  c.def(pybind11::self - pybind11::self);
-  c.def(pybind11::self * pybind11::self);
-  c.def(pybind11::self / pybind11::self);
-  c.def(pybind11::self + T());
-  c.def(pybind11::self - T());
-  c.def(pybind11::self * T());
-  c.def(pybind11::self / T());
-  c.def(T() + pybind11::self);
-  c.def(T() - pybind11::self);
-  c.def(T() * pybind11::self);
-  c.def(T() / pybind11::self);
-  c.def(pybind11::self += pybind11::self);
-  c.def(pybind11::self -= pybind11::self);
-  c.def(pybind11::self *= pybind11::self);
-  c.def(pybind11::self /= pybind11::self);
-  c.def(pybind11::self += T());
-  c.def(pybind11::self -= T());
-  c.def(pybind11::self *= T());
-  c.def(pybind11::self /= T());
-  c.def(-pybind11::self);
-  c.def(pybind11::self == pybind11::self);
-  c.def(pybind11::self != pybind11::self);
+  // clang-tidy misreads the nb::self operator-registration idiom (e.g. `nb::self / nb::self`)
+  // as a redundant self-operation; nb::self is a binding marker, not a value. These register
+  // __sub__/__truediv__/__eq__/__ne__ etc., so suppress the false positive over the block.
+  // NOLINTBEGIN(misc-redundant-expression)
+  c.def(nb::self + nb::self);
+  c.def(nb::self - nb::self);
+  c.def(nb::self * nb::self);
+  c.def(nb::self / nb::self);
+  c.def(nb::self + T());
+  c.def(nb::self - T());
+  c.def(nb::self * T());
+  c.def(nb::self / T());
+  c.def(T() + nb::self);
+  c.def(T() - nb::self);
+  c.def(T() * nb::self);
+  c.def(T() / nb::self);
+  c.def(nb::self += nb::self);
+  c.def(nb::self -= nb::self);
+  c.def(nb::self *= nb::self);
+  c.def(nb::self /= nb::self);
+  c.def(nb::self += T());
+  c.def(nb::self -= T());
+  c.def(nb::self *= T());
+  c.def(nb::self /= T());
+  c.def(-nb::self);
+  c.def(nb::self == nb::self);
+  c.def(nb::self != nb::self);
+  // NOLINTEND(misc-redundant-expression)
 
   // copy.copy / copy.deepcopy. NdArray stores its elements inline so the
   // C++ copy constructor produces an independent copy — correct for both
@@ -112,11 +110,11 @@ inline auto DefNdArray(pybind11::module& m, char const* pyName, char const* doc)
   c.def("__copy__", [](NdArrayT const& self) { return NdArrayT(self); });
   c.def(
       "__deepcopy__",
-      [](NdArrayT const& self, pybind11::dict) { return NdArrayT(self); },
-      pybind11::arg("memo"));
+      [](NdArrayT const& self, nb::dict) { return NdArrayT(self); },
+      nb::arg("memo"));
 
-  // Allow implicit conversion using the pybind11::sequence initializer (above)
-  pybind11::implicitly_convertible<pybind11::sequence, NdArrayT>();
+  // Allow implicit conversion using the nb::sequence initializer (above)
+  nb::implicitly_convertible<nb::sequence, NdArrayT>();
 
   return c;
 }

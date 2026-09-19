@@ -122,7 +122,7 @@ class Graph {
   Graph SortTargets(Cmp&& cmp = {}) && {
     MOCHI_PROFILE_SCOPE();
     if (NumTargets() == 0) {
-      return *this;
+      return std::move(*this);
     }
 
     // NOTE: The parallelization
@@ -138,7 +138,7 @@ class Graph {
       auto r = (*this)[v];
       std::sort(r.begin(), r.end(), cmp);
     });
-    return *this;
+    return std::move(*this);
   }
 
   Ptr NumTargets() const {
@@ -249,7 +249,7 @@ auto MaxAndCountTargets(GType const& g, GraphTargetType<GType> min = -1) {
 }
 
 template <typename Idx, typename Ptr, class GraphType>
-auto Reverse(GraphType&& g, Idx size = -1) {
+auto Reverse(GraphType const& g, Idx size = -1) {
   MOCHI_PROFILE_SCOPE();
   // Find the maximum target, it determines the number of sources in the result.
   auto [maxTarget, numTargets] = MaxAndCountTargets(g);
@@ -278,21 +278,20 @@ auto Reverse(GraphType&& g, Idx size = -1) {
 /// @param g The graph to reverse.
 /// @return A graph where for every edge (a,b) of g, there is an edge (b,a).
 template <class GraphType>
-auto Reverse(GraphType&& g) {
+auto Reverse(GraphType const& g) {
   using Idx = std::decay_t<typename std::decay_t<GraphType>::VertexType>;
   using Ptr = std::decay_t<typename std::decay_t<GraphType>::PointerType>;
   return Reverse<Idx, Ptr>(g);
 }
 
-/// @brief Build the transitive graph.
+/// @brief Compose two graphs.
 ///
-/// @tparam GraphTypeA
-/// @tparam GraphTypeB
-/// @param g_a
-/// @param g_b
-/// @return
+/// @param[in] g_a The graph mapping sources to intermediate vertices.
+/// @param[in] g_b The graph mapping intermediate vertices to targets.
+/// @return A graph mapping each source in @p g_a to the unique targets reachable through one edge
+/// in @p g_a followed by one edge in @p g_b.
 template <class GraphTypeA, class GraphTypeB>
-auto Traverse(GraphTypeA&& g_a, GraphTypeB&& g_b) {
+auto Traverse(GraphTypeA const& g_a, GraphTypeB const& g_b) {
   MOCHI_PROFILE_SCOPE();
   using IdxA = std::decay_t<typename std::decay_t<GraphTypeA>::VertexType>;
   using PtrA = std::decay_t<typename std::decay_t<GraphTypeA>::PointerType>;

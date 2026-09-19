@@ -302,7 +302,7 @@ if (MOCHI_USE_HDF5)
     #
     if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         # Applies to every consumer that gets its own dynamic symbol table: SHARED_LIBRARY and
-        # MODULE_LIBRARY, the latter being what pybind11_add_module() produces for the Python
+        # MODULE_LIBRARY, the latter being what nanobind_add_module() produces for the Python
         # extensions.
         set(_mochi_hdf5_dynamic_image "$<OR:$<STREQUAL:$<TARGET_PROPERTY:TYPE>,SHARED_LIBRARY>,$<STREQUAL:$<TARGET_PROPERTY:TYPE>,MODULE_LIBRARY>>")
         foreach (_mochi_hdf5_target hdf5-static hdf5_cpp-static hdf5_hl-static hdf5_hl_cpp-static)
@@ -418,122 +418,17 @@ target_include_directories(happly INTERFACE "${MOCHI_HAPPLY_SOURCE_DIR}")
 set_target_properties(happly PROPERTIES FOLDER "third_party")
 
 #-----------------------------------------------------------------------------
-# pybind11
+# nanobind
 #-----------------------------------------------------------------------------
 
+# The Python bindings are built with vendored nanobind. Its robin_map dependency ships under
+# ext/robin_map. Tests are not the master project here, so nanobind's own test suite is not built.
 if (MOCHI_USE_PYBIND)
-    # pybind11 requires Python development headers (Python.h) to build.
-    # Development.Module, not Development: the latter implies Development.Embed, which needs a
-    # libpython that manylinux CPython does not ship.
-    find_package(Python3 3.12...3.12.99 COMPONENTS Interpreter Development.Module QUIET)
-
-    if (Python3_FOUND AND Python3_Development.Module_FOUND)
-        message(STATUS "[Mochi] Found Python3 (${Python3_VERSION}) with development headers")
-        message(STATUS "[Mochi]   Python3_INCLUDE_DIRS: ${Python3_INCLUDE_DIRS}")
-    else ()
-        # Provide helpful error messages for different platforms
-        if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-            message(FATAL_ERROR
-                "[Mochi] Failed to find Python3 development headers (Python.h).\n"
-                "  pybind11 requires Python development headers to build.\n"
-                "  To fix this on Fedora/RHEL, run: sudo dnf install python3-devel\n"
-                "  To fix this on Ubuntu/Debian, run: sudo apt install python3-dev\n"
-                "  Alternatively, disable pybind support with: -DMOCHI_USE_PYBIND=OFF"
-            )
-        elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-            message(FATAL_ERROR
-                "[Mochi] Failed to find Python3 development headers (Python.h).\n"
-                "  pybind11 requires Python development headers to build.\n"
-                "  On macOS, install Python via Homebrew: brew install python3\n"
-                "  Or use pyenv/conda which includes development headers.\n"
-                "  Alternatively, disable pybind support with: -DMOCHI_USE_PYBIND=OFF"
-            )
-        elseif (CMAKE_SYSTEM_NAME STREQUAL "Windows")
-            message(FATAL_ERROR
-                "[Mochi] Failed to find Python3 development headers (Python.h).\n"
-                "  pybind11 requires Python development headers to build.\n"
-                "  On Windows, install Python from python.org (includes dev headers).\n"
-                "  Make sure to check 'Add Python to PATH' during installation.\n"
-                "  Alternatively, disable pybind support with: -DMOCHI_USE_PYBIND=OFF"
-            )
-        else ()
-            message(FATAL_ERROR
-                "[Mochi] Failed to find Python3 development headers (Python.h).\n"
-                "  pybind11 requires Python development headers to build.\n"
-                "  Please install Python3 with development headers for your platform.\n"
-                "  Alternatively, disable pybind support with: -DMOCHI_USE_PYBIND=OFF"
-            )
-        endif ()
-    endif ()
-
-    # Set hints for pybind11's Python search to use the Python3 we just found.
-    # pybind11 uses the legacy FindPythonInterp/FindPythonLibs modules which look
-    # for PYTHON_EXECUTABLE, PYTHON_INCLUDE_DIR, and PYTHON_LIBRARY variables.
-    set(PYTHON_EXECUTABLE "${Python3_EXECUTABLE}" CACHE FILEPATH "Python interpreter" FORCE)
-    set(PYTHON_INCLUDE_DIR "${Python3_INCLUDE_DIRS}" CACHE PATH "Python include directory" FORCE)
-
-    # Find the Python import library.
-    #
-    # Windows-only: pybind11::module links ${PYTHON_LIBRARIES} solely on Windows and
-    # Cygwin. macOS resolves the symbols with -undefined dynamic_lookup and Linux leaves
-    # them to the interpreter that loads the module, so neither platform reads this
-    # variable -- which is also why Development.Module leaves Python3's library variables
-    # unset there. Searching on those platforms would only produce a spurious warning.
-    if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
-        if (Python3_LIBRARY)
-            set(PYTHON_LIBRARY "${Python3_LIBRARY}" CACHE FILEPATH "Python library" FORCE)
-        elseif (Python3_LIBRARIES)
-            list(GET Python3_LIBRARIES 0 _first_lib)
-            set(PYTHON_LIBRARY "${_first_lib}" CACHE FILEPATH "Python library" FORCE)
-        else ()
-            # Development.Module normally sets one of the above on Windows, so reaching
-            # here means an unusual install. Search the standard layout as a last resort:
-            # <prefix>/include/Python.h beside <prefix>/libs/pythonXY.lib.
-            get_filename_component(_python_prefix "${Python3_INCLUDE_DIRS}" DIRECTORY)
-            set(_python_lib_name "python${Python3_VERSION_MAJOR}${Python3_VERSION_MINOR}")
-            set(_python_lib_dirs "${_python_prefix}/libs" "${_python_prefix}/lib")
-
-            find_library(PYTHON_LIBRARY
-                NAMES ${_python_lib_name}
-                PATHS ${_python_lib_dirs}
-                NO_DEFAULT_PATH
-            )
-            if (PYTHON_LIBRARY)
-                message(STATUS "[Mochi]   Python3_LIBRARY: ${PYTHON_LIBRARY}")
-            else ()
-                message(WARNING
-                    "[Mochi] Could not find the Python import library '${_python_lib_name}.lib' for\n"
-                    "  ${Python3_EXECUTABLE} (${Python3_VERSION}). pybind11 must link it on Windows,\n"
-                    "  so the build will likely fail. To fix, either:\n"
-                    "    - Install the Python ${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR} development files from python.org, or\n"
-                    "    - Point CMake at such an install: -DPython3_EXECUTABLE=<path\\to\\python.exe>, or\n"
-                    "    - Name the import library directly: -DPYTHON_LIBRARY=<path\\to\\${_python_lib_name}.lib>, or\n"
-                    "    - Disable Python bindings: -DMOCHI_USE_PYBIND=OFF"
-                )
-            endif ()
-        endif ()
-    endif ()
-
-    if (MOCHI_PYBIND_FIND_PACKAGE)
-        if (pybind11_FOUND)
-            message(STATUS "[Mochi] Found pybind11")
-        endif ()
-    else ()
-        message(STATUS "[Mochi] Including pybind11")
-        FetchContent_Declare(pybind11 SOURCE_DIR ${MOCHI_PYBIND_SOURCE_DIR})
-        # Suppress CMake warning: "Compatibility with CMake < 3.10 will be removed from a future version"
-        if (DEFINED CACHE{CMAKE_WARN_DEPRECATED})
-            set(_mochi_warn_deprecated "$CACHE{CMAKE_WARN_DEPRECATED}")
-        endif ()
-        set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
-        FetchContent_MakeAvailable(pybind11)
-        if (DEFINED _mochi_warn_deprecated)
-            set(CMAKE_WARN_DEPRECATED "${_mochi_warn_deprecated}" CACHE BOOL "" FORCE)
-            unset(_mochi_warn_deprecated)
-        else ()
-            unset(CMAKE_WARN_DEPRECATED CACHE)
-        endif ()
-    endif ()
+    message(STATUS "[Mochi] Including nanobind")
+    # Mochi's root CMake setup exposes its FindPython3 result under the FindPython variable and
+    # target names consumed by nanobind.
+    FetchContent_Declare(nanobind SOURCE_DIR ${MOCHI_NANOBIND_SOURCE_DIR})
+    FetchContent_MakeAvailable(nanobind)
 endif ()
 
 #-----------------------------------------------------------------------------

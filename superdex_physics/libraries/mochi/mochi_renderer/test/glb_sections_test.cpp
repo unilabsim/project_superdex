@@ -365,6 +365,31 @@ TEST(GlbReaderTest, RoundTripPositionsIndicesNormalsMaterial) {
   EXPECT_NEAR(read[0].roughness, 0.75f, 1e-6f);
 }
 
+// A strength above 1 is the reason it cannot be folded into emissiveFactor, which the spec clamps
+// to [0, 1]; it has to survive the round trip as a separate KHR_materials_emissive_strength value.
+TEST(GlbReaderTest, RoundTripEmissiveFactorAndStrength) {
+  std::vector<MeshSection> sections = {
+      MakeTriangle({1.0f, 1.0f, 1.0f, 1.0f}),
+      MakeTriangle({1.0f, 1.0f, 1.0f, 1.0f}),
+  };
+  sections[0].emissive = {0.0f, 0.25f, 1.0f};
+  sections[0].emissiveStrength = 25.0f;
+
+  std::vector<uint8_t> const glb = BuildGlbFromMeshSections(sections);
+  mochi::TempFileCleanup const file = WriteTempGlb(glb, "glb_sections_emissive");
+  std::vector<MeshSection> const read = ReadGlbFromFile(file.Path().string().c_str());
+
+  ASSERT_EQ(read.size(), 2u);
+  std::array<float, 3> const expectedEmissive = {0.0f, 0.25f, 1.0f};
+  EXPECT_EQ(read[0].emissive, expectedEmissive);
+  EXPECT_NEAR(read[0].emissiveStrength, 25.0f, 1e-6f);
+
+  // An untouched section keeps the defaults, so neither key is written for it.
+  std::array<float, 3> const noEmissive = {0.0f, 0.0f, 0.0f};
+  EXPECT_EQ(read[1].emissive, noEmissive);
+  EXPECT_NEAR(read[1].emissiveStrength, 1.0f, 1e-6f);
+}
+
 TEST(GlbReaderTest, MalformedFileReturnsEmpty) {
   // The reader warns on parse/open failure; silence it so the test harness does
   // not treat the expected warnings as failures.

@@ -11,8 +11,9 @@ provided in the adjacent directories.
 | happly | MIT | https://github.com/nmwsharp/happly |
 | HDF5 | HDF5 license | https://github.com/HDFGroup/hdf5 |
 | Marl | Apache-2.0 | https://github.com/google/marl |
+| nanobind | BSD-3-Clause | https://github.com/wjakob/nanobind |
 | picojson derivative (Steven Lovegrove modifications) | BSD-2-Clause | https://github.com/kazuho/picojson |
-| pybind11 | BSD-3-Clause | https://github.com/pybind/pybind11 |
+| robin-map | MIT | https://github.com/Tessil/robin-map |
 | tinyobjloader | MIT | https://github.com/tinyobjloader/tinyobjloader |
 | zlib | zlib | https://github.com/madler/zlib |
 

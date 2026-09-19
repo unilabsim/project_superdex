@@ -25,6 +25,10 @@
 
 #include <variant>
 
+#ifndef SUPERDEXROBOTICS_WITH_BOT_SCENE
+#define SUPERDEXROBOTICS_WITH_BOT_SCENE MOCHI_INTERNAL
+#endif
+
 namespace superdex::robotics {
 
 // Forwards:

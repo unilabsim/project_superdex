@@ -31,17 +31,24 @@
 #include <mochi_physics/utils/mochi_prefab.h>
 
 using namespace mochi;
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace mochi {
-void DefineSceneBatchExecutor(py::module_& m);
-void DefineSceneBatchExecutorV2(py::module_& m);
-void OverrideLeasedSceneDestroy(py::module_& m);
-void OverrideLeasedActorDestroy(py::module_& m);
-void OverrideLeasedSceneCallbacks(py::module_& m);
-}
+void DefineSceneBatchExecutor(nb::module_& m);
+void DefineSceneBatchExecutorV2(nb::module_& m);
+void OverrideLeasedSceneDestroy(nb::module_& m);
+void OverrideLeasedActorDestroy(nb::module_& m);
+void OverrideLeasedSceneCallbacks(nb::module_& m);
+}  // namespace mochi
 
-PYBIND11_MODULE(MOCHI_PHYSICS_MODULE_NAME, m) {
+NB_MODULE(MOCHI_PHYSICS_MODULE_NAME, m) {
+  // The extension module lives until interpreter shutdown, so its bound types, functions, and
+  // eagerly-created default-argument instances are still alive when nanobind's leak checker runs
+  // at teardown. That is benign (the OS reclaims the memory on process exit) but the checker's
+  // stderr output otherwise pollutes the test-listing protocol. pybind11 never performed this
+  // check, so disable it to match.
+  nb::set_leak_warnings(false);
+
   // Build configuration
   m.def(
       "is_debug",
@@ -49,72 +56,76 @@ PYBIND11_MODULE(MOCHI_PHYSICS_MODULE_NAME, m) {
       "Return whether the loaded native library is a debug build.");
 
   // MochiErrorException
-  py::register_exception<MochiErrorException>(m, "Error", PyExc_RuntimeError);
+  [[maybe_unused]] auto errorException =
+      nb::exception<MochiErrorException>(m, "Error", PyExc_RuntimeError);
 
   // WARNING: If defining more NdArray types, please add them to `is_ndarray_type_alias`
   // in `emit_pybind.rs`.
 
   // Int3
   DefNdArray<int, 3>(m, "Int3", "Fixed-size three-element integer array.")
-      .def(py::init<int, int, int>(), py::arg("x") = 0, py::arg("y") = 0, py::arg("z") = 0);
+      .def(nb::init<int, int, int>(), nb::arg("x") = 0, nb::arg("y") = 0, nb::arg("z") = 0);
 
   // Real2
   DefNdArray<real, 2>(m, "Real2", "Fixed-size two-element floating-point array.")
-      .def(py::init<real, real>(), py::arg("x") = real(0), py::arg("y") = real(0));
+      .def(nb::init<real, real>(), nb::arg("x") = real(0), nb::arg("y") = real(0));
 
   // Real3
   DefNdArray<real, 3>(m, "Real3", "Fixed-size three-element floating-point array.")
       .def(
-          py::init<real, real, real>(),
-          py::arg("x") = real(0),
-          py::arg("y") = real(0),
-          py::arg("z") = real(0));
+          nb::init<real, real, real>(),
+          nb::arg("x") = real(0),
+          nb::arg("y") = real(0),
+          nb::arg("z") = real(0));
 
   // Real6
   DefNdArray<real, 6>(m, "Real6", "Fixed-size six-element floating-point array.")
       .def(
-          py::init<real, real, real, real, real, real>(),
-          py::arg("a") = real(0),
-          py::arg("b") = real(0),
-          py::arg("c") = real(0),
-          py::arg("d") = real(0),
-          py::arg("e") = real(0),
-          py::arg("f") = real(0));
+          nb::init<real, real, real, real, real, real>(),
+          nb::arg("a") = real(0),
+          nb::arg("b") = real(0),
+          nb::arg("c") = real(0),
+          nb::arg("d") = real(0),
+          nb::arg("e") = real(0),
+          nb::arg("f") = real(0));
 
   // Color
   DefNdArray<uint8_t, 4>(
       m, "Color", "RGBA color representation using 4 bytes (0-255 per channel) in RGBA order.")
       .def(
-          py::init<uint8_t, uint8_t, uint8_t, uint8_t>(),
-          py::arg("r") = uint8_t(0),
-          py::arg("g") = uint8_t(0),
-          py::arg("b") = uint8_t(0),
-          py::arg("a") = uint8_t(0));
+          nb::init<uint8_t, uint8_t, uint8_t, uint8_t>(),
+          nb::arg("r") = uint8_t(0),
+          nb::arg("g") = uint8_t(0),
+          nb::arg("b") = uint8_t(0),
+          nb::arg("a") = uint8_t(0));
 
   // Quaternion
-  py::class_<Quaternion>(m, "Quaternion", "Used for 3D rotations.")
-      .def(py::init<>())
+  nb::class_<Quaternion>(m, "Quaternion", "Used for 3D rotations.")
+      .def(nb::init<>())
       .def(
-          py::init<real, real, real, real>(),
-          py::arg("x") = real(0),
-          py::arg("y") = real(0),
-          py::arg("z") = real(0),
-          py::arg("w") = real(0))
-      .def(py::init([](py::sequence seq) {
-        if (py::len(seq) != 4) {
-          throw std::runtime_error("Quaternion requires exactly 4 elements in order [x, y, z, w]");
-        }
-        return new Quaternion{
-            py::cast<real>(seq[0]),
-            py::cast<real>(seq[1]),
-            py::cast<real>(seq[2]),
-            py::cast<real>(seq[3])};
-      }))
+          nb::init<real, real, real, real>(),
+          nb::arg("x") = real(0),
+          nb::arg("y") = real(0),
+          nb::arg("z") = real(0),
+          nb::arg("w") = real(0))
+      .def(
+          "__init__",
+          [](Quaternion* self, nb::sequence seq) {
+            if (nb::len(seq) != 4) {
+              throw std::runtime_error(
+                  "Quaternion requires exactly 4 elements in order [x, y, z, w]");
+            }
+            new (self) Quaternion{
+                nb::cast<real>(seq[0]),
+                nb::cast<real>(seq[1]),
+                nb::cast<real>(seq[2]),
+                nb::cast<real>(seq[3])};
+          })
       .def(
           "__getitem__",
           [](Quaternion const& self, size_t index) -> real {
             if (index >= 4) {
-              throw py::index_error();
+              throw nb::index_error();
             }
             return self.data[index];
           })
@@ -122,19 +133,31 @@ PYBIND11_MODULE(MOCHI_PHYSICS_MODULE_NAME, m) {
           "__setitem__",
           [](Quaternion& self, size_t index, real value) {
             if (index >= 4) {
-              throw py::index_error();
+              throw nb::index_error();
             }
             self.data = Set(self.data, index, value);
           })
       .def("__len__", [](Quaternion const& /*self*/) { return size_t(4); })
+      .def(
+          "__array__",
+          [](Quaternion const& self, nb::object dtype, nb::object /*copy*/) -> nb::object {
+            real values[] = {self.data[0], self.data[1], self.data[2], self.data[3]};
+            nb::object result = MakeOwningNumpy1D(values, std::size(values));
+            if (!dtype.is_none()) {
+              result = result.attr("astype")(dtype);
+            }
+            return result;
+          },
+          nb::arg("dtype") = nb::none(),
+          nb::arg("copy") = nb::none())
       .def("__repr__", [](Quaternion const& self) { return ToPyReplString(self); })
       .def("__str__", [](Quaternion const& self) { return ToPyString(self); })
       .def(
           "__reduce__",
           [](Quaternion const& self) {
-            return py::make_tuple(
-                py::module::import(MOCHI_PHYSICS_MODULE_NAME_STR).attr("Quaternion"),
-                py::make_tuple(self.data[0], self.data[1], self.data[2], self.data[3]));
+            return nb::make_tuple(
+                nb::module_::import_(MOCHI_PHYSICS_MODULE_NAME_STR).attr("Quaternion"),
+                nb::make_tuple(self.data[0], self.data[1], self.data[2], self.data[3]));
           })
       .def(
           "tolist",
@@ -148,52 +171,55 @@ PYBIND11_MODULE(MOCHI_PHYSICS_MODULE_NAME, m) {
       .def_static(
           "from_axis_angle",
           static_cast<Quaternion (*)(Real3 const&, real)>(&Quaternion::FromAxisAngle),
-          py::arg("axis"),
-          py::arg("angle"))
+          nb::arg("axis"),
+          nb::arg("angle"))
       .def_static(
           "from_rotation_vector",
           static_cast<Quaternion (*)(Real3 const&)>(&Quaternion::FromRotationVector),
-          py::arg("rotation_vector"))
-      .def_static("rotation_x", &Quaternion::RotationX, py::arg("angle"))
-      .def_static("rotation_y", &Quaternion::RotationY, py::arg("angle"))
-      .def_static("rotation_z", &Quaternion::RotationZ, py::arg("angle"))
-      .def(py::self * py::self)
-      .def(py::self + py::self)
-      .def(py::self - py::self)
-      .def(py::self * real())
-      .def(py::self / real())
-      .def(real() * py::self)
-      .def(-py::self)
-      .def(py::self == py::self)
-      .def(py::self != py::self)
+          nb::arg("rotation_vector"))
+      .def_static("rotation_x", &Quaternion::RotationX, nb::arg("angle"))
+      .def_static("rotation_y", &Quaternion::RotationY, nb::arg("angle"))
+      .def_static("rotation_z", &Quaternion::RotationZ, nb::arg("angle"))
+      .def(nb::self * nb::self)
+      .def(nb::self + nb::self)
+      // NOLINTNEXTLINE(misc-redundant-expression) nb::self is a binding marker, not a value
+      .def(nb::self - nb::self)
+      .def(nb::self * real())
+      .def(nb::self / real())
+      .def(real() * nb::self)
+      .def(-nb::self)
+      // NOLINTNEXTLINE(misc-redundant-expression) nb::self is a binding marker, not a value
+      .def(nb::self == nb::self)
+      // NOLINTNEXTLINE(misc-redundant-expression) nb::self is a binding marker, not a value
+      .def(nb::self != nb::self)
       .def("__copy__", [](Quaternion const& self) { return Quaternion(self); })
       .def(
           "__deepcopy__",
-          [](Quaternion const& self, py::dict) { return Quaternion(self); },
-          py::arg("memo"));
+          [](Quaternion const& self, nb::dict) { return Quaternion(self); },
+          nb::arg("memo"));
 
   // Allow implicit conversion from Python sequences (e.g., [0, 0, 0, 1]) to Quaternion,
   // consistent with how NdArray types (Real3, Real2, etc.) support this.
-  py::implicitly_convertible<py::sequence, Quaternion>();
+  nb::implicitly_convertible<nb::sequence, Quaternion>();
 
   // TransformRT
-  py::class_<TransformRT>(
+  nb::class_<TransformRT>(
       m, "TransformRT", "A 3D affine transform (rotation and translation, but no scale).")
-      .def(py::init<>())
-      .def(py::init<Quaternion const&>(), py::arg("rotation"))
-      .def(py::init<Real3 const&>(), py::arg("translation"))
-      .def(py::init<Quaternion const&, Real3 const&>(), py::arg("rotation"), py::arg("translation"))
+      .def(nb::init<>())
+      .def(nb::init<Quaternion const&>(), nb::arg("rotation"))
+      .def(nb::init<Real3 const&>(), nb::arg("translation"))
+      .def(nb::init<Quaternion const&, Real3 const&>(), nb::arg("rotation"), nb::arg("translation"))
       .def(
           "__reduce__",
           [](TransformRT const& self) {
-            return py::make_tuple(
-                py::module::import(MOCHI_PHYSICS_MODULE_NAME_STR).attr("TransformRT"),
-                py::make_tuple(self.GetRotation(), self.GetTranslation()));
+            return nb::make_tuple(
+                nb::module_::import_(MOCHI_PHYSICS_MODULE_NAME_STR).attr("TransformRT"),
+                nb::make_tuple(self.GetRotation(), self.GetTranslation()));
           })
       .def("__repr__", [](TransformRT const& self) { return ToPyReplString(self); })
       .def("__str__", [](TransformRT const& self) { return ToPyString(self); })
-      .def_property("rotation", &TransformRT::GetRotation, &TransformRT::SetRotation)
-      .def_property(
+      .def_prop_rw("rotation", &TransformRT::GetRotation, &TransformRT::SetRotation)
+      .def_prop_rw(
           "translation",
           &TransformRT::GetTranslation,
           [](TransformRT& self, Real3 const& translation) { self.SetTranslation(translation); })
@@ -203,63 +229,67 @@ PYBIND11_MODULE(MOCHI_PHYSICS_MODULE_NAME, m) {
           "transform_point_inverse",
           static_cast<Real3 (TransformRT::*)(Real3 const&) const>(
               &TransformRT::TransformPointInverse),
-          py::arg("point"))
-      .def(py::self * py::self)
-      .def(py::self *= py::self)
-      .def(py::self == py::self)
-      .def(py::self != py::self)
+          nb::arg("point"))
+      .def(nb::self * nb::self)
+      .def(nb::self *= nb::self)
+      // NOLINTNEXTLINE(misc-redundant-expression) nb::self is a binding marker, not a value
+      .def(nb::self == nb::self)
+      // NOLINTNEXTLINE(misc-redundant-expression) nb::self is a binding marker, not a value
+      .def(nb::self != nb::self)
       .def("__copy__", [](TransformRT const& self) { return TransformRT(self); })
       .def(
           "__deepcopy__",
-          [](TransformRT const& self, py::dict) { return TransformRT(self); },
-          py::arg("memo"));
+          [](TransformRT const& self, nb::dict) { return TransformRT(self); },
+          nb::arg("memo"));
 
   // Aabb
-  py::class_<Aabb>(m, "Aabb", "Axis-aligned bounding box in 3D space.")
-      .def(py::init<>())
-      .def(py::init<Real3 const&, Real3 const&>(), py::arg("min"), py::arg("max"))
+  nb::class_<Aabb>(m, "Aabb", "Axis-aligned bounding box in 3D space.")
+      .def(nb::init<>())
+      .def(nb::init<Real3 const&, Real3 const&>(), nb::arg("min"), nb::arg("max"))
       .def(
           "__reduce__",
           [](Aabb const& self) {
-            return py::make_tuple(
-                py::module::import(MOCHI_PHYSICS_MODULE_NAME_STR).attr("Aabb"),
-                py::make_tuple(self.GetMin(), self.GetMax()));
+            return nb::make_tuple(
+                nb::module_::import_(MOCHI_PHYSICS_MODULE_NAME_STR).attr("Aabb"),
+                nb::make_tuple(self.GetMin(), self.GetMax()));
           })
       .def("__repr__", [](Aabb const& self) { return ToPyReplString(self); })
       .def("__str__", [](Aabb const& self) { return ToPyString(self); })
-      .def_property(
+      .def_prop_rw(
           "min",
           &Aabb::GetMin,
-          [](Aabb& self, py::object const& min) {
-            self = Aabb(py::cast<Real3>(min), self.GetMax());
+          [](Aabb& self, nb::object const& min) {
+            self = Aabb(nb::cast<Real3>(min), self.GetMax());
           })
-      .def_property(
+      .def_prop_rw(
           "max",
           &Aabb::GetMax,
-          [](Aabb& self, py::object const& max) {
-            self = Aabb(self.GetMin(), py::cast<Real3>(max));
+          [](Aabb& self, nb::object const& max) {
+            self = Aabb(self.GetMin(), nb::cast<Real3>(max));
           })
       .def("get_center", &Aabb::GetCenter)
       .def("get_size", &Aabb::GetSize)
-      .def(py::self == py::self)
-      .def(py::self != py::self)
+      // NOLINTNEXTLINE(misc-redundant-expression) nb::self is a binding marker, not a value
+      .def(nb::self == nb::self)
+      // NOLINTNEXTLINE(misc-redundant-expression) nb::self is a binding marker, not a value
+      .def(nb::self != nb::self)
       .def("__copy__", [](Aabb const& self) { return Aabb(self); })
-      .def("__deepcopy__", [](Aabb const& self, py::dict) { return Aabb(self); }, py::arg("memo"));
+      .def("__deepcopy__", [](Aabb const& self, nb::dict) { return Aabb(self); }, nb::arg("memo"));
 
   // Obb
-  py::class_<Obb>(m, "Obb", "Oriented bounding box in 3D space.")
-      .def(py::init<>())
+  nb::class_<Obb>(m, "Obb", "Oriented bounding box in 3D space.")
+      .def(nb::init<>())
       .def(
-          py::init<TransformRT const&, Real3 const&>(),
-          py::arg("transform"),
-          py::arg("half_extents"))
+          nb::init<TransformRT const&, Real3 const&>(),
+          nb::arg("transform"),
+          nb::arg("half_extents"))
       .def("__repr__", [](Obb const& self) { return ToPyReplString(self); })
       .def("__str__", [](Obb const& self) { return ToPyString(self); })
       .def("get_center", &Obb::GetCenter)
       .def("get_half_extents", &Obb::GetHalfExtents)
       .def("get_size", &Obb::GetSize)
       .def("__copy__", [](Obb const& self) { return Obb(self); })
-      .def("__deepcopy__", [](Obb const& self, py::dict) { return Obb(self); }, py::arg("memo"));
+      .def("__deepcopy__", [](Obb const& self, nb::dict) { return Obb(self); }, nb::arg("memo"));
 
   m.def(
       "is_initialized",
@@ -273,7 +303,7 @@ PYBIND11_MODULE(MOCHI_PHYSICS_MODULE_NAME, m) {
   m.def(
       "initialize",
       &InitGlobalContext,
-      py::arg("num_worker_threads"),
+      nb::arg("num_worker_threads"),
       R"doc(Initialize SuperDex Physics by creating the process-wide context.
 
 Only one context is needed for the entire process. It can be used to load shapes and create any
@@ -324,17 +354,17 @@ Raises:
   m.def(
       "normalize",
       static_cast<Real2 (*)(Real2 const&)>(&mochi::Normalize),
-      py::arg("v"),
+      nb::arg("v"),
       "Return a unit-length copy of the vector. A zero vector remains zero.");
   m.def(
       "normalize",
       static_cast<Real3 (*)(Real3 const&)>(&mochi::Normalize),
-      py::arg("v"),
+      nb::arg("v"),
       "Return a unit-length copy of the vector. A zero vector remains zero.");
   m.def(
       "normalize",
       static_cast<Quaternion (*)(Quaternion)>(&mochi::Normalize),
-      py::arg("q"),
+      nb::arg("q"),
       "Return a unit-length copy of the quaternion. A zero quaternion remains zero.");
 
   // Insert generated bindings here
@@ -352,22 +382,22 @@ Raises:
         CheckContext();
         GetContext()->ReleaseShape(shape.value_or(ShapeHandle{}));
       },
-      py::arg("shape"));
+      nb::arg("shape"));
 
   // This must come after the generated code because it references generated type LogChannel.
   m.def(
       "log",
       [](std::string const& message, LogChannel channel = LogChannel::Info) {
-        py::gil_scoped_acquire gil;
-        py::module inspect = py::module::import("inspect");
-        py::object stack = inspect.attr("stack")();
-        py::object frame_info = stack[py::int_(0)];
-        std::string filename = py::str(frame_info[py::int_(1)]);
-        auto lineno = py::cast<int>(frame_info[py::int_(2)]);
+        nb::gil_scoped_acquire gil;
+        nb::module_ inspect = nb::module_::import_("inspect");
+        nb::object stack = inspect.attr("stack")();
+        nb::object frame_info = stack[nb::int_(0)];
+        auto filename = nb::cast<std::string>(frame_info[nb::int_(1)]);
+        auto lineno = nb::cast<int>(frame_info[nb::int_(2)]);
         MOCHI_LOG_IMPL(channel, filename.c_str(), lineno, "%s", message.c_str());
       },
-      py::arg("message"),
-      py::arg("channel") = LogChannel::Info);
+      nb::arg("message"),
+      nb::arg("channel") = LogChannel::Info);
 
   // Best-effort clean-up on module exit: tear down dependent contexts (bots/mpc) first,
   // then the physics Context. This is the single atexit for the whole context tree — bots
@@ -376,11 +406,18 @@ Raises:
   // user already called shutdown(), there is no live context tree left to clean up; avoid running
   // dependent teardown callbacks again during interpreter shutdown, when extension unload order is
   // platform-sensitive.
-  py::module_::import("atexit").attr("register")(py::cpp_function([]() {
-    if (GetContext()) {
-      mochi::SetLogCallback(nullptr);
-      ShutdownGlobalContext();
-    }
-  }));
+  // The private name is a stable contract with worker bootstrap code that suppresses this callback
+  // in distributed processes where interpreter finalization can race scheduler teardown.
+  nb::object shutdownCallback = nb::cpp_function(
+      []() {
+        if (GetContext()) {
+          mochi::SetLogCallback(nullptr);
+          ShutdownGlobalContext();
+        }
+      },
+      nb::scope(m),
+      nb::name("_mochi_shutdown_global_context_atexit"));
+  m.attr("_mochi_shutdown_global_context_atexit") = shutdownCallback;
+  nb::module_::import_("atexit").attr("register")(shutdownCallback);
 
-} // PYBIND11_MODULE
+} // NB_MODULE

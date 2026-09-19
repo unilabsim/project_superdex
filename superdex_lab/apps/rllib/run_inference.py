@@ -16,11 +16,17 @@ import argparse
 import json
 import pathlib
 
-import gymnasium as gym
-from checkpoint_policy import restore_policy
 from superdex.physics.viewer import VIEWER_AVAILABLE
 from superdex.physics.viewer.utils import AnimationWriter
-from utils import register_envs
+
+try:
+    from .checkpoint_env import make_checkpoint_env, resolve_checkpoint_env_spec
+    from .checkpoint_policy import restore_policy
+    from .utils import register_envs
+except ImportError:
+    from checkpoint_env import make_checkpoint_env, resolve_checkpoint_env_spec
+    from checkpoint_policy import restore_policy
+    from utils import register_envs
 
 ########################################################################################
 
@@ -31,8 +37,9 @@ def run_inference(
     explore_during_inference: bool,
     video_path: pathlib.Path | None,
 ):
-    # Register MochiGym envs.
-    register_envs(import_sample_envs=True)
+    # Register the environment specs available in the current build with Gymnasium and
+    # Ray Tune before delegating here.
+    register_envs()
 
     # Determine paths to a) the training params and b) the policy checkpoint.
     path_to_training_params = checkpoint_path.parent / "params.json"
@@ -40,8 +47,8 @@ def run_inference(
     # Load the training params. Figure out the environment name and configuration.
     with open(path_to_training_params, "r") as handle:
         training_params = json.load(handle)
-    env_name = training_params["env"]
-    env_cfg = training_params["env_config"]
+    env_id = training_params["env"]
+    env_cfg = dict(training_params.get("env_config", {}))
 
     # Restore the policy together with its connector pipelines, so that observation
     # normalization and action rescaling match what training did.
@@ -52,8 +59,9 @@ def run_inference(
     # mode to "human", which will create a rendering window. Note we opt to handle
     # animation here through "rgb_array" in order to support arbitrary environments
     # other than those based in MochiEnv.
-    is_mochi_environment = "superdex_gym" in env_name
-    is_renderer_available = not is_mochi_environment or VIEWER_AVAILABLE
+    env_spec = resolve_checkpoint_env_spec(env_id)
+    is_superdex_environment = env_spec.namespace == "superdex_gym"
+    is_renderer_available = not is_superdex_environment or VIEWER_AVAILABLE
     animation_writer = None
 
     if is_renderer_available:
@@ -68,12 +76,9 @@ def run_inference(
         print("Renderer not available, setting render mode to None...")
         env_cfg["render_mode"] = None
 
-    # Create an env and do inference with it.
-    # MochiGym environment configuration is specified through the "cfg" argument.
-    # Other environments like Gymnasium's are specified through keyword arguments.
-    if "superdex_gym" in env_name:
-        env_cfg = {"cfg": env_cfg}
-    env = gym.make(env_name, **env_cfg)
+    # Create the exact registered environment and do inference with it. The helper merges
+    # SuperDex spec defaults with persisted overrides and handles ordinary Gymnasium envs.
+    env = make_checkpoint_env(env_id, env_cfg)
     obs, info = env.reset()
     episode = policy.new_episode(
         obs,

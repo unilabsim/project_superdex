@@ -17,7 +17,7 @@ namespace experimental;
 fn experimental::RestoreStateFromScene(Scene* sceneTo, Scene const* sceneFrom, StateHandle handleFrom) -> void [mochi_error];
 fn experimental::ApplyImprovedConvergenceSettings(Scene* scene) -> void [mochi_error];
 
-fn experimental::GetContactForceWorldBatch(Span<Actor const* const> actors, Span<Actor const* const> colliders) -> real [mochi_error, units(N)];
+fn experimental::GetContactForceWorldBatch(Span<Actor const* const> actors, Span<Actor const* const> colliders) -> real [mochi_error, units("N")];
 fn experimental::EnableNewtonEulerInertia(Actor* actor, bool enable) -> void [mochi_error];
 fn experimental::IsNewtonEulerInertiaEnabled(Actor const* actor) -> bool [mochi_error];
 fn experimental::SetSoftMaterialParamsField(Actor* actor, SoftMaterialParams const& params, int elementIndex) -> void [mochi_error];
@@ -167,10 +167,10 @@ struct experimental::IKSolverParams [no_reflection] {
   real relTol = 1e-8;
 
   // @brief Position error threshold [m] for determining if IK targets are reachable.
-  real positionErrorThres [units(m)] = 1e-2;
+  real positionErrorThres [units("m")] = 1e-2;
 
   // @brief Rotation error threshold [radians] for determining if IK targets are reachable.
-  real rotationErrorThres [units(rad)] = 1e-2;
+  real rotationErrorThres [units("rad")] = 1e-2;
 
   // @brief Maximum line search iterations per Newton step.
   //
@@ -364,17 +364,17 @@ struct experimental::ExperimentalSoftSkinnedActorParams [no_reflection] {
 }
 
 struct experimental::RodMaterialParams [no_reflection] {
-  real linearDensity [units(kg/m)] = 1e-1;
-  real linearRotationalInertia [units(kg*m)] = 1e-6;
-  real axialStiffness [units(N)] = 1e2;
-  real torsionalStiffness [units(N*m^2)] = 5e-4;
-  Real2 flexuralStiffness [units(N*m^2)] = {5e-4, 5e-4};
-  real massDampingCoefficient [units(1/s)] = 0;
-  real stiffnessDampingCoefficient [units(s)] = 0;
+  real linearDensity [units("kg/m")] = 1e-1;
+  real linearRotationalInertia [units("kg*m")] = 1e-6;
+  real axialStiffness [units("N")] = 1e2;
+  real torsionalStiffness [units("N*m^2")] = 5e-4;
+  Real2 flexuralStiffness [units("N*m^2")] = {5e-4, 5e-4};
+  real massDampingCoefficient [units("1/s")] = 0;
+  real stiffnessDampingCoefficient [units("s")] = 0;
 }
 
 struct experimental::PointCloudColliderParams [no_reflection] {
-  real radius [units(m)] = 0.01;
+  real radius [units("m")] = 0.01;
   real selfContactExclusionRatio = 1.5;
   real spatialHashLoadFactor = 0.0625;
   bool selfContact = false;
@@ -404,7 +404,9 @@ struct experimental::RodActorParams [no_reflection] {
   // ModelData::visualMesh. Without visual-mesh skinning, @ref Context::GetShapeVisualMesh still
   // returns the shape's visual mesh, but the rod actor ignores it: @ref Actor::GetVisualMesh returns
   // an empty view, and @ref QueryType::VisualNodePositions and @ref QueryType::VisualNodeNormals are
-  // unsupported. Setting @ref useVisualMeshContact to true then causes actor creation to fail.
+  // unsupported.
+  // @note Setting @ref useContactSkin to true requires @ref ModelData::contactSkinMesh and its
+  // skinning data.
   ShapeHandle shape;
 
   // @brief Contact properties for interactions with volume actors.
@@ -425,29 +427,30 @@ struct experimental::RodActorParams [no_reflection] {
   // @brief Enables gravity.
   bool hasGravity = true;
 
-  // @brief Places contact samples on the rod's visual (triangular) mesh instead of the centerline.
+  // @brief Use the rod shape's contact skin for contact instead of its centerline.
   //
-  // @note Forces are transmitted to rod degrees of freedom through the skinning Jacobian. Requires
-  // the rod shape to have a visual mesh with embedding data.
-  bool useVisualMeshContact = false;
+  // @details Actor creation fails if the shape does not have a triangular contact skin with rod
+  // embedding data.
+  bool useContactSkin = false;
 
-  // @brief Element type controlling the number of visual-mesh contact samples per triangle. Only
-  // used when visual-mesh contact is enabled.
-  ActorBoundaryElementType visualMeshContactElementType = Default;
+  // @brief Triangle element type for contact-skin quadrature.
+  //
+  // @note @ref RodActorParams::contactElementType controls centerline sampling instead.
+  ActorBoundaryElementType contactSkinElementType = Default;
 }
 
 fn experimental::CreateRodActor(Scene* scene, experimental::RodActorParams const& params) -> Actor* [mochi_error, nullable];
 
-fn experimental::GenerateTubularRodModelData(Span<Real3 const> nodes [units(m)], Span<Real3 const> elementFrameAxes, real radius [units(m)], int numCrossSectionSegments, bool isClosedLoop) -> ModelData [mochi_error, no_capi];
+fn experimental::GenerateTubularRodModelData(Span<Real3 const> nodes [units("m")], Span<Real3 const> elementFrameAxes, real radius [units("m")], int numCrossSectionSegments, bool isClosedLoop) -> ModelData [mochi_error, no_capi];
 
 struct experimental::ShellMaterialParams [no_reflection] {
-  real membraneLambda [units(Pa*m)] = 300;
-  real membraneMu [units(Pa*m)] = 400;
-  real bendingAlpha [units(Pa*m^3)] = 0.00002;
-  real bendingBeta [units(Pa*m^3)] = 0.00007;
-  real density [units(kg/m^2)] = 1.0;
-  real massDampingCoefficient [units(1/s)] = 0;
-  real stiffnessDampingCoefficient [units(s)] = 0;
+  real membraneLambda [units("Pa*m")] = 300;
+  real membraneMu [units("Pa*m")] = 400;
+  real bendingAlpha [units("Pa*m^3")] = 0.00002;
+  real bendingBeta [units("Pa*m^3")] = 0.00007;
+  real density [units("kg/m^2")] = 1.0;
+  real massDampingCoefficient [units("1/s")] = 0;
+  real stiffnessDampingCoefficient [units("s")] = 0;
 }
 
 // @brief Parameters for creating an experimental shell actor.
@@ -508,7 +511,7 @@ fn experimental::ShellMaterialParamsFrom3dIsotropic(real youngsModulus3d, real p
 // @return Normal viscous damping coefficient [s/m]; 0 on error.
 //
 // @see EffectiveCoefficientOfRestitution, ContactParams::normalViscousDampingCoefficient
-fn experimental::CalibrateNormalViscousDampingCoefficient(real cor, real impactVelocity) -> real [mochi_error, units(s/m)];
+fn experimental::CalibrateNormalViscousDampingCoefficient(real cor, real impactVelocity) -> real [mochi_error, units("s/m")];
 
 // @brief Effective coefficient of restitution (CoR) produced by a normal viscous damping
 // coefficient at an impact velocity.

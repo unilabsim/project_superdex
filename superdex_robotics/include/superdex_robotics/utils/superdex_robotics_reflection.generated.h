@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <limits>
 #include <mochi_core/utils/reflection.h>
 #include <superdex_robotics/superdex_robotics.h>
 

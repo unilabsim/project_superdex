@@ -18,50 +18,50 @@
 
 // clang-format off
 
-#include <pybind11/pybind11.h>
+#include <limits>
+#include <nanobind/nanobind.h>
 #include "../pybind_include.h"
 
 using namespace mochi;
-namespace py = pybind11;
-using namespace pybind11::literals;
+namespace nb = nanobind;
 
 namespace mochi {
   // Forward declarations for the definitions below.
-  void DeclareMochiPhysics_MochiPhysicsHandle(py::module_& m, PybindRegistry& registry);
-  void DefineMochiPhysics_MochiPhysicsHandle(py::module_& m, PybindRegistry& registry);
+  void DeclareMochiPhysics_MochiPhysicsHandle(nb::module_& m, PybindRegistry& registry);
+  void DefineMochiPhysics_MochiPhysicsHandle(nb::module_& m, PybindRegistry& registry);
 } // namespace mochi
 
-void mochi::DeclareMochiPhysics_MochiPhysicsHandle([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
-  registry.StoreClass(py::class_<mochi::Handle>(m, "Handle", "Generic 64-bit handle providing base functionality for strongly-typed handles."));
-  registry.StoreClass(py::class_<mochi::SceneHandle, mochi::Handle>(m, "SceneHandle", "Unique identifier for a :class:`~superdex.physics.Scene` within a Mochi context."));
-  registry.StoreClass(py::class_<mochi::ActorHandle, mochi::Handle>(m, "ActorHandle", "Unique identifier for an :class:`~superdex.physics.Actor` within a\n:class:`~superdex.physics.Scene`.\n\nNote:\n    An :class:`~superdex.physics.ActorHandle` can only be used with the\n    :class:`~superdex.physics.Scene` that created it.\n\nNote:\n    Creating and destroying many actors in the same scene may eventually cause\n    an :class:`~superdex.physics.ActorHandle` value from a previously destroyed\n    actor to be re-used."));
-  registry.StoreClass(py::class_<mochi::ShapeHandle, mochi::Handle>(m, "ShapeHandle", "Handle to a shape (mesh, sphere, plane, etc.) within a Mochi context.\n\nThe shape remains in memory while referenced by any handle, actor, or file cache\nentry. In C++ and Python, :class:`~superdex.physics.ShapeHandle` is\nreference-counted and releases its reference automatically when destroyed. In\nthe C API, you must call :func:`~superdex.physics.release_shape` when done with\nthe handle.\n\nSee Also:\n    :func:`~superdex.physics.release_shape`"));
-  registry.StoreClass(py::class_<mochi::CallbackHandle, mochi::Handle>(m, "CallbackHandle", "Unique identifier for a callback registration within a\n:class:`~superdex.physics.Scene`.\n\nNote:\n    A :class:`~superdex.physics.CallbackHandle` can only be used with the\n    :class:`~superdex.physics.Scene` that created it."));
-  registry.StoreClass(py::class_<mochi::ConstraintHandle, mochi::Handle>(m, "ConstraintHandle", "Unique identifier for a :class:`~superdex.physics.Constraint` within a\n:class:`~superdex.physics.Scene`.\n\nNote:\n    A :class:`~superdex.physics.ConstraintHandle` can only be used with the\n    :class:`~superdex.physics.Scene` that created it.\n\nNote:\n    Creating and destroying many constraints in the same scene may eventually\n    cause a :class:`~superdex.physics.ConstraintHandle` value from a previously\n    destroyed constraint to be re-used."));
-  registry.StoreClass(py::class_<mochi::StateHandle, mochi::Handle>(m, "StateHandle", "Unique identifier for a captured simulation state within a\n:class:`~superdex.physics.Scene`.\n\nNote:\n    A :class:`~superdex.physics.StateHandle` can only be used with the\n    :class:`~superdex.physics.Scene` that created it.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.capture_state`,\n    :meth:`~superdex.physics.Scene.restore_state`,\n    :meth:`~superdex.physics.Scene.release_state`"));
-  registry.StoreClass(py::class_<mochi::QueryHandle, mochi::Handle>(m, "QueryHandle", "Unique identifier for a query within a :class:`~superdex.physics.Scene`.\n\nNote:\n    A :class:`~superdex.physics.QueryHandle` can only be used with the\n    :class:`~superdex.physics.Scene` that created it.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.register_query`,\n    :meth:`~superdex.physics.Actor.cancel_query`,\n    :meth:`~superdex.physics.Constraint.register_query`,\n    :meth:`~superdex.physics.Constraint.cancel_query`"));
+void mochi::DeclareMochiPhysics_MochiPhysicsHandle([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+  registry.StoreClass(nb::class_<mochi::Handle>(m, "Handle", "Generic 64-bit handle providing base functionality for strongly-typed handles."));
+  registry.StoreClass(nb::class_<mochi::SceneHandle, mochi::Handle>(m, "SceneHandle", "Unique identifier for a :class:`~superdex.physics.Scene` within a Mochi context."));
+  registry.StoreClass(nb::class_<mochi::ActorHandle, mochi::Handle>(m, "ActorHandle", "Unique identifier for an :class:`~superdex.physics.Actor` within a\n:class:`~superdex.physics.Scene`.\n\nNote:\n    An :class:`~superdex.physics.ActorHandle` can only be used with the\n    :class:`~superdex.physics.Scene` that created it.\n\nNote:\n    Creating and destroying many actors in the same scene may eventually cause\n    an :class:`~superdex.physics.ActorHandle` value from a previously destroyed\n    actor to be re-used."));
+  registry.StoreClass(nb::class_<mochi::ShapeHandle, mochi::Handle>(m, "ShapeHandle", "Handle to a shape (mesh, sphere, plane, etc.) within a Mochi context.\n\nThe shape remains in memory while referenced by any handle, actor, or file cache\nentry. In C++ and Python, :class:`~superdex.physics.ShapeHandle` is\nreference-counted and releases its reference automatically when destroyed. In\nthe C API, you must call :func:`~superdex.physics.release_shape` when done with\nthe handle.\n\nSee Also:\n    :func:`~superdex.physics.release_shape`"));
+  registry.StoreClass(nb::class_<mochi::CallbackHandle, mochi::Handle>(m, "CallbackHandle", "Unique identifier for a callback registration within a\n:class:`~superdex.physics.Scene`.\n\nNote:\n    A :class:`~superdex.physics.CallbackHandle` can only be used with the\n    :class:`~superdex.physics.Scene` that created it."));
+  registry.StoreClass(nb::class_<mochi::ConstraintHandle, mochi::Handle>(m, "ConstraintHandle", "Unique identifier for a :class:`~superdex.physics.Constraint` within a\n:class:`~superdex.physics.Scene`.\n\nNote:\n    A :class:`~superdex.physics.ConstraintHandle` can only be used with the\n    :class:`~superdex.physics.Scene` that created it.\n\nNote:\n    Creating and destroying many constraints in the same scene may eventually\n    cause a :class:`~superdex.physics.ConstraintHandle` value from a previously\n    destroyed constraint to be re-used."));
+  registry.StoreClass(nb::class_<mochi::StateHandle, mochi::Handle>(m, "StateHandle", "Unique identifier for a captured simulation state within a\n:class:`~superdex.physics.Scene`.\n\nNote:\n    A :class:`~superdex.physics.StateHandle` can only be used with the\n    :class:`~superdex.physics.Scene` that created it.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.capture_state`,\n    :meth:`~superdex.physics.Scene.restore_state`,\n    :meth:`~superdex.physics.Scene.release_state`"));
+  registry.StoreClass(nb::class_<mochi::QueryHandle, mochi::Handle>(m, "QueryHandle", "Unique identifier for a query within a :class:`~superdex.physics.Scene`.\n\nNote:\n    A :class:`~superdex.physics.QueryHandle` can only be used with the\n    :class:`~superdex.physics.Scene` that created it.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.register_query`,\n    :meth:`~superdex.physics.Actor.cancel_query`,\n    :meth:`~superdex.physics.Constraint.register_query`,\n    :meth:`~superdex.physics.Constraint.cancel_query`"));
 }
 
-void mochi::DefineMochiPhysics_MochiPhysicsHandle([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+void mochi::DefineMochiPhysics_MochiPhysicsHandle([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
   registry.GetClass<mochi::Handle>()
-    .def(py::init([](py::object value) {
-      mochi::Handle result;
-      result.value = py::cast<mochi::Handle::ValueType>(value);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("value") = mochi::Handle{}.value
+    .def("__init__", [](mochi::Handle* self, nb::object value) {
+      mochi::Handle result{};
+      result.value = nb::cast<mochi::Handle::ValueType>(value);
+      new (self) mochi::Handle(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("value") = mochi::Handle{}.value
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
-    .def(py::self < py::self)
-    .def("__hash__", [](mochi::Handle const& self) { return static_cast<py::ssize_t>(std::hash<mochi::Handle>{}(self)); })
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
+    .def(nb::self < nb::self)
+    .def("__hash__", [](mochi::Handle const& self) { return static_cast<Py_ssize_t>(std::hash<mochi::Handle>{}(self)); })
     .def("__copy__", [](mochi::Handle const& self) { return mochi::Handle(self); })
-    .def("__deepcopy__", [](mochi::Handle const& self, py::dict) { return mochi::Handle(self); })
-    .def_readwrite("value", &mochi::Handle::value, "Raw 64-bit identifier. Zero indicates an invalid handle.")
-    .def(py::init<mochi::Handle::ValueType>()
-      , py::arg("raw")
+    .def("__deepcopy__", [](mochi::Handle const& self, nb::dict) { return mochi::Handle(self); })
+    .def_rw("value", &mochi::Handle::value, "Raw 64-bit identifier. Zero indicates an invalid handle.")
+    .def(nb::init<mochi::Handle::ValueType>()
+      , nb::arg("raw")
       , "Construct a handle from its raw 64-bit identifier.\n\nArgs:\n    raw (ValueTypeLike): The raw handle identifier."
     )
     .def("is_valid", &mochi::Handle::IsValid
@@ -71,108 +71,108 @@ void mochi::DefineMochiPhysics_MochiPhysicsHandle([[maybe_unused]] py::module_& 
       , "Compute a hash of the handle for use in unordered containers.\n\nReturns:\n    The hash of the handle's raw identifier."
     )
   ;
-  registry.GetClass<mochi::Handle>().attr("ValueType") = py::module_::import("builtins").attr("int");
-  registry.GetClass<mochi::Handle>().attr("ValueTypeLike") = py::module_::import("builtins").attr("int");
+  registry.GetClass<mochi::Handle>().attr("ValueType") = nb::module_::import_("builtins").attr("int");
+  registry.GetClass<mochi::Handle>().attr("ValueTypeLike") = nb::module_::import_("builtins").attr("int");
 
   registry.GetClass<mochi::SceneHandle, mochi::Handle>()
-    .def(py::init([](py::object value) {
-      mochi::SceneHandle result;
-      result.value = py::cast<mochi::Handle::ValueType>(value);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("value") = mochi::SceneHandle{}.value
+    .def("__init__", [](mochi::SceneHandle* self, nb::object value) {
+      mochi::SceneHandle result{};
+      result.value = nb::cast<mochi::Handle::ValueType>(value);
+      new (self) mochi::SceneHandle(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("value") = mochi::SceneHandle{}.value
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::SceneHandle const& self) { return mochi::SceneHandle(self); })
-    .def("__deepcopy__", [](mochi::SceneHandle const& self, py::dict) { return mochi::SceneHandle(self); })
+    .def("__deepcopy__", [](mochi::SceneHandle const& self, nb::dict) { return mochi::SceneHandle(self); })
   ;
 
   registry.GetClass<mochi::ActorHandle, mochi::Handle>()
-    .def(py::init([](py::object value) {
-      mochi::ActorHandle result;
-      result.value = py::cast<mochi::Handle::ValueType>(value);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("value") = mochi::ActorHandle{}.value
+    .def("__init__", [](mochi::ActorHandle* self, nb::object value) {
+      mochi::ActorHandle result{};
+      result.value = nb::cast<mochi::Handle::ValueType>(value);
+      new (self) mochi::ActorHandle(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("value") = mochi::ActorHandle{}.value
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::ActorHandle const& self) { return mochi::ActorHandle(self); })
-    .def("__deepcopy__", [](mochi::ActorHandle const& self, py::dict) { return mochi::ActorHandle(self); })
+    .def("__deepcopy__", [](mochi::ActorHandle const& self, nb::dict) { return mochi::ActorHandle(self); })
   ;
 
   registry.GetClass<mochi::ShapeHandle, mochi::Handle>()
-    .def(py::init([](py::object value) {
-      mochi::ShapeHandle result;
-      result.value = py::cast<mochi::Handle::ValueType>(value);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("value") = mochi::ShapeHandle{}.value
+    .def("__init__", [](mochi::ShapeHandle* self, nb::object value) {
+      mochi::ShapeHandle result{};
+      result.value = nb::cast<mochi::Handle::ValueType>(value);
+      new (self) mochi::ShapeHandle(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("value") = mochi::ShapeHandle{}.value
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::ShapeHandle const& self) { return mochi::ShapeHandle(self); })
-    .def("__deepcopy__", [](mochi::ShapeHandle const& self, py::dict) { return mochi::ShapeHandle(self); })
+    .def("__deepcopy__", [](mochi::ShapeHandle const& self, nb::dict) { return mochi::ShapeHandle(self); })
   ;
 
   registry.GetClass<mochi::CallbackHandle, mochi::Handle>()
-    .def(py::init([](py::object value) {
-      mochi::CallbackHandle result;
-      result.value = py::cast<mochi::Handle::ValueType>(value);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("value") = mochi::CallbackHandle{}.value
+    .def("__init__", [](mochi::CallbackHandle* self, nb::object value) {
+      mochi::CallbackHandle result{};
+      result.value = nb::cast<mochi::Handle::ValueType>(value);
+      new (self) mochi::CallbackHandle(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("value") = mochi::CallbackHandle{}.value
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::CallbackHandle const& self) { return mochi::CallbackHandle(self); })
-    .def("__deepcopy__", [](mochi::CallbackHandle const& self, py::dict) { return mochi::CallbackHandle(self); })
+    .def("__deepcopy__", [](mochi::CallbackHandle const& self, nb::dict) { return mochi::CallbackHandle(self); })
   ;
 
   registry.GetClass<mochi::ConstraintHandle, mochi::Handle>()
-    .def(py::init([](py::object value) {
-      mochi::ConstraintHandle result;
-      result.value = py::cast<mochi::Handle::ValueType>(value);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("value") = mochi::ConstraintHandle{}.value
+    .def("__init__", [](mochi::ConstraintHandle* self, nb::object value) {
+      mochi::ConstraintHandle result{};
+      result.value = nb::cast<mochi::Handle::ValueType>(value);
+      new (self) mochi::ConstraintHandle(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("value") = mochi::ConstraintHandle{}.value
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::ConstraintHandle const& self) { return mochi::ConstraintHandle(self); })
-    .def("__deepcopy__", [](mochi::ConstraintHandle const& self, py::dict) { return mochi::ConstraintHandle(self); })
+    .def("__deepcopy__", [](mochi::ConstraintHandle const& self, nb::dict) { return mochi::ConstraintHandle(self); })
   ;
 
   registry.GetClass<mochi::StateHandle, mochi::Handle>()
-    .def(py::init([](py::object value) {
-      mochi::StateHandle result;
-      result.value = py::cast<mochi::Handle::ValueType>(value);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("value") = mochi::StateHandle{}.value
+    .def("__init__", [](mochi::StateHandle* self, nb::object value) {
+      mochi::StateHandle result{};
+      result.value = nb::cast<mochi::Handle::ValueType>(value);
+      new (self) mochi::StateHandle(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("value") = mochi::StateHandle{}.value
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::StateHandle const& self) { return mochi::StateHandle(self); })
-    .def("__deepcopy__", [](mochi::StateHandle const& self, py::dict) { return mochi::StateHandle(self); })
+    .def("__deepcopy__", [](mochi::StateHandle const& self, nb::dict) { return mochi::StateHandle(self); })
   ;
 
   registry.GetClass<mochi::QueryHandle, mochi::Handle>()
-    .def(py::init([](py::object value) {
-      mochi::QueryHandle result;
-      result.value = py::cast<mochi::Handle::ValueType>(value);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("value") = mochi::QueryHandle{}.value
+    .def("__init__", [](mochi::QueryHandle* self, nb::object value) {
+      mochi::QueryHandle result{};
+      result.value = nb::cast<mochi::Handle::ValueType>(value);
+      new (self) mochi::QueryHandle(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("value") = mochi::QueryHandle{}.value
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::QueryHandle const& self) { return mochi::QueryHandle(self); })
-    .def("__deepcopy__", [](mochi::QueryHandle const& self, py::dict) { return mochi::QueryHandle(self); })
+    .def("__deepcopy__", [](mochi::QueryHandle const& self, nb::dict) { return mochi::QueryHandle(self); })
   ;
 
-    m.attr("INVALID_HANDLE") = py::cast(mochi::kInvalidHandle);
+    m.attr("INVALID_HANDLE") = nb::cast(mochi::kInvalidHandle);
 
 }
 // clang-format on

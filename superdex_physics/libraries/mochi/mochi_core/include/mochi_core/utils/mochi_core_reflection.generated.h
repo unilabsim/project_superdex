@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <limits>
 #include <mochi_core/utils/reflection.h>
 
 // clang-format on

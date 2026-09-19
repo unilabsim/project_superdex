@@ -14,6 +14,11 @@
 
 from __future__ import annotations
 
+from .registration import register_envs as _register_envs
+
+_register_envs()
+del _register_envs
+
 from . import envs
 from .envs import *  # noqa: F401,F403
 

@@ -18,25 +18,78 @@
 
 #include "pybind_helpers.h"
 
-namespace pybind11::detail {
+#include <mochi_core/utils/dynamic_string.h>
+
+namespace nanobind::detail {
+
+// Caster for mochi::DynamicString (a std::basic_string with a custom StlAllocator). nanobind's
+// bundled std::string caster only matches the default allocator, so this custom-allocator string
+// needs its own caster. pybind11's stl.h matched any allocator, which is why this was implicit
+// before. Converts to/from Python str.
+template <>
+struct type_caster<mochi::DynamicString> {
+  NB_TYPE_CASTER(mochi::DynamicString, const_name("str"))
+
+  bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
+    return mochi::TranslatePythonCasterExceptions(
+        [&] { return FromPython(src); }, "Unexpected error converting to DynamicString");
+  }
+
+  bool FromPython(handle src) {
+    if (!src.is_valid()) {
+      return false;
+    }
+    if (PyUnicode_Check(src.ptr())) {
+      Py_ssize_t size = 0;
+      char const* buffer = PyUnicode_AsUTF8AndSize(src.ptr(), &size);
+      if (!buffer) {
+        PyErr_Clear();
+        return false;
+      }
+      value = mochi::DynamicString(buffer, static_cast<size_t>(size));
+      return true;
+    }
+    if (PyBytes_Check(src.ptr())) {
+      char* buffer = nullptr;
+      Py_ssize_t size = 0;
+      if (PyBytes_AsStringAndSize(src.ptr(), &buffer, &size) != 0) {
+        PyErr_Clear();
+        return false;
+      }
+      value = mochi::DynamicString(buffer, static_cast<size_t>(size));
+      return true;
+    }
+    return false;
+  }
+
+  static handle from_cpp(mochi::DynamicString const& src, rv_policy, cleanup_list*) noexcept {
+    return PyUnicode_FromStringAndSize(src.data(), static_cast<Py_ssize_t>(src.size()));
+  }
+};
 
 // Full specialization of type_caster for std::string_view that keeps the source Python object
-// alive. pybind11's default partial specialization points directly into CPython's internal UTF-8
-// buffer without holding a reference to the Python str object.
+// alive. nanobind's default caster points directly into CPython's internal UTF-8 buffer without
+// holding a reference to the Python str object.
 //
 // This is normally safe while the GIL is held, but becomes unsafe when the GIL is released via
-// py::call_guard<py::gil_scoped_release>(): another thread could garbage-collect the string,
-// invalidating the string_view.
+// nb::call_guard<nb::gil_scoped_release>(): another thread could garbage-collect the string,
+// invalidating the string_view. The caster instance lives on the dispatcher stack for the whole
+// duration of the wrapped call, so storing a strong reference here prevents GC while the
+// string_view is in use.
 //
-// This specialization stores a pybind11::object to prevent GC, following the same pattern as
-// type_caster<mochi::Span<T>> in pybind_span.h.
+// This follows the same pattern as type_caster<mochi::Span<T>> in pybind_span.h.
 template <>
 struct type_caster<std::string_view> {
-  PYBIND11_TYPE_CASTER(std::string_view, _("str"));
+  NB_TYPE_CASTER(std::string_view, const_name("str"))
 
   // Conversion from Python to C++
-  bool load(handle src, bool) {
-    if (!src) {
+  bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
+    return mochi::TranslatePythonCasterExceptions(
+        [&] { return FromPython(src); }, "Unexpected error converting to string_view");
+  }
+
+  bool FromPython(handle src) {
+    if (!src.is_valid()) {
       return false;
     }
     if (PyUnicode_Check(src.ptr())) {
@@ -47,7 +100,7 @@ struct type_caster<std::string_view> {
         return false;
       }
       value = std::string_view(buffer, static_cast<size_t>(size));
-      _source = reinterpret_borrow<object>(src);
+      _source = borrow<object>(src);
       return true;
     }
     if (PyBytes_Check(src.ptr())) {
@@ -57,19 +110,19 @@ struct type_caster<std::string_view> {
         return false;
       }
       value = std::string_view(buffer, static_cast<size_t>(PyBytes_Size(src.ptr())));
-      _source = reinterpret_borrow<object>(src);
+      _source = borrow<object>(src);
       return true;
     }
     return false;
   }
 
   // Conversion from C++ to Python
-  static handle cast(std::string_view src, return_value_policy, handle) {
-    return str(src.data(), src.size()).release();
+  static handle from_cpp(std::string_view src, rv_policy, cleanup_list*) noexcept {
+    return PyUnicode_FromStringAndSize(src.data(), static_cast<Py_ssize_t>(src.size()));
   }
 
  private:
   object _source; // Prevent GC of the Python str/bytes while the string_view is alive
 };
 
-} // namespace pybind11::detail
+} // namespace nanobind::detail

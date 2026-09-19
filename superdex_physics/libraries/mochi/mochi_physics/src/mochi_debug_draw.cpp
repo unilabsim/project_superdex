@@ -713,4 +713,21 @@ std::unique_ptr<DebugDrawInternal> DebugDrawInternal::Create(entt::registry& reg
   return std::make_unique<DebugDrawImpl>(registry);
 }
 
+DynamicArray<DebugDrawFeatureInfo> GetDebugDrawFeatureCatalog() {
+  // Build a throwaway DebugDraw on a scratch registry just to enumerate the features.
+  entt::registry registry;
+  auto const debugDraw = DebugDrawInternal::Create(registry);
+  RegisterDebugDrawSystems(*debugDraw);
+
+  DynamicArray<DebugDrawFeatureInfo> features;
+  features.reserve(debugDraw->GetNumFeatures());
+  for (int i = 0; i < debugDraw->GetNumFeatures(); ++i) {
+    features.push_back(
+        DebugDrawFeatureInfo{
+            std::string{debugDraw->GetFeatureName(i)},
+            std::string{debugDraw->GetFeatureDescription(i)}});
+  }
+  return features;
+}
+
 } // namespace mochi

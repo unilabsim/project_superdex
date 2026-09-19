@@ -388,10 +388,10 @@ struct LinearSolverParams {
   real relDivTol = 1e10_r;
 
   /**
-   * @brief Maximum number of linear solver iterations.
+   * @brief Maximum number of iterations for iterative solvers.
    *
    * @note Applies only to iterative solvers.
-   * @note Must be non-negative or @ref kAutoLinearSolverMaxIter.
+   * @note Must be positive or @ref kAutoLinearSolverMaxIter.
    * @note @ref kAutoLinearSolverMaxIter lets Mochi select the maximum number of iterations based
    * on the problem.
    */

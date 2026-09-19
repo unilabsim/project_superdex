@@ -18,21 +18,21 @@
 
 // clang-format off
 
-#include <pybind11/pybind11.h>
+#include <limits>
+#include <nanobind/nanobind.h>
 #include "../pybind_include.h"
 
 using namespace mochi;
-namespace py = pybind11;
-using namespace pybind11::literals;
+namespace nb = nanobind;
 
 namespace mochi {
   // Forward declarations for the definitions below.
-  void DeclareMochiPhysics_MochiPhysicsEnums(py::module_& m, PybindRegistry& registry);
-  void DefineMochiPhysics_MochiPhysicsEnums(py::module_& m, PybindRegistry& registry);
+  void DeclareMochiPhysics_MochiPhysicsEnums(nb::module_& m, PybindRegistry& registry);
+  void DefineMochiPhysics_MochiPhysicsEnums(nb::module_& m, PybindRegistry& registry);
 } // namespace mochi
 
-void mochi::DeclareMochiPhysics_MochiPhysicsEnums([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
-  py::enum_<mochi::ActorType>(m, "ActorType", "Type of actor.\n\nSee Also:\n    :class:`~superdex.physics.Actor`, :meth:`~superdex.physics.Actor.get_type`")
+void mochi::DeclareMochiPhysics_MochiPhysicsEnums([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+  nb::enum_<mochi::ActorType>(m, "ActorType", "Type of actor.\n\nSee Also:\n    :class:`~superdex.physics.Actor`, :meth:`~superdex.physics.Actor.get_type`")
     .value("NONE", mochi::ActorType::None, "Invalid actor type.")
     .value("RIGID", mochi::ActorType::Rigid, "Rigid body actor.")
     .value("SOFT", mochi::ActorType::Soft, "Volumetric deformable actor.")
@@ -42,32 +42,40 @@ void mochi::DeclareMochiPhysics_MochiPhysicsEnums([[maybe_unused]] py::module_& 
     .value("COUNT", mochi::ActorType::Count, "Number of actor type enum values.")
   ;
 
-  py::enum_<mochi::BoundarySubsamplingStrategy>(m, "BoundarySubsamplingStrategy", "Strategy for selecting the active boundary faces when subsampling boundary\nintegrals.")
+  nb::enum_<mochi::BoundarySubsamplingStrategy>(m, "BoundarySubsamplingStrategy", "Strategy for selecting the active boundary faces when subsampling boundary\nintegrals.")
     .value("UNIFORM_PROBABILITY", mochi::BoundarySubsamplingStrategy::UniformProbability, "Select boundary faces with uniform probability.\n    \n    Note:\n        Results in sample density following mesh resolution. Areas with more\n        triangles have more samples.\n    \n    Note:\n        Active boundary faces are selected deterministically using uniformly-spaced\n        indices.")
     .value("AREA_PROPORTIONAL", mochi::BoundarySubsamplingStrategy::AreaProportional, "Select boundary faces with probability proportional to their area.\n    \n    Note:\n        Larger faces have higher selection probability.\n    \n    Note:\n        Results in more uniform spatial distribution of sample points, independent\n        of mesh resolution.")
     .value("COUNT", mochi::BoundarySubsamplingStrategy::Count, "Number of boundary subsampling strategy enum values.")
   ;
 
-  py::enum_<mochi::ActorBoundaryElementType>(m, "ActorBoundaryElementType", "Two-dimensional discretization element types for actor boundary integrals.\n\nNote:\n    PxQy indicates x-th order elements with y quadrature points.")
-    .value("P1Q1", mochi::ActorBoundaryElementType::P1Q1, "Linear elements (P1), Dunavant quadrature with 1 point (Q1).")
-    .value("P1Q3", mochi::ActorBoundaryElementType::P1Q3, "Linear elements (P1), Dunavant quadrature with 3 points (Q3).")
-    .value("P1Q6", mochi::ActorBoundaryElementType::P1Q6, "Linear elements (P1), Dunavant quadrature with 6 points (Q6).")
-    .value("EXPERIMENTAL_P1Q7", mochi::ActorBoundaryElementType::ExperimentalP1Q7, "[Experimental] Linear elements (P1), Lyness-Jespersen quadrature with 7 points\n    (Q7).\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
-    .value("EXPERIMENTAL_P1Q12", mochi::ActorBoundaryElementType::ExperimentalP1Q12, "[Experimental] Linear elements (P1), Dunavant quadrature with 12 points (Q12).\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
-    .value("EXPERIMENTAL_P1Q16", mochi::ActorBoundaryElementType::ExperimentalP1Q16, "[Experimental] Linear elements (P1), Lyness-Jespersen quadrature with 16 points\n    (Q16).\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
-    .value("COUNT", mochi::ActorBoundaryElementType::Count, "Number of actor boundary element type enum values.")
-    .value("DEFAULT", mochi::ActorBoundaryElementType::Default, "Default actor boundary element type.")
-  ;
+  {
+    auto boundEnum = nb::enum_<mochi::ActorBoundaryElementType>(m, "ActorBoundaryElementType", "Two-dimensional discretization element types for actor boundary integrals.\n\nNote:\n    PxQy indicates x-th order elements with y quadrature points.");
+    boundEnum
+      .value("P1Q1", mochi::ActorBoundaryElementType::P1Q1, "Linear elements (P1), Dunavant quadrature with 1 point (Q1).")
+      .value("P1Q3", mochi::ActorBoundaryElementType::P1Q3, "Linear elements (P1), Dunavant quadrature with 3 points (Q3).")
+      .value("P1Q6", mochi::ActorBoundaryElementType::P1Q6, "Linear elements (P1), Dunavant quadrature with 6 points (Q6).")
+      .value("EXPERIMENTAL_P1Q7", mochi::ActorBoundaryElementType::ExperimentalP1Q7, "[Experimental] Linear elements (P1), Lyness-Jespersen quadrature with 7 points\n    (Q7).\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
+      .value("EXPERIMENTAL_P1Q12", mochi::ActorBoundaryElementType::ExperimentalP1Q12, "[Experimental] Linear elements (P1), Dunavant quadrature with 12 points (Q12).\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
+      .value("EXPERIMENTAL_P1Q16", mochi::ActorBoundaryElementType::ExperimentalP1Q16, "[Experimental] Linear elements (P1), Lyness-Jespersen quadrature with 16 points\n    (Q16).\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
+      .value("COUNT", mochi::ActorBoundaryElementType::Count, "Number of actor boundary element type enum values.")
+    ;
+    boundEnum.attr("DEFAULT") = boundEnum.attr("P1Q3");
+    nb::cast<nb::dict>(boundEnum.attr("_member_map_")).attr("__setitem__")("DEFAULT", boundEnum.attr("P1Q3"));
+  }
 
-  py::enum_<mochi::ActorSegmentElementType>(m, "ActorSegmentElementType", "One-dimensional discretization element types for actor segment integrals.\n\nNote:\n    PxQy indicates x-th order elements with y quadrature points.")
-    .value("P1Q1", mochi::ActorSegmentElementType::P1Q1, "Linear elements (P1), Gauss-Legendre quadrature with 1 point (Q1).")
-    .value("P1Q2", mochi::ActorSegmentElementType::P1Q2, "Linear elements (P1), Gauss-Legendre quadrature with 2 points (Q2).")
-    .value("P1Q3", mochi::ActorSegmentElementType::P1Q3, "Linear elements (P1), Gauss-Legendre quadrature with 3 points (Q3).")
-    .value("COUNT", mochi::ActorSegmentElementType::Count, "Number of actor segment element type enum values.")
-    .value("DEFAULT", mochi::ActorSegmentElementType::Default, "Default actor segment element type.")
-  ;
+  {
+    auto boundEnum = nb::enum_<mochi::ActorSegmentElementType>(m, "ActorSegmentElementType", "One-dimensional discretization element types for actor segment integrals.\n\nNote:\n    PxQy indicates x-th order elements with y quadrature points.");
+    boundEnum
+      .value("P1Q1", mochi::ActorSegmentElementType::P1Q1, "Linear elements (P1), Gauss-Legendre quadrature with 1 point (Q1).")
+      .value("P1Q2", mochi::ActorSegmentElementType::P1Q2, "Linear elements (P1), Gauss-Legendre quadrature with 2 points (Q2).")
+      .value("P1Q3", mochi::ActorSegmentElementType::P1Q3, "Linear elements (P1), Gauss-Legendre quadrature with 3 points (Q3).")
+      .value("COUNT", mochi::ActorSegmentElementType::Count, "Number of actor segment element type enum values.")
+    ;
+    boundEnum.attr("DEFAULT") = boundEnum.attr("P1Q3");
+    nb::cast<nb::dict>(boundEnum.attr("_member_map_")).attr("__setitem__")("DEFAULT", boundEnum.attr("P1Q3"));
+  }
 
-  py::enum_<mochi::ConstraintType>(m, "ConstraintType", "Type of constraint acting on actors' degrees of freedom.\n\nEach constraint type enforces specific relationships between actor DoFs, such as\nfixing positions, limiting joint ranges, or maintaining rigid connections. The\ntype determines which constraint methods are applicable and what parameters are\nrequired.\n\nSee Also:\n    :class:`~superdex.physics.Constraint`,\n    :meth:`~superdex.physics.Constraint.get_type`")
+  nb::enum_<mochi::ConstraintType>(m, "ConstraintType", "Type of constraint acting on actors' degrees of freedom.\n\nEach constraint type enforces specific relationships between actor DoFs, such as\nfixing positions, limiting joint ranges, or maintaining rigid connections. The\ntype determines which constraint methods are applicable and what parameters are\nrequired.\n\nSee Also:\n    :class:`~superdex.physics.Constraint`,\n    :meth:`~superdex.physics.Constraint.get_type`")
     .value("NONE", mochi::ConstraintType::None, "Invalid constraint type.")
     .value("ARTICULATED_SINGLE_DOF_RANGE", mochi::ConstraintType::ArticulatedSingleDofRange, "Range constraint on a single articulated DoF. Limits the DoF value to [min,\n    max].\n    \n    See Also:\n        :meth:`~superdex.physics.Scene.create_articulated_single_dof_range_constraint`,\n        :class:`~superdex.physics.ArticulatedSingleDofRangeConstraintParams`")
     .value("ARTICULATED3D_ROTATION_RANGE", mochi::ConstraintType::Articulated3dRotationRange, "Range constraint on the DoFs of an articulated 3D rotation. Limits DoF values to\n    [min, max].\n    \n    See Also:\n        :meth:`~superdex.physics.Scene.create_articulated3d_rotation_range_constraint`,\n        :class:`~superdex.physics.Articulated3dRotationRangeConstraintParams`")
@@ -87,7 +95,7 @@ void mochi::DeclareMochiPhysics_MochiPhysicsEnums([[maybe_unused]] py::module_& 
     .value("COUNT", mochi::ConstraintType::Count, "Number of constraint type enum values.")
   ;
 
-  py::enum_<mochi::PoseConstraintType>(m, "PoseConstraintType", "Type of constraint in an articulated pose controller.\n\nDefines the functional purpose of a pose constraint, not its internal\nimplementation. Pose controllers use these constraints to track target\nconfigurations for articulated actors.\n\nSee Also:\n    :class:`~superdex.physics.PoseConstraintInfo`,\n    :class:`~superdex.physics.PoseTrackingParams`,\n    :class:`~superdex.physics.PoseControllerParams`")
+  nb::enum_<mochi::PoseConstraintType>(m, "PoseConstraintType", "Type of constraint in an articulated pose controller.\n\nDefines the functional purpose of a pose constraint, not its internal\nimplementation. Pose controllers use these constraints to track target\nconfigurations for articulated actors.\n\nSee Also:\n    :class:`~superdex.physics.PoseConstraintInfo`,\n    :class:`~superdex.physics.PoseTrackingParams`,\n    :class:`~superdex.physics.PoseControllerParams`")
     .value("JOINT", mochi::PoseConstraintType::Joint, "Joint constraint.")
     .value("LINK_TRANSLATION", mochi::PoseConstraintType::LinkTranslation, "Link translation constraint. Controls the position of a link.")
     .value("LINK_ROTATION", mochi::PoseConstraintType::LinkRotation, "Link rotation constraint. Controls the orientation of a link.")
@@ -95,7 +103,7 @@ void mochi::DeclareMochiPhysics_MochiPhysicsEnums([[maybe_unused]] py::module_& 
     .value("INVALID", mochi::PoseConstraintType::Invalid, "Invalid constraint type.")
   ;
 
-  py::enum_<mochi::QueryType>(m, "QueryType", "Type of query data to compute for an actor or constraint.\n\nQueries enable on-demand computation of simulation data. Some queries allow\nimmediate retrieval of data; others must be registered beforehand to have the\ndata computed and available for retrieval after the next step. Queries are\nreference counted, so multiple registrations are acceptable.\n\nNote:\n    Not all query types are supported for all actor/constraint types. Use\n    :meth:`~superdex.physics.Actor.is_query_supported` or\n    :meth:`~superdex.physics.Constraint.is_query_supported` to check at runtime\n    whether a specific query type is supported for a given actor/constraint.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.register_query`,\n    :meth:`~superdex.physics.Actor.register_query_and_compute`,\n    :meth:`~superdex.physics.Constraint.register_query`")
+  nb::enum_<mochi::QueryType>(m, "QueryType", "Type of query data to compute for an actor or constraint.\n\nQueries enable on-demand computation of simulation data. Some queries allow\nimmediate retrieval of data; others must be registered beforehand to have the\ndata computed and available for retrieval after the next step. Queries are\nreference counted, so multiple registrations are acceptable.\n\nNote:\n    Not all query types are supported for all actor/constraint types. Use\n    :meth:`~superdex.physics.Actor.is_query_supported` or\n    :meth:`~superdex.physics.Constraint.is_query_supported` to check at runtime\n    whether a specific query type is supported for a given actor/constraint.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.register_query`,\n    :meth:`~superdex.physics.Actor.register_query_and_compute`,\n    :meth:`~superdex.physics.Constraint.register_query`")
     .value("NODE_POSITIONS", mochi::QueryType::NodePositions, "Positions of all mesh nodes. Available via\n    :meth:`~superdex.physics.Actor.get_node_positions_local`.\n    \n    Note:\n        Only supported for standalone soft actors, nested soft actors, and shell\n        actors.")
     .value("ELEMENTS_DEFORMATION_GRADIENT", mochi::QueryType::ElementsDeformationGradient, "Deformation gradients for elements in deformable actors. Available via\n    :meth:`~superdex.physics.Actor.get_elements_deformation_gradient`.\n    \n    Note:\n        Only supported for standalone and nested soft actors (except ROMs).")
     .value("SURFACE_NODE_POSITIONS", mochi::QueryType::SurfaceNodePositions, "Positions of surface mesh nodes. Available via\n    :meth:`~superdex.physics.Actor.get_surface_mesh_node_positions_local`.\n    \n    Note:\n        Not supported for actors without a surface mesh, such as rod actors or rigid\n        actors without a mesh (e.g. with an implicit shape).")
@@ -112,7 +120,7 @@ void mochi::DeclareMochiPhysics_MochiPhysicsEnums([[maybe_unused]] py::module_& 
     .value("COUNT", mochi::QueryType::Count, "Number of query type enum values.")
   ;
 
-  py::enum_<mochi::IncludeNestedActors>(m, "IncludeNestedActors", "Specifies whether actor-contact filtering also applies to nested actors.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.enable_actor_contact_asymmetric`,\n    :meth:`~superdex.physics.Scene.enable_actor_contact_symmetric`")
+  nb::enum_<mochi::IncludeNestedActors>(m, "IncludeNestedActors", "Specifies whether actor-contact filtering also applies to nested actors.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.enable_actor_contact_asymmetric`,\n    :meth:`~superdex.physics.Scene.enable_actor_contact_symmetric`")
     .value("NO", mochi::IncludeNestedActors::No, "Affect only the exact actor handles passed to the API.")
     .value("YES", mochi::IncludeNestedActors::Yes, "Affect the exact actor and, for parent actors, its nested actors.\n    \n    Note:\n        Actors without nested actors are affected as exact actors.")
     .value("COUNT", mochi::IncludeNestedActors::Count, "Number of :class:`~superdex.physics.IncludeNestedActors` values.")
@@ -120,6 +128,6 @@ void mochi::DeclareMochiPhysics_MochiPhysicsEnums([[maybe_unused]] py::module_& 
 
 }
 
-void mochi::DefineMochiPhysics_MochiPhysicsEnums([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+void mochi::DefineMochiPhysics_MochiPhysicsEnums([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
 }
 // clang-format on

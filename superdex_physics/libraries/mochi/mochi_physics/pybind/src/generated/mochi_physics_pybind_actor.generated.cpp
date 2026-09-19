@@ -18,30 +18,31 @@
 
 // clang-format off
 
-#include <pybind11/pybind11.h>
+#include <limits>
+#include <nanobind/nanobind.h>
 #include "../pybind_include.h"
 
 using namespace mochi;
-namespace py = pybind11;
-using namespace pybind11::literals;
+namespace nb = nanobind;
 
 namespace mochi {
   // Forward declarations for the definitions below.
-  void DeclareMochiPhysics_MochiPhysicsActor(py::module_& m, PybindRegistry& registry);
-  void DefineMochiPhysics_MochiPhysicsActor(py::module_& m, PybindRegistry& registry);
+  void DeclareMochiPhysics_MochiPhysicsActor(nb::module_& m, PybindRegistry& registry);
+  void DefineMochiPhysics_MochiPhysicsActor(nb::module_& m, PybindRegistry& registry);
 } // namespace mochi
 
-void mochi::DeclareMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
-  registry.StoreClass(py::class_<mochi::Actor, std::unique_ptr<mochi::Actor, py::nodelete>>(m, "Actor", "Represents a simulated body (actor) in a scene.\n\nNote:\n    Every body in the simulation is an actor.\n\nNote:\n    Actors always belong to exactly one scene.\n\nNote:\n    Actors can be static or dynamic.\n\nWarning:\n    Concurrent access to the actor or its scene is illegal."));
+void mochi::DeclareMochiPhysics_MochiPhysicsActor([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+  registry.StoreClass(nb::class_<mochi::Actor>(m, "Actor", "Represents a simulated body (actor) in a scene.\n\nNote:\n    Every body in the simulation is an actor.\n\nNote:\n    Actors always belong to exactly one scene.\n\nNote:\n    Actors can be static or dynamic.\n\nWarning:\n    Concurrent access to the actor or its scene is illegal.", nb::never_destruct()));
 }
 
-void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
-  registry.GetClass<mochi::Actor, std::unique_ptr<mochi::Actor, py::nodelete>>()
+void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+  registry.GetClass<mochi::Actor>()
     .def("get_handle", &mochi::Actor::GetHandle
       , "Get the actor's handle.\n\nReturns:\n    Actor's handle.\n\nNote:\n    Handles are safe to store and remain valid throughout the actor lifespan.\n\nNote:\n    Call :meth:`~superdex.physics.Scene.get_actor` to look up the actor's\n    pointer from the actor's handle.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.get_actor`"
     )
-    .def("get_scene", py::overload_cast<>(&mochi::Actor::GetScene)
+    .def("get_scene", nb::overload_cast<>(&mochi::Actor::GetScene)
       , "Get the :class:`~superdex.physics.Scene` that this actor belongs to.\n\nReturns:\n    Pointer to the scene that this actor belongs to."
+      , nb::rv_policy::reference
     )
     .def("get_name", &mochi::Actor::GetName
       , "Get the name of the actor.\n\nReturns:\n    Name of the actor.\n\nNote:\n    Actor names are not guaranteed to be unique."
@@ -72,7 +73,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Set the contact parameters of the actor.\n\nArgs:\n    params (ContactParams): Contact parameters to set.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs."
     )
     .def("get_collider_type", &mochi::Actor::GetColliderType
@@ -91,7 +92,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("world_from_local")
+      , nb::arg("world_from_local")
       , "Set the actor's world-from-local transform (root transform).\n\nArgs:\n    world_from_local (TransformRT): World-space transform to set.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Not allowed on nested link actors\n    (:meth:`~superdex.physics.Actor.get_nested_link_actors`) or nested soft\n    actors (:meth:`~superdex.physics.Actor.get_nested_soft_actors`).\n\nNote:\n    For a top-level articulated actor, the local frame is the articulation root\n    frame, not the root link's frame.\n\nNote:\n    For dynamic actors, it does not change velocity. For static actors, however,\n    it changes velocity, because it is implicitly defined by the root transform\n    in consecutive time steps. To cancel the velocity of a static actor, use\n    :meth:`~superdex.physics.Actor.set_velocity`.\n\nNote:\n    Resets multi-step time integrators, e.g. BDF2 falls back to backward Euler\n    in the first time step after this method is called."
     )
     .def("get_rigid_center_of_mass_local", [](mochi::Actor& self) {
@@ -121,7 +122,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("world_from_com")
+      , nb::arg("world_from_com")
       , "Set the world-space transform of the actor expressed at the center of mass.\n\nArgs:\n    world_from_com (TransformRT): World-space transform at the center of mass to\n        set.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only supported for standalone dynamic rigid actors.\n\nNote:\n    Does not change velocity.\n\nNote:\n    Resets multi-step time integrators, e.g. BDF2 falls back to backward Euler\n    in the first time step after this method is called.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.get_center_of_mass_transform`,\n    :meth:`~superdex.physics.Actor.set_root_transform`"
     )
     .def("get_rigid_moment_of_inertia_local", [](mochi::Actor& self) {
@@ -141,8 +142,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("linear_vel")
-      , py::arg("angular_vel")
+      , nb::arg("linear_vel")
+      , nb::arg("angular_vel")
       , "Set the world-frame linear and angular velocity of the actor at the center of\nmass.\n\nArgs:\n    linear_vel (Real3Like): Linear velocity [m/s] of the center of mass in world\n        frame.\n    angular_vel (Real3Like): Angular velocity [rad/s] at the center of mass in\n        world frame.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only supported for standalone rigid actors and standalone soft actors\n    (except ROMs).\n\nNote:\n    For static actors, it only supports setting zero velocity.\n\nNote:\n    For standalone soft actors, the angular velocity must be zero.\n\nNote:\n    Resets multi-step time integrators, e.g. BDF2 falls back to backward Euler\n    in the first time step after this method is called."
     )
     .def("get_linear_velocity", [](mochi::Actor& self) {
@@ -192,7 +193,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("density")
+      , nb::arg("density")
       , "Set the density of the actor in the undeformed configuration.\n\nArgs:\n    density (float): Density [kg/m³] to set. Must be positive.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only supported for rigid actors (except static rigid actors), articulated\n    links and soft actors.\n\nNote:\n    The moment of inertia is updated based on the new density. The center of\n    mass is left unchanged.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.get_density`,\n    :meth:`~superdex.physics.Actor.set_inertia_properties`,\n    :meth:`~superdex.physics.Actor.set_soft_material_params`"
     )
     .def("set_inertia_properties", [](mochi::Actor& self, mochi::real mass, mochi::Real3 const& center_of_mass, mochi::Real6 const& moment_of_inertia) {
@@ -202,9 +203,9 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("mass")
-      , py::arg("center_of_mass")
-      , py::arg("moment_of_inertia")
+      , nb::arg("mass")
+      , nb::arg("center_of_mass")
+      , nb::arg("moment_of_inertia")
       , "Set the mass properties of the actor.\n\nDirectly sets mass, center of mass position in local coordinates, and moment of\ninertia tensor at the center of mass. This bypasses density-based computation\nand allows specifying exact inertia from CAD data or external measurements.\n\nArgs:\n    mass (float): Mass [kg] to set. Must be positive and finite.\n    center_of_mass (Real3Like): Position of center of mass [m] in actor's local\n        coordinate frame (:meth:`~superdex.physics.Actor.get_root_transform`).\n    moment_of_inertia (Real6Like): Moment of inertia tensor at center of mass\n        [kg·m²], upper-right triangle [ixx, ixy, ixz, iyy, iyz, izz] using\n        negative tensor notation consistent with\n        :meth:`~superdex.physics.Actor.get_rigid_moment_of_inertia_local`. Must\n        be finite.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only supported for standalone dynamic rigid actors.\n\nNote:\n    A finite but physically invalid moment of inertia tensor (negative principal\n    moments or one violating the triangle inequality) is accepted with a\n    warning, not rejected.\n\nNote:\n    Re-anchors the density reference state. Subsequent\n    :meth:`~superdex.physics.Actor.set_density` calls rescale mass and moment of\n    inertia proportionally about the new values; center of mass is unchanged by\n    :meth:`~superdex.physics.Actor.set_density`.\n\nNote:\n    After this call, :meth:`~superdex.physics.Actor.get_density` returns bulk\n    density mass / volume.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.get_mass`,\n    :meth:`~superdex.physics.Actor.get_density`,\n    :meth:`~superdex.physics.Actor.set_density`,\n    :meth:`~superdex.physics.Actor.get_rigid_center_of_mass_local`,\n    :meth:`~superdex.physics.Actor.get_rigid_moment_of_inertia_local`"
     )
     .def("get_elastic_energy", [](mochi::Actor& self) {
@@ -227,7 +228,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Set the recentering parameters of the actor.\n\nWhen enabled, the root transform automatically moves as the actor's \"rigid\npivot\" (typically near the center of mass) moves.\n\nArgs:\n    params (RecenteringParams): Recentering parameters to set.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only supported for standalone soft actors.\n\nSee Also:\n    :class:`~superdex.physics.RecenteringParams`,\n    :meth:`~superdex.physics.Actor.get_recentering_params`"
     )
     .def("get_displacements", [](mochi::Actor& self) {
@@ -247,8 +248,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("displacements")
-      , "Set the node displacements in the actor's local frame, relative to reference\n(rest) positions.\n\nArgs:\n    displacements (ArrayLikeReal): Node displacements [m] to set in the actor's\n        local frame. Length must be 3 × the number of nodes. The number of nodes\n        is available from :meth:`~superdex.physics.Actor.get_mesh`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only supported for standalone soft actors, nested soft actors, and shell\n    actors.\n\nNote:\n    For nested soft actors, displacements are the elastic deformation component\n    only (before skinning is applied).\n\nNote:\n    Does not change node velocities.\n\nNote:\n    Resets multi-step time integrators, e.g. BDF2 falls back to backward Euler\n    in the first time step after this method is called.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.get_displacements`,\n    :meth:`~superdex.physics.Actor.set_node_positions_local`"
+      , nb::arg("displacements")
+      , "Set the node displacements in the actor's local frame, relative to reference\n(rest) positions.\n\nArgs:\n    displacements (ArrayLikeReal): Node displacements [m] to set in the actor's\n        local frame. Length must be 3 × the number of nodes. The number of nodes\n        is available from :meth:`~superdex.physics.Actor.get_mesh`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only supported for standalone soft actors, nested soft actors, and shell\n    actors.\n\nNote:\n    For nested soft actors, displacements are the elastic deformation component\n    only (before skinning is applied).\n\nNote:\n    Does not change the elastic velocity DoFs, but changes the skinned node\n    velocities of nested soft actors.\n\nNote:\n    Resets multi-step time integrators, e.g. BDF2 falls back to backward Euler\n    in the first time step after this method is called.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.get_displacements`,\n    :meth:`~superdex.physics.Actor.set_node_positions_local`"
     )
     .def("get_soft_material_params", [](mochi::Actor& self) {
       mochi::Error error;
@@ -267,14 +268,14 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Set the material parameters of a soft actor.\n\nArgs:\n    params (SoftMaterialParams): Material parameters to set.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only supported for soft actors.\n\nNote:\n    If the :class:`ELASTIC_ENERGY <superdex.physics.QueryType>` query is active,\n    invalidates the elastic energy baseline. One simulation step must complete\n    before :meth:`~superdex.physics.Actor.get_elastic_energy` returns valid\n    results.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.get_soft_material_params`,\n    :func:`~superdex.physics.experimental.set_soft_material_params_field`,\n    :meth:`~superdex.physics.Actor.set_density`"
     )
     .def("get_mesh", &mochi::Actor::GetMesh
       , "Get a view of the actor's reference simulation mesh.\n\nFor soft actors, returns the tetrahedral mesh. For shell actors, returns the\ntriangle mesh. For rod actors, returns the polyline mesh. For articulated actors\nwith a skin mesh, returns the skin mesh. For articulated actors without a skin\nmesh, returns an empty view. For soft-skinned actors, returns the blended skin\nmesh when one is present and an empty view otherwise. For rigid actors whose\nshape is a tetrahedral or triangular mesh, returns their surface simulation\nmesh. For rigid actors with an implicit shape, such as spheres and planes,\nreturns an empty view.\n\nReturns:\n    A non-owning view of the actor's reference simulation mesh, or an empty view\n    if the actor has no simulation mesh.\n\nNote:\n    The returned coordinates are reference positions in the actor's local frame.\n    They do not include deformation for deformable actors.\n\nNote:\n    For rigid actors with tetrahedral or triangular mesh shapes, returns the\n    same compact surface view as\n    :meth:`~superdex.physics.Actor.get_surface_mesh`. For tetrahedral meshes\n    this is the boundary surface. For triangular meshes, nodes not referenced by\n    any surface triangle are omitted and remaining nodes may be reindexed. Use\n    :meth:`~superdex.physics.Actor.get_reference_shape` and\n    :func:`~superdex.physics.get_shape_mesh` to retrieve the original authored\n    shape mesh.\n\nNote:\n    The returned view remains valid until the actor is destroyed.\n\nSee Also:\n    :class:`~superdex.physics.MeshDataView`,\n    :meth:`~superdex.physics.Actor.get_surface_mesh`,\n    :meth:`~superdex.physics.Actor.get_visual_mesh`,\n    :func:`~superdex.physics.get_shape_mesh`"
     )
     .def("get_surface_mesh", &mochi::Actor::GetSurfaceMesh
-      , "Get a view of the actor's reference surface mesh.\n\nReturns a compact triangle mesh for the actor's surface. For volumetric\nsimulation meshes, the surface is the boundary triangles. For triangular\nsimulation meshes, the surface has the same triangle elements as the simulation\nmesh, but nodes not referenced by any surface triangle are omitted and remaining\nnodes may be reindexed. Returns an empty view if the actor does not have a\nsurface mesh.\n\nReturns:\n    A non-owning view of the actor's reference surface mesh, or an empty view if\n    the actor has no surface mesh.\n\nNote:\n    The returned coordinates are reference surface-mesh positions in the actor's\n    local frame. They do not include deformation for deformable actors.\n\nNote:\n    The returned mesh uses compact surface-node ordering. Connectivity indices\n    refer to this ordering, which may differ from the node ordering returned by\n    :meth:`~superdex.physics.Actor.get_mesh`. Interior nodes and nodes not\n    referenced by any surface triangle are excluded. Results from\n    :meth:`~superdex.physics.Actor.get_surface_mesh_node_positions_local` and\n    :meth:`~superdex.physics.Actor.get_surface_mesh_node_normals_local` use this\n    same surface ordering.\n\nNote:\n    The returned view remains valid until the actor is destroyed.\n\nSee Also:\n    :class:`~superdex.physics.MeshDataView`,\n    :meth:`~superdex.physics.Actor.get_mesh`,\n    :meth:`~superdex.physics.Actor.get_visual_mesh`,\n    :meth:`~superdex.physics.Actor.get_surface_mesh_node_positions_local`,\n    :meth:`~superdex.physics.Actor.get_surface_mesh_node_normals_local`,\n    :func:`~superdex.physics.get_shape_surface_mesh`"
+      , "Get a view of the actor's reference surface mesh.\n\nReturns a compact triangle mesh for the actor's surface. For volumetric\nsimulation meshes, the surface is the boundary triangles. For triangular\nsimulation meshes, the surface has the same triangle elements as the simulation\nmesh, but nodes not referenced by any surface triangle are omitted and remaining\nnodes may be reindexed. For rod actors with an authored contact skin, returns\nthat skin regardless of the actor's selected collision representation. Returns\nan empty view if the actor does not have a surface mesh.\n\nReturns:\n    A non-owning view of the actor's reference surface mesh, or an empty view if\n    the actor has no surface mesh.\n\nNote:\n    The returned coordinates are reference surface-mesh positions in the actor's\n    local frame. They do not include deformation for deformable actors.\n\nNote:\n    The returned mesh uses compact surface-node ordering. Connectivity indices\n    refer to this ordering, which may differ from the node ordering returned by\n    :meth:`~superdex.physics.Actor.get_mesh`. Interior nodes and nodes not\n    referenced by any surface triangle are excluded. Results from\n    :meth:`~superdex.physics.Actor.get_surface_mesh_node_positions_local` and\n    :meth:`~superdex.physics.Actor.get_surface_mesh_node_normals_local` use this\n    same surface ordering.\n\nNote:\n    The returned view remains valid until the actor is destroyed.\n\nSee Also:\n    :class:`~superdex.physics.MeshDataView`,\n    :meth:`~superdex.physics.Actor.get_mesh`,\n    :meth:`~superdex.physics.Actor.get_visual_mesh`,\n    :meth:`~superdex.physics.Actor.get_surface_mesh_node_positions_local`,\n    :meth:`~superdex.physics.Actor.get_surface_mesh_node_normals_local`,\n    :func:`~superdex.physics.get_shape_surface_mesh`"
     )
     .def("get_visual_mesh", &mochi::Actor::GetVisualMesh
       , "Get a view of the actor's reference visual mesh.\n\nReturns a triangle mesh intended for visual rendering. The mesh may include\nlinear visual-mesh skinning data when available. Returns an empty view if the\nactor does not have a visual mesh.\n\nReturns:\n    A non-owning view of the actor's reference visual mesh, or an empty view if\n    the actor has no visual mesh.\n\nNote:\n    The returned coordinates are reference visual-mesh positions in the actor's\n    local frame. They do not include deformation for deformable actors.\n\nNote:\n    Includes visual mesh nodes not referenced by any visual triangle. Unlike\n    surface mesh getters, visual mesh getters do not omit unreferenced nodes.\n\nNote:\n    When linear visual-mesh skinning data is present, skinning indices refer to\n    the node ordering returned by :meth:`~superdex.physics.Actor.get_mesh`, not\n    to the compact surface-node ordering returned by\n    :meth:`~superdex.physics.Actor.get_surface_mesh`. Rod visual mesh embeddings\n    are nonlinear and are not exposed through this linear skinning field.\n\nNote:\n    The returned view remains valid until the actor is destroyed.\n\nSee Also:\n    :class:`~superdex.physics.MeshDataView`,\n    :meth:`~superdex.physics.Actor.get_mesh`,\n    :meth:`~superdex.physics.Actor.get_surface_mesh`,\n    :meth:`~superdex.physics.Actor.get_visual_mesh_node_positions_local`,\n    :meth:`~superdex.physics.Actor.get_visual_mesh_node_normals_local`,\n    :func:`~superdex.physics.get_shape_visual_mesh`"
@@ -287,7 +288,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , "Get the current position of the nodes (reference + displacements) of the surface\nmesh in the actor's local frame.\n\nReturns:\n    Current node positions [m] of the surface mesh in the actor's local frame (3\n    values per node: x, y, z). The returned node list contains exactly the nodes\n    referenced by :meth:`~superdex.physics.Actor.get_surface_mesh` and is 1-to-1\n    with :meth:`~superdex.physics.Actor.get_surface_mesh_node_normals_local`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Requires registering :class:`SURFACE_NODE_POSITIONS\n    <superdex.physics.QueryType>` before the simulation step. Results are\n    available after the simulation step completes.\n\nNote:\n    Requires the actor to support :class:`SURFACE_NODE_POSITIONS\n    <superdex.physics.QueryType>`.\n\nNote:\n    The node ordering corresponds to the mesh connectivity from\n    :meth:`~superdex.physics.Actor.get_surface_mesh`.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.register_query`,\n    :class:`SURFACE_NODE_POSITIONS <superdex.physics.QueryType>`,\n    :meth:`~superdex.physics.Actor.get_surface_mesh`,\n    :meth:`~superdex.physics.Actor.get_surface_mesh_node_normals_local`"
+      , "Get the current position of the nodes (reference + displacements) of the surface\nmesh in the actor's local frame.\n\nReturns:\n    Current node positions [m] of the surface mesh in the actor's local frame (3\n    values per node: x, y, z). The returned node list contains exactly the nodes\n    referenced by :meth:`~superdex.physics.Actor.get_surface_mesh` and is 1-to-1\n    with :meth:`~superdex.physics.Actor.get_surface_mesh_node_normals_local`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Requires registering :class:`SURFACE_NODE_POSITIONS\n    <superdex.physics.QueryType>` before the simulation step. Results are\n    available after the simulation step completes.\n\nNote:\n    Requires the actor to support :class:`SURFACE_NODE_POSITIONS\n    <superdex.physics.QueryType>`.\n\nNote:\n    The node ordering corresponds to the mesh connectivity from\n    :meth:`~superdex.physics.Actor.get_surface_mesh`.\n\nNote:\n    Supported for rod actors whose shape has an authored contact skin,\n    regardless of whether that skin is selected for collision.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.register_query`,\n    :class:`SURFACE_NODE_POSITIONS <superdex.physics.QueryType>`,\n    :meth:`~superdex.physics.Actor.get_surface_mesh`,\n    :meth:`~superdex.physics.Actor.get_surface_mesh_node_normals_local`"
     )
     .def("get_surface_mesh_node_normals_local", [](mochi::Actor& self) {
       mochi::Error error;
@@ -297,7 +298,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , "Get the normal direction for each node of the surface mesh in the actor's local\nframe.\n\nReturns:\n    Span of normals (3 values per node) in the actor's local frame, computed by\n    normalizing the area-weighted sum of adjacent triangle normals. The returned\n    node list contains exactly the nodes referenced by\n    :meth:`~superdex.physics.Actor.get_surface_mesh` and is 1-to-1 with\n    :meth:`~superdex.physics.Actor.get_surface_mesh_node_positions_local`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Requires registering :class:`SURFACE_NODE_NORMALS\n    <superdex.physics.QueryType>` before the simulation step. Results are\n    available after the simulation step completes.\n\nNote:\n    Requires the actor to support :class:`SURFACE_NODE_NORMALS\n    <superdex.physics.QueryType>`.\n\nNote:\n    The node ordering corresponds to the mesh connectivity from\n    :meth:`~superdex.physics.Actor.get_surface_mesh`.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.register_query`, :class:`SURFACE_NODE_NORMALS\n    <superdex.physics.QueryType>`,\n    :meth:`~superdex.physics.Actor.get_surface_mesh`,\n    :meth:`~superdex.physics.Actor.get_surface_mesh_node_positions_local`"
+      , "Get the normal direction for each node of the surface mesh in the actor's local\nframe.\n\nReturns:\n    Span of normals (3 values per node) in the actor's local frame, computed by\n    normalizing the area-weighted sum of adjacent triangle normals. The returned\n    node list contains exactly the nodes referenced by\n    :meth:`~superdex.physics.Actor.get_surface_mesh` and is 1-to-1 with\n    :meth:`~superdex.physics.Actor.get_surface_mesh_node_positions_local`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Requires registering :class:`SURFACE_NODE_NORMALS\n    <superdex.physics.QueryType>` before the simulation step. Results are\n    available after the simulation step completes.\n\nNote:\n    Requires the actor to support :class:`SURFACE_NODE_NORMALS\n    <superdex.physics.QueryType>`.\n\nNote:\n    The node ordering corresponds to the mesh connectivity from\n    :meth:`~superdex.physics.Actor.get_surface_mesh`.\n\nNote:\n    Supported for rod actors whose shape has an authored contact skin,\n    regardless of whether that skin is selected for collision.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.register_query`, :class:`SURFACE_NODE_NORMALS\n    <superdex.physics.QueryType>`,\n    :meth:`~superdex.physics.Actor.get_surface_mesh`,\n    :meth:`~superdex.physics.Actor.get_surface_mesh_node_positions_local`"
     )
     .def("get_reference_shape", [](mochi::Actor& self) {
       mochi::Error error;
@@ -313,7 +314,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
       , "Get the name of the contact layer of the actor.\n\nReturns:\n    Contact layer name, or an empty string if the actor has no contact layer.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.set_contact_layer`,\n    :meth:`~superdex.physics.Scene.enable_layer_contact_asymmetric`,\n    :meth:`~superdex.physics.Scene.enable_layer_contact_symmetric`"
     )
     .def("set_contact_layer", &mochi::Actor::SetContactLayer
-      , py::arg("layer")
+      , nb::arg("layer")
       , "Set the name of the contact layer of the actor.\n\nArgs:\n    layer (str): Contact layer name to set.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.get_contact_layer`,\n    :meth:`~superdex.physics.Scene.enable_layer_contact_asymmetric`,\n    :meth:`~superdex.physics.Scene.enable_layer_contact_symmetric`"
     )
     .def("get_num_dofs", &mochi::Actor::GetNumDofs
@@ -326,8 +327,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("dof_indices")
-      , py::arg("out_dof_values")
+      , nb::arg("dof_indices")
+      , nb::arg("out_dof_values")
       , "Get the current value of the actor's degrees of freedom (DoFs) corresponding to\nthe specified indices.\n\nArgs:\n    dof_indices (ArrayLikeInt): DoF indices to query. Each index must be in the\n        range [0, :meth:`~superdex.physics.Actor.get_num_dofs`). If empty, get\n        the value of all DoFs.\n    out_dof_values (ArrayLikeReal): Output buffer for the DoF values. Size must\n        equal :meth:`~superdex.physics.Actor.get_num_dofs` when ``dof_indices``\n        is empty, or the size of ``dof_indices`` otherwise.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Not supported for static actors, even when both input and output spans are\n    empty.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.get_num_dofs`"
     )
     .def("query_nodes_in_volume_local", [](mochi::Actor& self, mochi::Aabb const& volume, bool boundary_only, std::function<void(int, mochi::Real3)> const& callback) {
@@ -337,9 +338,9 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("volume")
-      , py::arg("boundary_only")
-      , py::arg("callback")
+      , nb::arg("volume")
+      , nb::arg("boundary_only")
+      , nb::arg("callback").none()
       , "Find the actor's nodes that are inside an axis-aligned bounding box (AABB).\n\nArgs:\n    volume (Aabb): Axis-aligned bounding box in the actor's local frame.\n    boundary_only (bool): If true, only boundary nodes are considered.\n    callback (Callable[[int, Real3], None]): Callback called for each node\n        found. The position is the current node position [m] in the actor's\n        local frame. The node index uses\n        :meth:`~superdex.physics.Actor.get_mesh` ordering, including when\n        ``boundary_only`` is true.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    When ``boundary_only`` is false, this function supports only soft and shell\n    actors. When true, it also supports articulated actors with a skin mesh,\n    soft-skinned actors with a blended skin mesh, and rigid actors (dynamic or\n    static) with tetrahedral or triangular mesh shapes. Rod actors and actors\n    without a simulation mesh are not supported.\n\nNote:\n    Requires query registration before the simulation step. Register\n    :class:`NODE_POSITIONS <superdex.physics.QueryType>` when ``boundary_only``\n    is false, or :class:`SURFACE_NODE_POSITIONS <superdex.physics.QueryType>`\n    when ``boundary_only`` is true. Results are available after the simulation\n    step completes.\n\nWarning:\n    This is a synchronous call and may be expensive."
     )
     .def("query_nodes_in_volume_local", [](mochi::Actor& self, mochi::Obb const& volume, bool boundary_only, std::function<void(int, mochi::Real3)> const& callback) {
@@ -349,9 +350,9 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("volume")
-      , py::arg("boundary_only")
-      , py::arg("callback")
+      , nb::arg("volume")
+      , nb::arg("boundary_only")
+      , nb::arg("callback").none()
       , "Find the actor's nodes that are inside an oriented bounding box (OBB).\n\nArgs:\n    volume (Obb): Oriented bounding box in the actor's local frame.\n    boundary_only (bool): If true, only boundary nodes are considered.\n    callback (Callable[[int, Real3], None]): Callback called for each node\n        found. The position is the current node position [m] in the actor's\n        local frame. The node index uses\n        :meth:`~superdex.physics.Actor.get_mesh` ordering, including when\n        ``boundary_only`` is true.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    When ``boundary_only`` is false, this function supports only soft and shell\n    actors. When true, it also supports articulated actors with a skin mesh,\n    soft-skinned actors with a blended skin mesh, and rigid actors (dynamic or\n    static) with tetrahedral or triangular mesh shapes. Rod actors and actors\n    without a simulation mesh are not supported.\n\nNote:\n    Requires query registration before the simulation step. Register\n    :class:`NODE_POSITIONS <superdex.physics.QueryType>` when ``boundary_only``\n    is false, or :class:`SURFACE_NODE_POSITIONS <superdex.physics.QueryType>`\n    when ``boundary_only`` is true. Results are available after the simulation\n    step completes.\n\nWarning:\n    This is a synchronous call and may be expensive."
     )
     .def("query_nodes_in_volume_local", [](mochi::Actor& self, mochi::Sphere const& volume, bool boundary_only, std::function<void(int, mochi::Real3)> const& callback) {
@@ -361,9 +362,9 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("volume")
-      , py::arg("boundary_only")
-      , py::arg("callback")
+      , nb::arg("volume")
+      , nb::arg("boundary_only")
+      , nb::arg("callback").none()
       , "Find the actor's nodes that are inside a sphere.\n\nArgs:\n    volume (Sphere): Sphere in the actor's local frame.\n    boundary_only (bool): If true, only boundary nodes are considered.\n    callback (Callable[[int, Real3], None]): Callback called for each node\n        found. The position is the current node position [m] in the actor's\n        local frame. The node index uses\n        :meth:`~superdex.physics.Actor.get_mesh` ordering, including when\n        ``boundary_only`` is true.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    When ``boundary_only`` is false, this function supports only soft and shell\n    actors. When true, it also supports articulated actors with a skin mesh,\n    soft-skinned actors with a blended skin mesh, and rigid actors (dynamic or\n    static) with tetrahedral or triangular mesh shapes. Rod actors and actors\n    without a simulation mesh are not supported.\n\nNote:\n    Requires query registration before the simulation step. Register\n    :class:`NODE_POSITIONS <superdex.physics.QueryType>` when ``boundary_only``\n    is false, or :class:`SURFACE_NODE_POSITIONS <superdex.physics.QueryType>`\n    when ``boundary_only`` is true. Results are available after the simulation\n    step completes.\n\nWarning:\n    This is a synchronous call and may be expensive."
     )
     .def("get_points_distance_to_surface", [](mochi::Actor& self, mochi::Span<mochi::Real3 const> points_world, mochi::Span<mochi::real> out_distances) {
@@ -373,8 +374,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("points_world")
-      , py::arg("out_distances")
+      , nb::arg("points_world")
+      , nb::arg("out_distances")
       , "Query the signed distance to the closest point on the actor's surface.\n\nArgs:\n    points_world (ArrayLikeReal3): Point cloud in world frame.\n    out_distances (ArrayLikeReal): Output distances [m], in the same order as\n        the input points. Must be the same size as the input points. Negative\n        values indicate points inside the actor.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Requires the actor to have a collider.\n\nNote:\n    For actors with SDF collider, the reported distance is only correct inside\n    the actor's bounding box. Outside the bounding box, it is an upper bound\n    based on the triangle inequality.\n\nNote:\n    This function is not supported for soft actors or for the experimental\n    :class:`POINT_CLOUD <superdex.physics.ColliderType>`."
     )
     .def("get_aabb_local", [](mochi::Actor& self) {
@@ -414,7 +415,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , "Set all local displacement and velocity DoFs to zero.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only supported for standalone soft actors, nested soft actors, shell actors,\n    and rod actors.\n\nNote:\n    For nested soft actors, it zeroes the elastic deformation and velocity only.\n    The skeleton-driven pose is unaffected.\n\nNote:\n    For rod actors, it zeroes both the translational displacement DoFs and the\n    twist-angle DoFs.\n\nNote:\n    Resets multi-step time integrators, e.g. BDF2 falls back to backward Euler\n    in the first time step after this method is called."
+      , "Set all local displacement and velocity DoFs to zero.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only supported for standalone soft actors, nested soft actors, shell actors,\n    and rod actors.\n\nNote:\n    For nested soft actors, it zeroes only elastic displacement and velocity.\n    Skeleton-driven displacement and velocity are preserved.\n\nNote:\n    For rod actors, it zeroes both the translational displacement DoFs and the\n    twist-angle DoFs.\n\nNote:\n    Resets multi-step time integrators, e.g. BDF2 falls back to backward Euler\n    in the first time step after this method is called."
     )
     .def("get_elements_deformation_gradient", [](mochi::Actor& self) {
       mochi::Error error;
@@ -433,7 +434,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("positions_local")
+      , nb::arg("positions_local")
       , "Set the current position of each node (reference + displacements) in the actor's\nlocal frame.\n\nArgs:\n    positions_local (ArrayLikeReal): Node positions [m] to set (3 values per\n        node: x, y, z) in the actor's local frame.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only supported for standalone soft actors and shell actors.\n\nNote:\n    Does not change node velocities.\n\nNote:\n    Resets multi-step time integrators, e.g. BDF2 falls back to backward Euler\n    in the first time step after this method is called."
     )
     .def("set_node_velocities_local", [](mochi::Actor& self, mochi::Span<mochi::real const> velocities_local) {
@@ -443,7 +444,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("velocities_local")
+      , nb::arg("velocities_local")
       , "Set the current velocity of each node in the actor's local frame.\n\nArgs:\n    velocities_local (ArrayLikeReal): Node velocities to set in the actor's\n        local frame.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only supported for standalone soft actors, shell actors, and rod actors.\n\nNote:\n    For standalone soft actors and shell actors: 3 values per node [m/s] — (vx,\n    vy, vz).\n\nNote:\n    For rod actors: 4 values per node — (vx, vy, vz) in [m/s] plus a twist rate\n    [rad/s].\n\nNote:\n    Resets multi-step time integrators, e.g. BDF2 falls back to backward Euler\n    in the first time step after this method is called."
     )
     .def("get_visual_mesh_node_positions_local", [](mochi::Actor& self) {
@@ -479,8 +480,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("dof_indices")
-      , py::arg("dof_values_world")
+      , nb::arg("dof_indices")
+      , nb::arg("dof_values_world")
       , "Add boundary conditions to specified DoFs.\n\nArgs:\n    dof_indices (ArrayLikeInt): DoF indices to constrain.\n    dof_values_world (ArrayLikeReal): Target values in the actor-specific\n        representations described below. Length must equal ``dof_indices``.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Not supported for nested soft actors (see\n    :meth:`~superdex.physics.Actor.get_nested_soft_actors`).\n\nNote:\n    Not supported in differentiable scenes\n    (:func:`~superdex.physics.diffsim.make_scene_differentiable`) or for ROM\n    actors.\n\nNote:\n    For soft and shell actors, each node has 3 consecutive DoFs containing its\n    target x, y, and z position [m] in the world frame. All 3 must be specified\n    together. Consider\n    :meth:`~superdex.physics.Actor.add_boundary_condition_nodes_world` as a more\n    convenient alternative.\n\nNote:\n    For rigid and articulated actors, the DoF indices within each call must be\n    sorted in strictly increasing order (no duplicate indices).\n\nNote:\n    Rigid actors have 6 DoFs: indices 0-2 are the target world-space\n    center-of-mass position [m], and indices 3-5 are the target world-from-local\n    orientation as a rotation vector (axis multiplied by angle [rad]). Either\n    all or none of the 3 rotation DoFs must be specified.\n\nNote:\n    Articulated actors have a number of DoFs that depends on the number of\n    joints and the DoFs per joint. When setting boundary conditions on the\n    rotation of a free or spherical joint, either all or none of the 3 DoFs must\n    be specified.\n\nNote:\n    Rod actors have 4 DoFs per node: the first 3 values are the target node x,\n    y, and z position [m] in the world frame, followed by the next element's\n    scalar twist angle [rad]. (For open rods, the last DoF, i.e., the final\n    node's twist DoF, is included for padding only, does not affect the physics,\n    and is automatically constrained to zero. This automatic constraint is not\n    reported by\n    :meth:`~superdex.physics.Actor.get_boundary_condition_dof_indices`. For\n    closed-loop rods, all twist DoFs are physical.) Boundary conditions on a rod\n    node's position must specify all 3 consecutive displacement DoFs for that\n    node. Only zero values are allowed for the scalar twist angle in this\n    function, with the interpretation that the element's cross-section material\n    axes rotate by only the minimal amount needed to remain orthogonal to the\n    rod's centerline. More elaborate control over rod element rotations should\n    use constraints instead of boundary conditions.\n\nNote:\n    Boundary condition APIs add to existing boundary conditions; they do not\n    replace existing entries. If a DoF has more than one entry, getter APIs\n    return all entries in the order they were added, and the most recently added\n    value is the effective value during the step.\n\nNote:\n    Boundary conditions can be cleared with\n    :meth:`~superdex.physics.Actor.clear_boundary_conditions`.\n\nWarning:\n    Constrained 3D rotations may exhibit small numerical differences due to\n    differences in the internal representation.\n\nWarning:\n    Adding a boundary condition to the same DoF more than once is legal — the\n    most recently added value wins — but strongly discouraged. Each call adds an\n    entry, so repeatedly re-adding without an intervening\n    :meth:`~superdex.physics.Actor.clear_boundary_conditions` grows the per-step\n    cost without bound. To update a boundary condition, call\n    :meth:`~superdex.physics.Actor.clear_boundary_conditions` and add it again.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.clear_boundary_conditions`,\n    :meth:`~superdex.physics.Actor.add_boundary_condition_nodes_world`,\n    :meth:`~superdex.physics.Actor.add_boundary_condition_dofs_world_permanent`,\n    :meth:`~superdex.physics.Actor.get_boundary_condition_dof_indices`,\n    :meth:`~superdex.physics.Actor.get_boundary_condition_dof_values_world`"
     )
     .def("add_boundary_condition_dofs_world_permanent", [](mochi::Actor& self, mochi::Span<int const> dof_indices, mochi::Span<mochi::real const> dof_values_world) {
@@ -490,8 +491,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("dof_indices")
-      , py::arg("dof_values_world")
+      , nb::arg("dof_indices")
+      , nb::arg("dof_values_world")
       , "Add permanent boundary conditions to specified DoFs.\n\nArgs:\n    dof_indices (ArrayLikeInt): DoF indices to constrain.\n    dof_values_world (ArrayLikeReal): Target values in the actor-specific\n        representations documented by\n        :meth:`~superdex.physics.Actor.add_boundary_condition_dofs_world`.\n        Length must equal ``dof_indices``.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Not supported for nested soft actors (see\n    :meth:`~superdex.physics.Actor.get_nested_soft_actors`).\n\nNote:\n    Not supported in differentiable scenes\n    (:func:`~superdex.physics.diffsim.make_scene_differentiable`) or for ROM\n    actors.\n\nNote:\n    Same as :meth:`~superdex.physics.Actor.add_boundary_condition_dofs_world`,\n    except boundary conditions cannot be cleared.\n\nNote:\n    If a clearable entry is later added for the same DoF, that clearable entry\n    is the effective value until\n    :meth:`~superdex.physics.Actor.clear_boundary_conditions` removes it. The\n    permanent entry is then the effective value again.\n\nWarning:\n    Permanent boundary conditions are retained for the lifetime of the actor and\n    cannot be removed by\n    :meth:`~superdex.physics.Actor.clear_boundary_conditions`. Adding a\n    permanent boundary condition to the same DoF more than once is legal but\n    strongly discouraged. The duplicates can never be cleared and irreversibly\n    grow the per-step cost. Add each permanent boundary condition only once.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.add_boundary_condition_dofs_world`"
     )
     .def("add_boundary_condition_nodes_world", [](mochi::Actor& self, mochi::Span<int const> node_indices, mochi::Span<mochi::real const> node_positions_world) {
@@ -501,8 +502,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("node_indices")
-      , py::arg("node_positions_world")
+      , nb::arg("node_indices")
+      , nb::arg("node_positions_world")
       , "Add world-space boundary conditions for specified nodes.\n\nArgs:\n    node_indices (ArrayLikeInt): Node indices to constrain.\n    node_positions_world (ArrayLikeReal): Target positions [m] in world frame.\n        Length must be 3 times the size of ``node_indices``.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only supported for standalone soft actors and shell actors.\n\nNote:\n    Not supported in differentiable scenes\n    (:func:`~superdex.physics.diffsim.make_scene_differentiable`) or for ROM\n    actors.\n\nNote:\n    Boundary conditions can be cleared with\n    :meth:`~superdex.physics.Actor.clear_boundary_conditions`.\n\nNote:\n    Equivalent to calling\n    :meth:`~superdex.physics.Actor.add_boundary_condition_dofs_world` with DoF\n    indices (3*i, 3*i+1, 3*i+2) for each node i.\n\nNote:\n    This API adds to existing boundary conditions. See\n    :meth:`~superdex.physics.Actor.add_boundary_condition_dofs_world` for\n    behavior when a DoF has more than one entry.\n\nWarning:\n    Adding boundary conditions to the same nodes repeatedly without clearing\n    grows the per-step cost without bound. See\n    :meth:`~superdex.physics.Actor.add_boundary_condition_dofs_world`.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.clear_boundary_conditions`,\n    :meth:`~superdex.physics.Actor.add_boundary_condition_dofs_world`,\n    :meth:`~superdex.physics.Actor.add_boundary_condition_nodes_world_permanent`,\n    :meth:`~superdex.physics.Actor.get_boundary_condition_dof_indices`,\n    :meth:`~superdex.physics.Actor.get_boundary_condition_dof_values_world`"
     )
     .def("add_boundary_condition_nodes_world_permanent", [](mochi::Actor& self, mochi::Span<int const> node_indices, mochi::Span<mochi::real const> node_positions_world) {
@@ -512,8 +513,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("node_indices")
-      , py::arg("node_positions_world")
+      , nb::arg("node_indices")
+      , nb::arg("node_positions_world")
       , "Add permanent world-space boundary conditions for specified nodes.\n\nArgs:\n    node_indices (ArrayLikeInt): Node indices to constrain.\n    node_positions_world (ArrayLikeReal): Target positions [m] in world frame.\n        Length must be 3 times the size of ``node_indices``.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only supported for standalone soft actors and shell actors.\n\nNote:\n    Not supported in differentiable scenes\n    (:func:`~superdex.physics.diffsim.make_scene_differentiable`) or for ROM\n    actors.\n\nNote:\n    Same as :meth:`~superdex.physics.Actor.add_boundary_condition_nodes_world`,\n    except boundary conditions cannot be cleared.\n\nNote:\n    See\n    :meth:`~superdex.physics.Actor.add_boundary_condition_dofs_world_permanent`\n    for interaction with clearable entries later added to the same DoF.\n\nWarning:\n    Add each permanent boundary condition only once. Duplicates can never be\n    cleared and irreversibly grow the per-step cost. See\n    :meth:`~superdex.physics.Actor.add_boundary_condition_dofs_world_permanent`.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.add_boundary_condition_nodes_world`,\n    :meth:`~superdex.physics.Actor.add_boundary_condition_dofs_world_permanent`"
     )
     .def("add_boundary_condition_constrained_nodes_at_rest", [](mochi::Actor& self) {
@@ -544,8 +545,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("dof_indices")
-      , py::arg("force_values")
+      , nb::arg("dof_indices")
+      , nb::arg("force_values")
       , "Set external forces on specified DoFs.\n\nArgs:\n    dof_indices (ArrayLikeInt): DoF indices to apply forces to. Must be unique.\n    force_values (ArrayLikeReal): Force values [N] for translation DoFs, torque\n        values [N·m] for rotation DoFs. Length must equal the number of DoF\n        indices.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only supported for rigid, articulated, rod, and shell actors.\n\nNote:\n    DoF indices use the same per-actor-type index layout documented by\n    :meth:`~superdex.physics.Actor.add_boundary_condition_dofs_world`.\n\nNote:\n    External forces can be cleared with\n    :meth:`~superdex.physics.Actor.clear_external_forces`.\n\nNote:\n    Replaces all previously set external forces, including external forces on\n    DoFs not included in ``dof_indices``. Passing empty ``dof_indices`` and\n    ``force_values`` is equivalent to calling\n    :meth:`~superdex.physics.Actor.clear_external_forces`.\n\nNote:\n    For rigid and shell actors, values are interpreted in the world frame.\n\nNote:\n    For articulated actors, values are generalized forces in the actor's\n    joint-DoF coordinate basis.\n\nNote:\n    For rod actors, forces on displacement DoFs are specified in the world\n    frame, while (generalized) forces (scalar torques) on element twist-angle\n    DoFs are always oriented along the corresponding element's current\n    orientation.\n\nNote:\n    For open (non-closed-loop) rod actors, the last DoF is padding that does not\n    participate in physics, so it is invalid to apply a torque to it. For\n    closed-loop rods, the last DoF is a physical twist angle.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.clear_external_forces`,\n    :meth:`~superdex.physics.Actor.get_external_forces`,\n    :meth:`~superdex.physics.Actor.add_boundary_condition_dofs_world`"
     )
     .def("clear_external_forces", &mochi::Actor::ClearExternalForces
@@ -558,7 +559,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("out_forces")
+      , nb::arg("out_forces")
       , "Get the external forces currently set on this actor as a dense array over all\nDoFs.\n\nArgs:\n    out_forces (ArrayLikeReal): Dense output array of force values [N] for\n        translation DoFs and torque values [N·m] for rotation DoFs. One entry\n        per DoF. Size must equal :meth:`~superdex.physics.Actor.get_num_dofs`.\n        DoFs with no external force set are filled with zero.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Returned values use the same frame convention as\n    :meth:`~superdex.physics.Actor.set_external_forces_on_dofs`.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.set_external_forces_on_dofs`,\n    :meth:`~superdex.physics.Actor.clear_external_forces`"
     )
     .def("get_contact_points_world", [](mochi::Actor& self) {
@@ -609,7 +610,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("other")
+      , nb::arg("other").none()
       , "Get the total contact force on the actor from another specified actor.\n\nArgs:\n    other (Actor): Actor exerting the contact force on this actor.\n\nReturns:\n    Total contact force [N] in world frame from the specified actor.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Requires registering :class:`TOTAL_CONTACT_FORCE\n    <superdex.physics.QueryType>` before the simulation step. Results are\n    available after the simulation step completes.\n\nNote:\n    Requires the actor to support :class:`TOTAL_CONTACT_FORCE\n    <superdex.physics.QueryType>`.\n\nNote:\n    If the solver diverged in the last simulation step, results may not be\n    available or may be stale.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.register_query`,\n    :meth:`~superdex.physics.Actor.get_contact_force_world`,\n    :class:`TOTAL_CONTACT_FORCE <superdex.physics.QueryType>`"
     )
     .def("get_sdf_distances", [](mochi::Actor& self) {
@@ -630,7 +631,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("type")
+      , nb::arg("type")
       , "Register a query to compute data for this actor.\n\nArgs:\n    type (QueryType | int): Type of query to register.\n\nReturns:\n    :class:`~superdex.physics.QueryHandle` for the registered query, or an\n    invalid handle if registration fails.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Queries may add substantial computational overhead. Use only when necessary.\n\nNote:\n    Data is available after the next simulation step, even if its time step is\n    zero.\n\nNote:\n    Call :meth:`~superdex.physics.Actor.cancel_query` when the query is not\n    needed again in the future.\n\nNote:\n    Queries are reference counted internally, so they will be available as long\n    as there is one outstanding :class:`~superdex.physics.QueryHandle`.\n\nNote:\n    Registration is all-or-nothing: if registration fails, no query is\n    registered.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.cancel_query`,\n    :meth:`~superdex.physics.Actor.register_query_and_compute`,\n    :meth:`~superdex.physics.Actor.is_query_supported`,\n    :meth:`~superdex.physics.Constraint.register_query`"
     )
     .def("register_query_and_compute", [](mochi::Actor& self, mochi::QueryType type) {
@@ -641,15 +642,15 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
       }
       return result;
     }
-      , py::arg("type")
+      , nb::arg("type")
       , "Register a query for this actor and compute the result immediately.\n\nArgs:\n    type (QueryType | int): Type of query to register.\n\nReturns:\n    :class:`~superdex.physics.QueryHandle` for the registered query.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Same as :meth:`~superdex.physics.Actor.register_query`, except that the data\n    is computed immediately (blocking) rather than at the next simulation step.\n\nNote:\n    Immediate computation is not supported for all query types. For unsupported\n    types, the query is still registered successfully, immediate computation is\n    skipped, and data becomes available after the next simulation step. See\n    :class:`~superdex.physics.QueryType` documentation for which types support\n    immediate computation.\n\nNote:\n    Stepping the scene with zero time step is another way to force queries to\n    update, without advancing the state of the simulation.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.register_query`,\n    :meth:`~superdex.physics.Actor.cancel_query`"
     )
     .def("cancel_query", &mochi::Actor::CancelQuery
-      , py::arg("handle")
+      , nb::arg("handle")
       , "Cancel a previously registered query.\n\nArgs:\n    handle (QueryHandle): :class:`~superdex.physics.QueryHandle` from\n        :meth:`~superdex.physics.Actor.register_query` or\n        :meth:`~superdex.physics.Actor.register_query_and_compute`.\n\nNote:\n    Cancelling an invalid or already-cancelled handle has no effect.\n\nNote:\n    Cancelling queries may improve memory usage and/or performance if the query\n    is no longer needed.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.register_query`,\n    :meth:`~superdex.physics.Actor.register_query_and_compute`"
     )
     .def("is_query_supported", &mochi::Actor::IsQuerySupported
-      , py::arg("type")
+      , nb::arg("type")
       , "Check whether a query type is supported for this actor.\n\nArgs:\n    type (QueryType | int): Type of query to check.\n\nReturns:\n    True if :meth:`~superdex.physics.Actor.register_query` would succeed for\n    this query type, false otherwise.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.register_query`"
     )
     .def("get_nested_link_actors", [](mochi::Actor& self) {
@@ -709,7 +710,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("friction")
+      , nb::arg("friction")
       , "Set the per-joint friction parameters of the articulated actor.\n\nArgs:\n    friction (ArrayLikeArticulatedJointFrictionParams): Friction parameters, one\n        per joint. Must be of size equal to the number of joints (matching\n        :meth:`~superdex.physics.Actor.get_articulated_joint_friction_params`);\n        all values must be finite and non-negative.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.get_articulated_joint_friction_params`,\n    :class:`~superdex.physics.ArticulatedJointFrictionParams`"
     )
     .def("get_articulated_joint_inertia_params", [](mochi::Actor& self) {
@@ -729,7 +730,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("inertia")
+      , nb::arg("inertia")
       , "Set the per-joint inertia coefficients of the articulated actor.\n\nArgs:\n    inertia (ArrayLikeReal): Inertia coefficients, one per joint. Must be of\n        size equal to the number of joints (matching\n        :meth:`~superdex.physics.Actor.get_articulated_joint_inertia_params`);\n        all values must be finite and non-negative.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.get_articulated_joint_inertia_params`"
     )
     .def("get_articulated_dof_limits", [](mochi::Actor& self, mochi::Span<mochi::Real2> out_dof_limits) {
@@ -739,7 +740,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("out_dof_limits")
+      , nb::arg("out_dof_limits")
       , "Get the limit values on all DoFs of the articulated actor.\n\nArgs:\n    out_dof_limits (ArrayLikeReal2): Output span for DoF limits. Must be of size\n        :meth:`~superdex.physics.Actor.get_num_dofs`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors.\n\nNote:\n    Each element contains [min, max] limits for the corresponding DoF: [m] for\n    translational DoFs and [rad] for rotational DoFs.\n\nNote:\n    Unconstrained DoFs have limits of ±infinity.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.get_articulated_joint_limit_constraints`"
     )
     .def("get_articulated_pose", [](mochi::Actor& self, mochi::Span<mochi::real> out_pose) {
@@ -749,7 +750,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("out_pose")
+      , nb::arg("out_pose")
       , "Get the pose of an articulated actor expressed as joint DoFs.\n\nArgs:\n    out_pose (ArrayLikeReal): Output span for pose as joint DoFs: position [m]\n        for translational DoFs and angle [rad] for rotational DoFs. Must be of\n        size :meth:`~superdex.physics.Actor.get_num_dofs`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.set_articulated_pose_from_joints`"
     )
     .def("get_articulated_link_transforms", [](mochi::Actor& self, mochi::Span<mochi::TransformRT> out_world_from_links) {
@@ -759,7 +760,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("out_world_from_links")
+      , nb::arg("out_world_from_links")
       , "Get the pose of an articulated actor expressed as world-from-local link\ntransforms.\n\nArgs:\n    out_world_from_links (ArrayLikeTransformRT): Output span for pose as\n        world-from-local links transforms. Must be of size equal to the number\n        of links.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.set_articulated_pose_from_links`,\n    :meth:`~superdex.physics.Actor.get_articulated_pose`"
     )
     .def("get_articulated_joint_velocities", [](mochi::Actor& self, mochi::Span<mochi::real> out_velocities) {
@@ -769,7 +770,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("out_velocities")
+      , nb::arg("out_velocities")
       , "Get time derivatives of the articulated actor DoFs.\n\nArgs:\n    out_velocities (ArrayLikeReal): Output span for DoF velocities: [m/s] for\n        translational DoFs and [rad/s] for rotational DoFs. Must be of size\n        :meth:`~superdex.physics.Actor.get_num_dofs`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.set_articulated_joint_velocities`"
     )
     .def("set_articulated_pose_from_links", [](mochi::Actor& self, mochi::Span<mochi::TransformRT const> world_from_links) {
@@ -779,7 +780,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("world_from_links")
+      , nb::arg("world_from_links")
       , "Set the pose of an articulated actor from the world-from-local link transforms.\n\nArgs:\n    world_from_links (ArrayLikeTransformRT): World-from-local link transforms.\n        Must be of size equal to the number of links.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors.\n\nNote:\n    Transforms are automatically projected onto valid joint space.\n\nNote:\n    If the actor has a pose controller, its target pose is reset to the provided\n    transforms and its target velocity is set to zero. Call\n    :meth:`~superdex.physics.Actor.set_articulated_target_velocity` afterward to\n    use a non-zero target velocity.\n\nNote:\n    Does not affect the actor's velocities.\n\nNote:\n    Resets multi-step time integrators, e.g. BDF2 falls back to backward Euler\n    in the first time step after this method is called.\n\nWarning:\n    Round-trip error:\n    :meth:`~superdex.physics.Actor.set_articulated_pose_from_links` followed by\n    :meth:`~superdex.physics.Actor.get_articulated_link_transforms` may not\n    return identical values due to internal representation differences.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.get_articulated_link_transforms`,\n    :meth:`~superdex.physics.Actor.set_articulated_pose_from_joints`"
     )
     .def("set_articulated_pose_from_joints", [](mochi::Actor& self, mochi::Span<mochi::real const> pose) {
@@ -789,7 +790,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("pose")
+      , nb::arg("pose")
       , "Set the pose of an articulated actor from joint DoFs.\n\nArgs:\n    pose (ArrayLikeReal): Joint DoF values to set. Must be of size\n        :meth:`~superdex.physics.Actor.get_num_dofs`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors.\n\nNote:\n    If the actor has a pose controller, its target pose is reset to the provided\n    pose and its target velocity is set to zero. Call\n    :meth:`~superdex.physics.Actor.set_articulated_target_velocity` afterward to\n    use a non-zero target velocity.\n\nNote:\n    Does not affect the actor's velocities.\n\nNote:\n    Resets multi-step time integrators, e.g. BDF2 falls back to backward Euler\n    in the first time step after this method is called.\n\nWarning:\n    Round-trip error:\n    :meth:`~superdex.physics.Actor.set_articulated_pose_from_joints` followed by\n    :meth:`~superdex.physics.Actor.get_articulated_pose` may not return\n    identical values due to internal representation differences.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.get_articulated_pose`,\n    :meth:`~superdex.physics.Actor.set_articulated_pose_from_links`"
     )
     .def("set_articulated_joint_velocities", [](mochi::Actor& self, mochi::Span<mochi::real const> velocities) {
@@ -799,7 +800,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("velocities")
+      , nb::arg("velocities")
       , "Set time derivatives of the articulated actor DoFs.\n\nArgs:\n    velocities (ArrayLikeReal): Joint DoF velocities to set. Must be of size\n        :meth:`~superdex.physics.Actor.get_num_dofs`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors.\n\nNote:\n    If the actor has a pose controller, target velocity is also set to the\n    provided velocities.\n\nNote:\n    Resets multi-step time integrators, e.g. BDF2 falls back to backward Euler\n    in the first time step after this method is called.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.get_articulated_joint_velocities`"
     )
     .def("add_articulated_delta_to_pose", [](mochi::Actor& self, mochi::Span<mochi::real const> pose, mochi::Span<mochi::real const> delta_dofs, mochi::Span<mochi::real> out_pose) {
@@ -809,9 +810,9 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("pose")
-      , py::arg("delta_dofs")
-      , py::arg("out_pose")
+      , nb::arg("pose")
+      , nb::arg("delta_dofs")
+      , nb::arg("out_pose")
       , "Add a pose delta to a pose using joint-aware composition.\n\nArgs:\n    pose (ArrayLikeReal): Base pose as joint DoFs. Must be of size\n        :meth:`~superdex.physics.Actor.get_num_dofs`.\n    delta_dofs (ArrayLikeReal): Pose delta to add. Must be of size\n        :meth:`~superdex.physics.Actor.get_num_dofs`.\n    out_pose (ArrayLikeReal): Output pose after adding deltaDofs. Must be of\n        size :meth:`~superdex.physics.Actor.get_num_dofs`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors.\n\nNote:\n    Deltas cannot be simply added to poses. This function uses joint information\n    to correctly add the delta.\n\nNote:\n    Useful for adding time-stepped velocity to a reference pose.\n\nNote:\n    For 3D rotations, delta values are interpreted as Lie-algebra\n    rotation-vector increments.\n\nNote:\n    For 3D rotations, angular velocity is not directly the time derivative of\n    the rotation vector representation.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.compute_articulated_pose_delta`,\n    :meth:`~superdex.physics.Actor.get_articulated_pose`,\n    :meth:`~superdex.physics.Actor.get_articulated_pose_distance`"
     )
     .def("compute_articulated_pose_delta", [](mochi::Actor& self, mochi::Span<mochi::real const> pose_base, mochi::Span<mochi::real const> pose_target, mochi::Span<mochi::real> out_delta_dofs) {
@@ -821,9 +822,9 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("pose_base")
-      , py::arg("pose_target")
-      , py::arg("out_delta_dofs")
+      , nb::arg("pose_base")
+      , nb::arg("pose_target")
+      , nb::arg("out_delta_dofs")
       , "Compute the pose delta from a base pose to a target pose.\n\nArgs:\n    pose_base (ArrayLikeReal): Base pose as joint DoFs. Must be of size\n        :meth:`~superdex.physics.Actor.get_num_dofs`.\n    pose_target (ArrayLikeReal): Target pose as joint DoFs. Must be of size\n        :meth:`~superdex.physics.Actor.get_num_dofs`.\n    out_delta_dofs (ArrayLikeReal): Pose delta. Must be of size\n        :meth:`~superdex.physics.Actor.get_num_dofs`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors.\n\nNote:\n    Deltas cannot be simply subtracted between poses. This function uses joint\n    information to correctly subtract the delta.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.add_articulated_delta_to_pose`,\n    :meth:`~superdex.physics.Actor.get_articulated_pose`,\n    :meth:`~superdex.physics.Actor.get_articulated_pose_distance`"
     )
     .def("get_articulated_pose_distance", [](mochi::Actor& self, mochi::Span<mochi::real const> pose_a, mochi::Span<mochi::real const> pose_b, mochi::Span<mochi::real> out_trans_distances, mochi::Span<mochi::real> out_rot_distances) {
@@ -833,10 +834,10 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("pose_a")
-      , py::arg("pose_b")
-      , py::arg("out_trans_distances")
-      , py::arg("out_rot_distances")
+      , nb::arg("pose_a")
+      , nb::arg("pose_b")
+      , nb::arg("out_trans_distances")
+      , nb::arg("out_rot_distances")
       , "Compute per-joint distances between two poses.\n\nArgs:\n    pose_a (ArrayLikeReal): First pose as joint DoFs. Must be of size\n        :meth:`~superdex.physics.Actor.get_num_dofs`.\n    pose_b (ArrayLikeReal): Second pose as joint DoFs. Must be of size\n        :meth:`~superdex.physics.Actor.get_num_dofs`.\n    out_trans_distances (ArrayLikeReal): Translation distances [m] for each\n        joint. Must be of size equal to the number of joints.\n    out_rot_distances (ArrayLikeReal): Rotation distances [rad] for each joint.\n        Must be of size equal to the number of joints.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors.\n\nNote:\n    Uses joint-specific distance metrics (Euclidean for translation, angle for\n    rotation).\n\nSee Also:\n    :meth:`~superdex.physics.Actor.get_articulated_pose`,\n    :meth:`~superdex.physics.Actor.add_articulated_delta_to_pose`,\n    :meth:`~superdex.physics.Actor.compute_articulated_pose_delta`"
     )
     .def("has_articulated_pose_controller", [](mochi::Actor& self) {
@@ -856,7 +857,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Add a pose controller to an articulated actor.\n\nArgs:\n    params (PoseControllerParams): Parameters defining the pose controller.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors.\n\nNote:\n    Only one pose controller is allowed per actor. Adding a second controller\n    raises an error.\n\nNote:\n    The initial target pose and target velocity are set to the actor's current\n    pose and velocity.\n\nNote:\n    Empty tracking arrays are allowed. Default zero-gain parameters are used for\n    any empty array.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.remove_articulated_pose_controller`,\n    :meth:`~superdex.physics.Actor.has_articulated_pose_controller`"
     )
     .def("remove_articulated_pose_controller", [](mochi::Actor& self) {
@@ -875,7 +876,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("world_from_targets")
+      , nb::arg("world_from_targets")
       , "Set the target pose for the controller expressed as link transforms.\n\nArgs:\n    world_from_targets (ArrayLikeTransformRT): Target world-from-link transforms\n        to set. Must be of size equal to the number of links.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only supported for articulated actors with a pose controller.\n\nNote:\n    Also affects target velocity, which depends on how the target changes\n    between simulation steps.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.reset_articulated_target_link_transforms`,\n    :meth:`~superdex.physics.Actor.set_articulated_target_pose`"
     )
     .def("set_articulated_target_pose", [](mochi::Actor& self, mochi::Span<mochi::real const> pose) {
@@ -885,7 +886,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("pose")
+      , nb::arg("pose")
       , "Set the target pose for the controller expressed as joint DoFs.\n\nArgs:\n    pose (ArrayLikeReal): Target pose as joint DoFs to set. Must be of size\n        :meth:`~superdex.physics.Actor.get_num_dofs`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors with a pose controller.\n\nNote:\n    Also affects target velocity, which depends on how the target changes\n    between simulation steps.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.reset_articulated_target_pose`,\n    :meth:`~superdex.physics.Actor.set_articulated_target_link_transforms`,\n    :meth:`~superdex.physics.Actor.get_articulated_target_pose`,\n    :meth:`~superdex.physics.Actor.get_articulated_target_link_transforms`,\n    :meth:`~superdex.physics.Actor.set_articulated_target_velocity`"
     )
     .def("reset_articulated_target_link_transforms", [](mochi::Actor& self, mochi::Span<mochi::TransformRT const> world_from_targets) {
@@ -895,7 +896,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("world_from_targets")
+      , nb::arg("world_from_targets")
       , "Reset the target pose of the controller expressed as link transforms.\n\nArgs:\n    world_from_targets (ArrayLikeTransformRT): Target world-from-link transforms\n        to reset to. Must be finite and of size equal to the number of links.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors with a pose controller.\n\nNote:\n    Sets the target to the provided transforms and the target velocity to zero,\n    so no velocity kick is introduced.\n\nNote:\n    To use a non-zero target velocity, call\n    :meth:`~superdex.physics.Actor.set_articulated_target_velocity` after this\n    function.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.set_articulated_target_link_transforms`,\n    :meth:`~superdex.physics.Actor.reset_articulated_target_pose`"
     )
     .def("reset_articulated_target_pose", [](mochi::Actor& self, mochi::Span<mochi::real const> pose) {
@@ -905,7 +906,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("pose")
+      , nb::arg("pose")
       , "Reset the target pose of the controller expressed as joint DoFs.\n\nArgs:\n    pose (ArrayLikeReal): Target pose as joint DoFs to reset to. Must be finite\n        and of size :meth:`~superdex.physics.Actor.get_num_dofs`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors with a pose controller.\n\nNote:\n    Sets the target to the provided pose and the target velocity to zero, so no\n    velocity kick is introduced.\n\nNote:\n    To use a non-zero target velocity, call\n    :meth:`~superdex.physics.Actor.set_articulated_target_velocity` after this\n    function.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.set_articulated_target_pose`,\n    :meth:`~superdex.physics.Actor.reset_articulated_target_link_transforms`"
     )
     .def("set_articulated_target_velocity", [](mochi::Actor& self, mochi::Span<mochi::real const> velocity) {
@@ -915,7 +916,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("velocity")
+      , nb::arg("velocity")
       , "Set the target velocity of the controller expressed as joint velocities for the\nnext simulation step.\n\nArgs:\n    velocity (ArrayLikeReal): Target DoF velocities to set. [m/s] for\n        translational DoFs and [rad/s] for rotational DoFs. Must be finite and\n        of size :meth:`~superdex.physics.Actor.get_num_dofs`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors with a pose controller.\n\nNote:\n    Does not change target pose.\n\nNote:\n    The velocity override is applied once at the start of the next simulation\n    step to compute damping, then cleared automatically. To maintain a constant\n    target velocity, call this function before each step.\n\nNote:\n    :meth:`~superdex.physics.Actor.reset_articulated_target_pose` and\n    :meth:`~superdex.physics.Actor.reset_articulated_target_link_transforms`\n    overwrite any pending target velocity with zero. Call this function after\n    reset to use a non-zero target velocity.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.set_articulated_target_pose`,\n    :meth:`~superdex.physics.Actor.reset_articulated_target_pose`"
     )
     .def("get_articulated_pose_constraints", [](mochi::Actor& self) {
@@ -935,7 +936,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("out_params")
+      , nb::arg("out_params")
       , "Get the pose controller's tracking parameters.\n\nArgs:\n    out_params (PoseControllerParams): Output tracking parameters grouped by\n        constraint type\n        (:attr:`~superdex.physics.PoseControllerParams.link_pos_tracking`,\n        :attr:`~superdex.physics.PoseControllerParams.link_rot_tracking`,\n        :attr:`~superdex.physics.PoseControllerParams.joint_tracking`). All\n        three arrays are link-indexed and must be pre-sized to numLinks; they\n        are not resized. Entries in\n        :attr:`~superdex.physics.PoseControllerParams.joint_tracking` for links\n        without a controllable joint are reported as zero gains.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors with a pose controller.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.get_articulated_pose_constraints`,\n    :meth:`~superdex.physics.Actor.set_articulated_pose_controller_params`"
     )
     .def("set_articulated_pose_controller_params", [](mochi::Actor& self, mochi::PoseControllerParams const& params) {
@@ -945,7 +946,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("params")
+      , nb::arg("params")
       , "Set the pose controller's tracking parameters.\n\nArgs:\n    params (PoseControllerParams): Tracking parameters grouped by constraint\n        type. Each array must be empty, size 1 (broadcast to all links), or size\n        numLinks (per-link). An empty array will broadcast using a\n        default-constructed PoseTrackingParams (zero gains) to all links.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors with a pose controller.\n\nNote:\n    Setting zero stiffness and damping disables the constraint but does not\n    destroy it.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.get_articulated_pose_controller_params`,\n    :meth:`~superdex.physics.Actor.get_articulated_pose_constraints`"
     )
     .def("get_articulated_target_pose", [](mochi::Actor& self, mochi::Span<mochi::real> out_pose) {
@@ -955,7 +956,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("out_pose")
+      , nb::arg("out_pose")
       , "Get the last target pose set to the pose controller.\n\nArgs:\n    out_pose (ArrayLikeReal): Output span for the target pose as joint DoFs.\n        Must be of size :meth:`~superdex.physics.Actor.get_num_dofs`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors with a pose controller.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.set_articulated_target_pose`,\n    :meth:`~superdex.physics.Actor.set_articulated_target_link_transforms`,\n    :meth:`~superdex.physics.Actor.get_articulated_target_link_transforms`"
     )
     .def("get_articulated_target_link_transforms", [](mochi::Actor& self, mochi::Span<mochi::TransformRT> out_world_from_targets) {
@@ -965,7 +966,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsActor([[maybe_unused]] py::module_& m
         throw MochiErrorException(error);
       }
     }
-      , py::arg("out_world_from_targets")
+      , nb::arg("out_world_from_targets")
       , "Get the last target pose set to the pose controller, expressed as link\ntransforms.\n\nArgs:\n    out_world_from_targets (ArrayLikeTransformRT): Output span for the target\n        world-from-link transforms. Must be of size equal to the number of\n        links.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only applicable to articulated actors with a pose controller.\n\nSee Also:\n    :meth:`~superdex.physics.Actor.set_articulated_target_pose`,\n    :meth:`~superdex.physics.Actor.set_articulated_target_link_transforms`,\n    :meth:`~superdex.physics.Actor.get_articulated_target_pose`"
     )
     .def("get_articulated_controller_force", [](mochi::Actor& self) {

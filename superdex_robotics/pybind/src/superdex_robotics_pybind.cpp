@@ -24,12 +24,13 @@
 #include <mochi_core/utils/error.h>
 #include <mochi_core/utils/log.h>
 
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <utility>
 
 using namespace mochi;
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace {
 
@@ -40,7 +41,7 @@ namespace {
  * callers drive it directly on the Python object retrieved via get_python_{controller,sensor,
  * actuator}, so it is intentionally not part of this C++ surface.
  *
- * Composition rather than a pybind11 trampoline: the RoboticsContext owns every component and
+ * Composition rather than a nanobind trampoline: the RoboticsContext owns every component and
  * destroys it through ComponentBase::Destroy, so the Python object cannot be the owner, and the
  * bases are bound (generated) as [no_init, no_destruct] types that Python does not subclass. The
  * adapter keeps the C++ side authoritative and treats the Python instance as held state.
@@ -57,7 +58,7 @@ class PythonComponent : public BaseT {
    * ((prefab, actor, error) for controllers, (actor, error) for sensors and actuators), so they
    * trail the arguments this adapter consumes itself. */
   template <typename... BaseArgs>
-  PythonComponent(py::object impl, std::string typeName, BaseArgs&&... baseArgs)
+  PythonComponent(nb::object impl, std::string typeName, BaseArgs&&... baseArgs)
       : BaseT(std::forward<BaseArgs>(baseArgs)...),
         _impl(std::move(impl)),
         _typeName(std::move(typeName)) {}
@@ -73,7 +74,7 @@ class PythonComponent : public BaseT {
    * swallowed -- resetting is experiment hygiene, and a silent failure is the thing worth
    * avoiding. */
   void Reset() override {
-    py::gil_scoped_acquire gil;
+    nb::gil_scoped_acquire gil;
     _impl.attr("reset")();
   }
 
@@ -81,15 +82,15 @@ class PythonComponent : public BaseT {
     return _typeName;
   }
 
-  [[nodiscard]] py::object const& Impl() const {
+  [[nodiscard]] nb::object const& Impl() const {
     return _impl;
   }
 
   ~PythonComponent() override {
     /* Never let an exception escape a destructor (bugprone-exception-escape). */
     try {
-      py::gil_scoped_acquire gil;
-      _impl = py::object();
+      nb::gil_scoped_acquire gil;
+      _impl = nb::object();
     } catch (...) {
     }
   }
@@ -100,7 +101,7 @@ class PythonComponent : public BaseT {
   }
 
  private:
-  py::object _impl;
+  nb::object _impl;
   std::string _typeName;
 };
 
@@ -111,7 +112,7 @@ class PythonComponent : public BaseT {
 class PythonController final : public PythonComponent<superdex::robotics::ControllerBase> {
  public:
   PythonController(
-      py::object impl,
+      nb::object impl,
       std::string typeName,
       superdex::robotics::BotPrefab const* prefab,
       mochi::Actor* actor,
@@ -123,15 +124,15 @@ class PythonController final : public PythonComponent<superdex::robotics::Contro
       std::string_view initArgs,
       mochi::Error& error) override {
     MOCHI_ERROR_RETURN(error);
-    py::gil_scoped_acquire gil;
-    if (!py::hasattr(Impl(), "configure_from_scene_entry")) {
+    nb::gil_scoped_acquire gil;
+    if (!nb::hasattr(Impl(), "configure_from_scene_entry")) {
       return;
     }
     /* The Python detail cannot be stored in Error (it holds a borrowed char const*), so log it and
      * set a static message the scene loader can surface. */
     try {
       Impl().attr("configure_from_scene_entry")(std::string(paramArgs), std::string(initArgs));
-    } catch (py::error_already_set& e) {
+    } catch (nb::python_error& e) {
       MOCHI_LOG_ERROR(
           "Python controller '%s' configure_from_scene_entry raised an exception: %s",
           TypeNameString().c_str(),
@@ -150,8 +151,8 @@ using PythonActuator = PythonComponent<superdex::robotics::ActuatorBase>;
  * inherited a no-op would carry stale state into the next run and only show it in the collected
  * data. Checked here, at creation, so the failure lands at scene load rather than mid-collection.
  * A component with no per-episode state writes `def reset(self): pass`. */
-bool RequireResetMethod(py::object const& impl, std::string const& typeName, mochi::Error& error) {
-  if (py::hasattr(impl, "reset")) {
+bool RequireResetMethod(nb::object const& impl, std::string const& typeName, mochi::Error& error) {
+  if (nb::hasattr(impl, "reset")) {
     return true;
   }
   MOCHI_LOG_ERROR(
@@ -167,15 +168,14 @@ bool RequireResetMethod(py::object const& impl, std::string const& typeName, moc
  * which takes only the actor because a controller's params arrive later via
  * ConfigureFromSceneEntry. `actor` is None for an actor-less sensor. */
 template <typename PythonComponentT>
-auto MakePythonComponentFactory(std::string typeName, py::object factory) {
+auto MakePythonComponentFactory(std::string typeName, nb::object factory) {
   return [factory = std::move(factory), typeName = std::move(typeName)](
              mochi::Actor* actor,
              std::string_view paramArgs,
              mochi::Error& error) -> PythonComponentT* {
-    py::gil_scoped_acquire gil;
+    nb::gil_scoped_acquire gil;
     try {
-      py::object impl =
-          factory(py::cast(actor, py::return_value_policy::reference), std::string(paramArgs));
+      nb::object impl = factory(nb::cast(actor, nb::rv_policy::reference), std::string(paramArgs));
       if (!RequireResetMethod(impl, typeName, error)) {
         return nullptr;
       }
@@ -185,7 +185,7 @@ auto MakePythonComponentFactory(std::string typeName, py::object factory) {
         return nullptr;
       }
       return component;
-    } catch (py::error_already_set& e) {
+    } catch (nb::python_error& e) {
       MOCHI_LOG_ERROR(
           "Python factory for type '%s' raised an exception: %s", typeName.c_str(), e.what());
       MOCHI_ERROR_SET(error, "Python component factory raised an exception (see log).");
@@ -197,21 +197,23 @@ auto MakePythonComponentFactory(std::string typeName, py::object factory) {
 /* The live Python instance behind a handle, or None when the handle does not name a
  * Python-implemented component of that kind (an invalid handle, or a C++ implementation). */
 template <typename PythonComponentT, typename ComponentT>
-py::object PythonImplOf(ComponentT* component) {
+nb::object PythonImplOf(ComponentT* component) {
   auto* const pythonComponent = dynamic_cast<PythonComponentT*>(component);
   if (pythonComponent == nullptr) {
-    return py::none();
+    return nb::none();
   }
   return pythonComponent->Impl();
 }
 
 } // namespace
 
-PYBIND11_MODULE(SUPERDEX_ROBOTICS_MODULE_NAME, m) {
+NB_MODULE(SUPERDEX_ROBOTICS_MODULE_NAME, m) {
+  nb::set_leak_warnings(false);
+
   // Import the physics module so that shared types (Real3, ShapeHandle, …) are
-  // already registered in pybind11's global type registry, and so the shared pybind-core
+  // already registered in nanobind's global type registry, and so the shared pybind-core
   // library (which owns g_context and the MochiErrorException translator) is loaded.
-  py::module_::import(MOCHI_PHYSICS_MODULE_NAME_STR);
+  nb::module_::import_(MOCHI_PHYSICS_MODULE_NAME_STR);
 
   // Insert generated bindings
   mochi::DefineAll(m);
@@ -225,19 +227,21 @@ PYBIND11_MODULE(SUPERDEX_ROBOTICS_MODULE_NAME, m) {
   // without capturing, and it stays valid when the teardown runs after this function returns (at
   // shutdown/atexit).
   static superdex::robotics::RoboticsContext* g_botsContext = nullptr;
-  auto m_bots = m.attr("bots").cast<py::module_>();
+  static std::mutex g_botsContextMutex; // NOLINT(facebook-thread-safety-analysis)
+  auto m_bots = nb::borrow<nb::module_>(m.attr("bots"));
 
   m_bots.def(
       "create_context",
       []() -> superdex::robotics::RoboticsContext* {
         // The physics Context lives in the shared pybind-core library.
         mochi::CheckContext();
+        std::lock_guard lock(g_botsContextMutex); // NOLINT(facebook-thread-safety-analysis)
         if (!g_botsContext) {
           g_botsContext = superdex::robotics::CreateRoboticsContext();
         }
         return g_botsContext;
       },
-      py::return_value_policy::reference,
+      nb::rv_policy::reference,
       "Create a RoboticsContext. Returns the existing one if already created.");
 
   // Register a pure-C++ teardown with the shared pybind-core library: the physics module runs
@@ -246,6 +250,7 @@ PYBIND11_MODULE(SUPERDEX_ROBOTICS_MODULE_NAME, m) {
   // Empty capture: g_botsContext has static storage. Null-guarded and idempotent, so it is safe
   // to run when no context was created or after a prior teardown.
   mochi::RegisterContextDependent([]() {
+    std::lock_guard lock(g_botsContextMutex); // NOLINT(facebook-thread-safety-analysis)
     if (g_botsContext) {
       superdex::robotics::DestroyRoboticsContext(g_botsContext);
       g_botsContext = nullptr;
@@ -269,16 +274,16 @@ PYBIND11_MODULE(SUPERDEX_ROBOTICS_MODULE_NAME, m) {
       "register_python_controller",
       [](superdex::robotics::RoboticsContext* botsCtx,
          std::string const& typeName,
-         py::object factory) {
+         nb::object factory) {
         botsCtx->RegisterControllerType(
             typeName,
             [factory = std::move(factory), typeName](
                 superdex::robotics::BotPrefab const* prefab,
                 mochi::Actor* actor,
                 mochi::Error& error) -> superdex::robotics::ControllerBase* {
-              py::gil_scoped_acquire gil;
+              nb::gil_scoped_acquire gil;
               try {
-                py::object impl = factory(py::cast(actor, py::return_value_policy::reference));
+                nb::object impl = factory(nb::cast(actor, nb::rv_policy::reference));
                 if (!RequireResetMethod(impl, typeName, error)) {
                   return nullptr;
                 }
@@ -289,7 +294,7 @@ PYBIND11_MODULE(SUPERDEX_ROBOTICS_MODULE_NAME, m) {
                   return nullptr;
                 }
                 return controller;
-              } catch (py::error_already_set& e) {
+              } catch (nb::python_error& e) {
                 MOCHI_LOG_ERROR(
                     "Python factory for type '%s' raised an exception: %s",
                     typeName.c_str(),
@@ -299,9 +304,9 @@ PYBIND11_MODULE(SUPERDEX_ROBOTICS_MODULE_NAME, m) {
               }
             });
       },
-      py::arg("bots_ctx"),
-      py::arg("type_name"),
-      py::arg("factory"),
+      nb::arg("bots_ctx"),
+      nb::arg("type_name"),
+      nb::arg("factory"),
       "Register a controller type implemented in Python. `factory` is called with the robot Actor "
       "(None if the controller was created without one) and must return a Python controller "
       "instance. The instance must define `reset()` (an empty body is fine); its optional "
@@ -313,13 +318,13 @@ PYBIND11_MODULE(SUPERDEX_ROBOTICS_MODULE_NAME, m) {
       "register_python_sensor",
       [](superdex::robotics::RoboticsContext* botsCtx,
          std::string const& typeName,
-         py::object factory) {
+         nb::object factory) {
         botsCtx->RegisterSensorType(
             typeName, MakePythonComponentFactory<PythonSensor>(typeName, std::move(factory)));
       },
-      py::arg("bots_ctx"),
-      py::arg("type_name"),
-      py::arg("factory"),
+      nb::arg("bots_ctx"),
+      nb::arg("type_name"),
+      nb::arg("factory"),
       "Register a sensor type implemented in Python. `factory` is called with (actor, param_args) "
       "-- the link Actor, or None for an actor-less sensor, and the sensor's params (a file path "
       "or inline JSON, empty for defaults) -- and must return a Python sensor instance, which must "
@@ -330,13 +335,13 @@ PYBIND11_MODULE(SUPERDEX_ROBOTICS_MODULE_NAME, m) {
       "register_python_actuator",
       [](superdex::robotics::RoboticsContext* botsCtx,
          std::string const& typeName,
-         py::object factory) {
+         nb::object factory) {
         botsCtx->RegisterActuatorType(
             typeName, MakePythonComponentFactory<PythonActuator>(typeName, std::move(factory)));
       },
-      py::arg("bots_ctx"),
-      py::arg("type_name"),
-      py::arg("factory"),
+      nb::arg("bots_ctx"),
+      nb::arg("type_name"),
+      nb::arg("factory"),
       "Register an actuator type implemented in Python. `factory` is called with (actor, "
       "param_args) -- the link Actor, which an actuator always has, and the actuator's params (a "
       "file path or inline JSON, empty for defaults) -- and must return a Python actuator "
@@ -346,28 +351,28 @@ PYBIND11_MODULE(SUPERDEX_ROBOTICS_MODULE_NAME, m) {
   m_bots.def(
       "get_python_controller",
       [](superdex::robotics::RoboticsContext* botsCtx, superdex::robotics::ControllerHandle handle)
-          -> py::object { return PythonImplOf<PythonController>(botsCtx->GetController(handle)); },
-      py::arg("bots_ctx"),
-      py::arg("handle"),
+          -> nb::object { return PythonImplOf<PythonController>(botsCtx->GetController(handle)); },
+      nb::arg("bots_ctx"),
+      nb::arg("handle"),
       "Return the Python controller instance behind a handle (created from a type registered via "
       "register_python_controller), or None if the handle is not a Python controller.");
 
   m_bots.def(
       "get_python_sensor",
       [](superdex::robotics::RoboticsContext* botsCtx, superdex::robotics::SensorHandle handle)
-          -> py::object { return PythonImplOf<PythonSensor>(botsCtx->GetSensor(handle)); },
-      py::arg("bots_ctx"),
-      py::arg("handle"),
+          -> nb::object { return PythonImplOf<PythonSensor>(botsCtx->GetSensor(handle)); },
+      nb::arg("bots_ctx"),
+      nb::arg("handle"),
       "Return the Python sensor instance behind a handle (created from a type registered via "
       "register_python_sensor), or None if the handle is not a Python sensor.");
 
   m_bots.def(
       "get_python_actuator",
       [](superdex::robotics::RoboticsContext* botsCtx, superdex::robotics::ActuatorHandle handle)
-          -> py::object { return PythonImplOf<PythonActuator>(botsCtx->GetActuator(handle)); },
-      py::arg("bots_ctx"),
-      py::arg("handle"),
+          -> nb::object { return PythonImplOf<PythonActuator>(botsCtx->GetActuator(handle)); },
+      nb::arg("bots_ctx"),
+      nb::arg("handle"),
       "Return the Python actuator instance behind a handle (created from a type registered via "
       "register_python_actuator), or None if the handle is not a Python actuator.");
 
-} // PYBIND11_MODULE
+} // NB_MODULE

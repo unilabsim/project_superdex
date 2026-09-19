@@ -12,79 +12,103 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Auto-generated scene-sharing and batched-stepping tests for every discovered env.
+"""Scene-sharing and batched-stepping tests for registered base environments."""
 
-These validate base ``MochiEnv`` behavior across every environment discovered on the
-filesystem, so environments absent from a build are simply not covered -- no
-per-environment gating is required:
+from __future__ import annotations
 
-- ``test_scene_sharing_<env>``: the scene manager shares one scene between instances of
-  the same env class when ``use_shared_scenes`` is set, and gives each instance its own
-  scene otherwise. Applies to every env.
-- ``test_batched_stepping_<env>``: stepping two shared-scene envs in alternating batches
-  reproduces a single independent reference env exactly (deterministic shared-scene state
-  capture/restore). This compares the ``agent_pose`` observation, so envs whose
-  observation has no ``agent_pose`` are skipped.
-"""
-
+import re
 import unittest
+from collections.abc import Iterable
 from typing import Callable
 
+import gymnasium as gym
 import superdex.physics as sdp
+from gymnasium.envs.registration import EnvSpec
 from numpy.testing import assert_array_equal
-from superdex.lab.gym.utils.env_discovery import discover_envs, EnvEntry
+from superdex.lab.gym.registration import get_env_specs
+from superdex.lab.gym.utils.registry import unwrap_mochi_env
 
 ########################################################################################
 
-_NUM_STEPS_TOTAL = 100  # Total number of steps to perform.
-_NUM_STEPS_BATCH = 5  # Number of steps to perform in each batch.
-_SEED = 42  # Random seed for reproducibility.
-
-# Observation key compared by the batched-stepping test; envs without it are skipped.
+_NUM_STEPS_TOTAL = 100
+_NUM_STEPS_BATCH = 5
+_SEED = 42
 _POSE_KEY = "agent_pose"
 
 
 class TestSceneSharing(unittest.TestCase):
-    """Scene-sharing and batched-stepping tests, generated per discovered env."""
+    """Scene-sharing and batched-stepping tests generated per base EnvSpec."""
 
     def tearDown(self) -> None:
-        # Force the Mochi context to be shut down after each test.
         if sdp.is_initialized():
             sdp.shutdown()
 
+    def test_rejects_duplicate_generated_test_names(self) -> None:
+        class DuplicateSceneSharingTests(unittest.TestCase):
+            pass
 
-def _make_scene_sharing_test(entry: EnvEntry) -> Callable[[TestSceneSharing], None]:
-    def test(self: TestSceneSharing) -> None:
-        # Shared scenes: both envs share the same scene via the scene manager.
-        shared_cfg = entry.cfg_cls(**{**entry.cfg_kwargs, "use_shared_scenes": True})
-        with entry.env_cls(shared_cfg) as env_1, entry.env_cls(shared_cfg) as env_2:
-            self.assertIsNotNone(env_1._scene_manager)
-            self.assertIsNotNone(env_2._scene_manager)
-            self.assertIs(env_1._scene, env_2._scene)
+        specs = (EnvSpec("Example-A-v0"), EnvSpec("Example_A-v0"))
+        with self.assertRaisesRegex(
+            ValueError, "Duplicate generated scene-sharing test"
+        ):
+            register_scene_sharing_tests(DuplicateSceneSharingTests, specs)
+        self.assertFalse(
+            hasattr(DuplicateSceneSharingTests, "test_scene_sharing_example_a_v0")
+        )
 
-        # Independent scenes: no scene manager, distinct scenes.
-        indep_cfg = entry.cfg_cls(**{**entry.cfg_kwargs, "use_shared_scenes": False})
-        with entry.env_cls(indep_cfg) as env_1, entry.env_cls(indep_cfg) as env_2:
-            self.assertIsNone(env_1._scene_manager)
-            self.assertIsNone(env_2._scene_manager)
-            self.assertIsNot(env_1._scene, env_2._scene)
+    def test_rejects_existing_generated_test_attribute(self) -> None:
+        class ExistingSceneSharingTest(unittest.TestCase):
+            test_scene_sharing_example_v0 = None
 
-    test.__doc__ = f"Scene sharing for {entry.env_id}."
+        with self.assertRaisesRegex(ValueError, "already exists"):
+            register_scene_sharing_tests(
+                ExistingSceneSharingTest,
+                (EnvSpec("Example-v0"),),
+            )
+
+
+def _test_name(env_id: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", env_id.lower()).strip("_")
+
+
+def _make_scene_sharing_test(
+    spec: EnvSpec,
+) -> Callable[[unittest.TestCase], None]:
+    def test(self: unittest.TestCase) -> None:
+        with (
+            gym.make(spec.id, use_shared_scenes=True) as env_1,
+            gym.make(spec.id, use_shared_scenes=True) as env_2,
+        ):
+            mochi_env_1 = unwrap_mochi_env(env_1)
+            mochi_env_2 = unwrap_mochi_env(env_2)
+            self.assertIsNotNone(mochi_env_1._scene_manager)
+            self.assertIsNotNone(mochi_env_2._scene_manager)
+            self.assertIs(mochi_env_1._scene, mochi_env_2._scene)
+
+        with (
+            gym.make(spec.id, use_shared_scenes=False) as env_1,
+            gym.make(spec.id, use_shared_scenes=False) as env_2,
+        ):
+            mochi_env_1 = unwrap_mochi_env(env_1)
+            mochi_env_2 = unwrap_mochi_env(env_2)
+            self.assertIsNone(mochi_env_1._scene_manager)
+            self.assertIsNone(mochi_env_2._scene_manager)
+            self.assertIsNot(mochi_env_1._scene, mochi_env_2._scene)
+
+    test.__doc__ = f"Scene sharing for {spec.id}."
     return test
 
 
-def _make_batched_stepping_test(entry: EnvEntry) -> Callable[[TestSceneSharing], None]:
-    def test(self: TestSceneSharing) -> None:
-        # Reference: a single independent env yields the ground-truth trajectory.
-        ref_cfg = entry.cfg_cls(
-            **{**entry.cfg_kwargs, "num_worker_threads": 0, "use_shared_scenes": False}
-        )
-        with entry.env_cls(ref_cfg) as ref_env:
+def _make_batched_stepping_test(
+    spec: EnvSpec,
+) -> Callable[[unittest.TestCase], None]:
+    def test(self: unittest.TestCase) -> None:
+        common_cfg = {"num_worker_threads": 0}
+        with gym.make(spec.id, **{**common_cfg, "use_shared_scenes": False}) as ref_env:
+            mochi_ref_env = unwrap_mochi_env(ref_env)
             ref_env.reset(seed=_SEED)
-
-            # The batched-stepping check compares the agent pose; skip envs without it.
-            if _POSE_KEY not in ref_env.get_last_step().observation:
-                self.skipTest(f"{entry.env_id} has no '{_POSE_KEY}' observation.")
+            if _POSE_KEY not in mochi_ref_env.get_last_step().observation:
+                self.skipTest(f"{spec.id} has no {_POSE_KEY!r} observation.")
 
             ref_env.action_space.seed(_SEED)
             ref_actions = []
@@ -92,61 +116,58 @@ def _make_batched_stepping_test(entry: EnvEntry) -> Callable[[TestSceneSharing],
                 action = ref_env.action_space.sample()
                 ref_actions.append(action)
                 ref_env.step(action)
-            ref_final_pose = ref_env.get_last_step().observation[_POSE_KEY]
+            ref_final_pose = mochi_ref_env.get_last_step().observation[_POSE_KEY]
 
-        # Two shared-scene envs stepped in alternating batches must reproduce the
-        # reference exactly, and end in an identical physics state.
-        shared_cfg = entry.cfg_cls(
-            **{**entry.cfg_kwargs, "num_worker_threads": 0, "use_shared_scenes": True}
-        )
-        with entry.env_cls(shared_cfg) as env_1, entry.env_cls(shared_cfg) as env_2:
+        shared_cfg = {**common_cfg, "use_shared_scenes": True}
+        with (
+            gym.make(spec.id, **shared_cfg) as env_1,
+            gym.make(spec.id, **shared_cfg) as env_2,
+        ):
+            mochi_env_1 = unwrap_mochi_env(env_1)
+            mochi_env_2 = unwrap_mochi_env(env_2)
             env_1.reset(seed=_SEED)
             env_2.reset(seed=_SEED)
-            for i in range(0, _NUM_STEPS_TOTAL, _NUM_STEPS_BATCH):
-                for action in ref_actions[i : i + _NUM_STEPS_BATCH]:
+            for index in range(0, _NUM_STEPS_TOTAL, _NUM_STEPS_BATCH):
+                actions = ref_actions[index : index + _NUM_STEPS_BATCH]
+                for action in actions:
                     env_1.step(action)
-                for action in ref_actions[i : i + _NUM_STEPS_BATCH]:
+                for action in actions:
                     env_2.step(action)
 
-            final_pose_1 = env_1.get_last_step().observation[_POSE_KEY]
-            final_pose_2 = env_2.get_last_step().observation[_POSE_KEY]
+            final_pose_1 = mochi_env_1.get_last_step().observation[_POSE_KEY]
+            final_pose_2 = mochi_env_2.get_last_step().observation[_POSE_KEY]
             assert_array_equal(
                 final_pose_1,
                 ref_final_pose,
-                err_msg=f"{entry.env_id}: env_1 batched pose diverged from reference.",
+                err_msg=f"{spec.id}: env_1 batched pose diverged from reference.",
             )
             assert_array_equal(
                 final_pose_2,
                 ref_final_pose,
-                err_msg=f"{entry.env_id}: env_2 batched pose diverged from reference.",
+                err_msg=f"{spec.id}: env_2 batched pose diverged from reference.",
             )
-
-            # env_1 and env_2 share the same physics.Scene, so their states are comparable.
             self.assertTrue(
-                env_1._scene.is_equal_state(
-                    env_1._state_snapshot, env_2._state_snapshot
+                mochi_env_1._scene.is_equal_state(
+                    mochi_env_1._state_snapshot, mochi_env_2._state_snapshot
                 ),
-                msg=f"{entry.env_id}: env_1 and env_2 state snapshots diverged.",
+                msg=f"{spec.id}: env state snapshots diverged.",
             )
 
-    test.__doc__ = f"Shared-scene batched stepping for {entry.env_id}."
+    test.__doc__ = f"Shared-scene batched stepping for {spec.id}."
     return test
 
 
 def _make_survives_creator_close_test(
-    entry: EnvEntry,
-) -> Callable[[TestSceneSharing], None]:
-    def test(self: TestSceneSharing) -> None:
-        # Closing the env that built the shared scene must not tear down resources the
-        # surviving sibling still needs: scene-owned resources (e.g. a bot's articulated
-        # actor) are released via SceneManager cleanup callbacks only once the reference
-        # count reaches zero. A multi-item `with` unwinds in reverse, so the creator is
-        # always closed last there -- this closes it first on purpose.
-        shared_cfg = entry.cfg_cls(**{**entry.cfg_kwargs, "use_shared_scenes": True})
-        creator = entry.env_cls(shared_cfg)
-        sibling = entry.env_cls(shared_cfg)
+    spec: EnvSpec,
+) -> Callable[[unittest.TestCase], None]:
+    def test(self: unittest.TestCase) -> None:
+        shared_cfg = {"use_shared_scenes": True}
+        creator = gym.make(spec.id, **shared_cfg)
+        sibling = gym.make(spec.id, **shared_cfg)
         try:
-            self.assertIs(creator._scene, sibling._scene)
+            mochi_creator = unwrap_mochi_env(creator)
+            mochi_sibling = unwrap_mochi_env(sibling)
+            self.assertIs(mochi_creator._scene, mochi_sibling._scene)
             creator.close()
             sibling.reset()
             sibling.step(sibling.action_space.sample())
@@ -154,35 +175,55 @@ def _make_survives_creator_close_test(
             creator.close()
             sibling.close()
 
-    test.__doc__ = f"Shared scene survives creator close for {entry.env_id}."
+    test.__doc__ = f"Shared scene survives creator close for {spec.id}."
     return test
 
 
-def _register_generated_tests() -> None:
-    # Base envs only, deliberately: these exercise base `MochiEnv` behavior, which a
-    # config variant does not change, and each entry costs three physics-instantiating
-    # tests. Running them per variant would multiply this slow suite for no extra signal.
-    for entry in discover_envs():
-        if entry.variant is not None:
+def register_scene_sharing_tests(
+    test_case: type[unittest.TestCase],
+    specs: Iterable[EnvSpec],
+) -> None:
+    """Attach deterministic scene-sharing tests for base environment specs."""
+    generated_tests = []
+    for spec in sorted(specs, key=lambda item: item.id):
+        if spec.kwargs.get("cfg"):
             continue
-        setattr(
-            TestSceneSharing,
-            f"test_scene_sharing_{entry.short_name}",
-            _make_scene_sharing_test(entry),
-        )
-        setattr(
-            TestSceneSharing,
-            f"test_batched_stepping_{entry.short_name}",
-            _make_batched_stepping_test(entry),
-        )
-        setattr(
-            TestSceneSharing,
-            f"test_shared_scene_survives_creator_close_{entry.short_name}",
-            _make_survives_creator_close_test(entry),
+        suffix = _test_name(spec.id)
+        generated_tests.extend(
+            (
+                (
+                    f"test_scene_sharing_{suffix}",
+                    _make_scene_sharing_test(spec),
+                ),
+                (
+                    f"test_batched_stepping_{suffix}",
+                    _make_batched_stepping_test(spec),
+                ),
+                (
+                    f"test_shared_scene_survives_creator_close_{suffix}",
+                    _make_survives_creator_close_test(spec),
+                ),
+            )
         )
 
+    generated_names: set[str] = set()
+    for method_name, _ in generated_tests:
+        if method_name in generated_names:
+            raise ValueError(
+                f"Duplicate generated scene-sharing test method name: {method_name}"
+            )
+        if hasattr(test_case, method_name):
+            raise ValueError(
+                f"Scene-sharing test method already exists on "
+                f"{test_case.__name__}: {method_name}"
+            )
+        generated_names.add(method_name)
 
-_register_generated_tests()
+    for method_name, test in generated_tests:
+        setattr(test_case, method_name, test)
+
+
+register_scene_sharing_tests(TestSceneSharing, get_env_specs())
 
 ########################################################################################
 

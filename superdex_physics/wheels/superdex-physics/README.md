@@ -16,12 +16,12 @@ from source. Remote debugging still works: `DebugServer` is part of the core run
 pip install superdex-physics
 ```
 
-This wheel carries the single-precision native extension. For double precision, install the
-`double` extra -- which pulls in `superdex-physics-fp64` -- and select it at import time:
+This wheel carries the FP32 native extension. For FP64, install the `fp64` extra -- which
+pulls in `superdex-physics-fp64` -- and select it at import time:
 
 ```bash
-pip install 'superdex-physics[double]'
-export SUPERDEX_PRECISION=double
+pip install 'superdex-physics[fp64]'
+export SUPERDEX_PRECISION=fp64
 ```
 
 See the [repository README](https://github.com/facebookresearch/project_superdex#readme)

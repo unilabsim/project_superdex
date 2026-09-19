@@ -191,7 +191,7 @@ static void EmplaceShellShellContact(
   reg.emplace<CCollJacs<CollRole::Collider>>(e);
 
   // Emplace point-cloud collider properties.
-  ValidatePointCloudColliderParams(params.pointCloudCollider, error);
+  ValidatePointCloudColliderParams(params.pointCloudCollider, params.contact, error);
   MOCHI_ERROR_RETURN(error);
   auto& pcComponent = reg.emplace<CPointCloudColliderParams>(e, params.pointCloudCollider);
   pcComponent.integralDim = 2;

@@ -141,7 +141,7 @@ namespace mochi::krylov {
  * @param[in] rhs The right-hand side vector b of \f$ A x = b\f$.
  * @param[in,out] x Vector containing the initial guess at input and the solution at output.
  * @param[in] prec The preconditioner application functor.
- * @param[in] iterMax Maximum number of iterations.
+ * @param[in] iterMax Maximum number of iterations. Must be positive.
  * @param[in] statusCheck A functor called at each iteration to check the stop criteria.
  * @param[in] restartSize Size of Krylov space triggering a restart (default = no restart)
  * @param[in] verbosity Verbosity level for logging output.
@@ -186,6 +186,7 @@ LinearSolverStatus GMRes(
       "The type 'StopCriterion' is currently not supported by GMRes.");
 
   int n = static_cast<int>(NumRows(x));
+  MOCHI_ASSERT_VERBOSE(iterMax > 0, "Maximum number of iterations must be positive.");
   MOCHI_ASSERT_VERBOSE(NumRows(x) == NumRows(rhs));
   MOCHI_ASSERT_VERBOSE(
       initialGuessHint != InitialGuessHint::Zero || dot(x, x) == 0,

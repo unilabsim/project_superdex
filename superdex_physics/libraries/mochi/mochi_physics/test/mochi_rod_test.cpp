@@ -18,6 +18,7 @@
 #include <mochi_core/geometry/model_data.h>
 #include <mochi_core/utils/array_utils.h>
 #include <mochi_core/utils/rand_utils.h>
+#include <mochi_core/utils/reflection.h>
 #include <mochi_physics/src/mochi_context.h>
 #include <mochi_physics/src/mochi_integration.h>
 #include <mochi_physics/src/mochi_rod.h>
@@ -1249,7 +1250,7 @@ TEST_F(GenerateDiscreteBishopFrameTest, RandomPolylinesValidityAndMinimalRotatio
 // Rod Visual Mesh Tests
 // ============================================================================
 
-class MochiRodVisualMesh : public test::MochiSceneTestBase {
+class MochiRodSurfaceMeshes : public test::MochiSceneTestBase {
  protected:
   // These members are populated by CreateRodShapeWithVisualMesh for use by tests that need to
   // reference the input geometry (e.g., ReferenceConfigQueriesMatchInput, Hdf5RoundTrip).
@@ -1265,9 +1266,9 @@ class MochiRodVisualMesh : public test::MochiSceneTestBase {
     test::MochiSceneTestBase::SetUp();
   }
 
-  // Create a rod shape with a visual mesh triangle. When periodic, the visual mesh is placed on
+  // Create rod model data with a visual mesh triangle. When periodic, the visual mesh is placed on
   // the closing element to exercise wrapping; otherwise it is placed on an interior element.
-  ShapeHandle CreateRodShapeWithVisualMesh(bool isClosedLoop = false, bool includeSkinning = true) {
+  ModelData CreateRodModelWithVisualMesh(bool isClosedLoop = false, bool includeSkinning = true) {
     _rodNodes = isClosedLoop
         ? DynamicArray<
               Real3>{Real3{0_r, 0_r, 0_r}, Real3{0.75_r, 0_r, 0_r}, Real3{0.75_r, 0_r, 0.75_r}, Real3{0_r, 0_r, 0.75_r}}
@@ -1280,7 +1281,7 @@ class MochiRodVisualMesh : public test::MochiSceneTestBase {
     int const numElements = isClosedLoop ? numNodes : numNodes - 1;
     DynamicArray<Real3> frameAxes(numElements, Real3{0_r, 1_r, 0_r});
 
-    // Use default visual mesh if not already set by the test
+    // Use default visual mesh if not already set by the test.
     if (_visNodePositions.empty()) {
       int const visElement = isClosedLoop ? numElements - 1 : 1;
       Int2 const en = {visElement, (visElement + 1) % numNodes};
@@ -1293,42 +1294,81 @@ class MochiRodVisualMesh : public test::MochiSceneTestBase {
       _weights = {1_r, 1_r, 1_r};
     }
 
-    ModelDataView modelView;
-    modelView.mesh.emplace();
-    modelView.mesh->nodesPerElement = 2;
-    modelView.mesh->coordinates = Flatten(MakeConstSpan(_rodNodes));
-    modelView.elementFrameAxes = Flatten(MakeConstSpan(frameAxes));
-    // Periodicity is now encoded by the mesh connectivity array. Build the appropriate
-    // sequential connectivity for either an open or closed polyline.
     DynamicArray<int> connectivity;
-    {
-      int const numSegments = isClosedLoop ? numNodes : numNodes - 1;
-      connectivity.reserve(2 * numSegments);
-      for (int i = 0; i < numSegments; ++i) {
-        connectivity.push_back(i);
-        connectivity.push_back((i + 1) % numNodes);
-      }
+    connectivity.reserve(2 * numElements);
+    for (int i = 0; i < numElements; ++i) {
+      connectivity.push_back(i);
+      connectivity.push_back((i + 1) % numNodes);
     }
-    modelView.mesh->connectivity = MakeConstSpan(connectivity);
 
-    modelView.visualMesh.emplace();
-    modelView.visualMesh->nodesPerElement = 3;
-    modelView.visualMesh->coordinates = Flatten(MakeConstSpan(_visNodePositions));
-    modelView.visualMesh->connectivity = Flatten(MakeConstSpan(_visTriangles));
+    ModelData model;
+    model.mesh.emplace();
+    model.mesh->nodesPerElement = 2;
+    model.mesh->coordinates = DynamicArray<real>{Flatten(MakeConstSpan(_rodNodes))};
+    model.mesh->connectivity = std::move(connectivity);
+    model.elementFrameAxes = DynamicArray<real>{Flatten(MakeConstSpan(frameAxes))};
+
+    model.visualMesh.emplace();
+    model.visualMesh->nodesPerElement = 3;
+    model.visualMesh->coordinates = DynamicArray<real>{Flatten(MakeConstSpan(_visNodePositions))};
+    model.visualMesh->connectivity = DynamicArray<int>{Flatten(MakeConstSpan(_visTriangles))};
     if (includeSkinning) {
-      modelView.visualMesh->skinning.emplace();
-      modelView.visualMesh->skinning->weightsPerNode = _weightsPerNode;
-      modelView.visualMesh->skinning->indices = MakeConstSpan(_elementIndices);
-      modelView.visualMesh->skinning->weights = MakeConstSpan(_weights);
+      model.visualMesh->skinning.emplace();
+      model.visualMesh->skinning->weightsPerNode = _weightsPerNode;
+      model.visualMesh->skinning->indices = _elementIndices;
+      model.visualMesh->skinning->weights = _weights;
     }
-
-    return _scene->GetContext()->CreateModelShape(modelView, ErrorAssert{});
+    return model;
   }
 
-  static RodActorParams GetRodActorParams(ShapeHandle shape, bool useVisualMeshContact = false) {
+  ShapeHandle CreateRodShapeWithVisualMesh(bool isClosedLoop = false, bool includeSkinning = true) {
+    return _scene->GetContext()->CreateModelShape(
+        CreateRodModelWithVisualMesh(isClosedLoop, includeSkinning), ErrorAssert{});
+  }
+  ShapeHandle CreateRodShapeWithContactSkin(
+      bool includeVisualMesh = true,
+      bool isClosedLoop = false,
+      bool includeUnreferencedNode = false,
+      bool includeContactSkinning = true) {
+    ModelData model = CreateRodModelWithVisualMesh(isClosedLoop);
+    model.contactSkinMesh.emplace();
+    model.contactSkinMesh->nodesPerElement = 3;
+    model.contactSkinMesh->coordinates =
+        DynamicArray<real>{Flatten(MakeConstSpan(_visNodePositions))};
+    model.contactSkinMesh->skinning.emplace();
+    model.contactSkinMesh->skinning->weightsPerNode = _weightsPerNode;
+    model.contactSkinMesh->skinning->indices = _elementIndices;
+    model.contactSkinMesh->skinning->weights = _weights;
+    Real3 const extraNode = _visNodePositions[0] + Real3{0_r, -0.1_r, 0_r};
+    model.contactSkinMesh->coordinates.push_back(extraNode[0]);
+    model.contactSkinMesh->coordinates.push_back(extraNode[1]);
+    model.contactSkinMesh->coordinates.push_back(extraNode[2]);
+    model.contactSkinMesh->connectivity = DynamicArray<int>{0, 1, 2, 0, 2, 3};
+    for (int i = 0; i < _weightsPerNode; ++i) {
+      model.contactSkinMesh->skinning->indices.push_back(_elementIndices[i]);
+      model.contactSkinMesh->skinning->weights.push_back(_weights[i]);
+    }
+    if (includeUnreferencedNode) {
+      model.contactSkinMesh->connectivity = DynamicArray<int>{0, 2, 3};
+    }
+    if (!includeContactSkinning) {
+      model.contactSkinMesh->skinning.reset();
+    }
+    if (!includeVisualMesh) {
+      model.visualMesh = std::nullopt;
+    }
+
+    return _scene->GetContext()->CreateModelShape(model, test::ExpectOK{});
+  }
+
+  static RodActorParams GetRodActorParams(
+      ShapeHandle shape,
+      bool useContactSkin = false,
+      ActorBoundaryElementType contactSkinElementType = ActorBoundaryElementType::Default) {
     RodActorParams params;
     params.shape = shape;
-    params.useVisualMeshContact = useVisualMeshContact;
+    params.useContactSkin = useContactSkin;
+    params.contactSkinElementType = contactSkinElementType;
     params.material.linearDensity = 1_r;
     params.material.linearRotationalInertia = 1_r;
     params.material.axialStiffness = 1e3_r;
@@ -1337,8 +1377,18 @@ class MochiRodVisualMesh : public test::MochiSceneTestBase {
     return params;
   }
 
-  Actor* CreateRodActorWithVisualMesh(ShapeHandle shape, bool useVisualMeshContact = false) {
-    return CreateRodActor(_scene, GetRodActorParams(shape, useVisualMeshContact), ErrorAssert{});
+  Actor* CreateTestRodActor(
+      ShapeHandle shape,
+      bool useContactSkin = false,
+      ActorBoundaryElementType contactSkinElementType = ActorBoundaryElementType::Default) {
+    return CreateRodActor(
+        _scene, GetRodActorParams(shape, useContactSkin, contactSkinElementType), ErrorAssert{});
+  }
+
+  Actor* CreateTestRodActorWithContactSkin(
+      ShapeHandle shape,
+      ActorBoundaryElementType contactSkinElementType = ActorBoundaryElementType::Default) {
+    return CreateTestRodActor(shape, true, contactSkinElementType);
   }
 
   // Verify skinning Jacobian FD consistency at reference config and after a deformation step.
@@ -1367,21 +1417,21 @@ class MochiRodVisualMesh : public test::MochiSceneTestBase {
     auto const& basePose = reg.get<CRodPose<TimeStep::Current> const>(entity);
     int const numElements = polylineMesh.NumElements();
 
-    auto const& visualMesh = reg.get<CVisualMesh const>(entity);
-    auto const& rodEmbedding = reg.get<CRodVisualMeshEmbedding const>(entity);
-    CRodContactSkin contactSkin(visualMesh.mesh, rodEmbedding.data);
+    auto const& contactSkin = reg.get<CRodContactSkin const>(entity);
+    CVisualMesh visualLike{contactSkin.mesh};
+    CRodVisualMeshEmbedding embeddingLike{contactSkin.embedding};
     CRodContactSkinningData skinningData;
     rod::InitializeContactSkinningJacobian(contactSkin, polylineMesh, skinningData);
     rod::ResolveContactSkinningJacobian(contactSkin, polylineMesh, basePose, skinningData);
 
     auto const& jac = skinningData.jacobian;
     int const numDofs = jac.Cols();
-    int const numVisualNodes = jac.Rows();
+    int const numSurfaceNodes = jac.Rows();
 
-    auto computeVisualPositions = [&](CRodPose<TimeStep::Current> const& pose) {
+    auto computeSurfacePositions = [&](CRodPose<TimeStep::Current> const& pose) {
       CQueryVisualNodePositions visPosQuery;
       rod::UpdateQueryVisualNodePositionsAndNormals(
-          visualMesh, rodEmbedding, polylineMesh, pose, visPosQuery, nullptr);
+          visualLike, embeddingLike, polylineMesh, pose, visPosQuery, nullptr);
       return visPosQuery.nodePositions;
     };
 
@@ -1400,7 +1450,7 @@ class MochiRodVisualMesh : public test::MochiSceneTestBase {
           perturbedPosePlus.value.displacements,
           MakeSpan(perturbedPosePlus.value.frameAxes));
 
-      auto positionsPlus = computeVisualPositions(perturbedPosePlus);
+      auto positionsPlus = computeSurfacePositions(perturbedPosePlus);
 
       ColumnVector<real> dofDeltaMinus = ColumnVector<real>::Zero(numDofs);
       dofDeltaMinus(dofIdx) = -kFdEps;
@@ -1416,20 +1466,20 @@ class MochiRodVisualMesh : public test::MochiSceneTestBase {
           perturbedPoseMinus.value.displacements,
           MakeSpan(perturbedPoseMinus.value.frameAxes));
 
-      auto positionsMinus = computeVisualPositions(perturbedPoseMinus);
+      auto positionsMinus = computeSurfacePositions(perturbedPoseMinus);
 
-      for (int visNodeIdx = 0; visNodeIdx < numVisualNodes; ++visNodeIdx) {
-        auto const colIndices = jac.Indices(visNodeIdx);
+      for (int surfaceNodeIdx = 0; surfaceNodeIdx < numSurfaceNodes; ++surfaceNodeIdx) {
+        auto const colIndices = jac.Indices(surfaceNodeIdx);
 
         auto const* it = std::find(colIndices.begin(), colIndices.end(), dofIdx);
 
         if (it == colIndices.end()) {
           for (int d = 0; d < 3; ++d) {
             real const fdDeriv =
-                (positionsPlus[3 * visNodeIdx + d] - positionsMinus[3 * visNodeIdx + d]) /
+                (positionsPlus[3 * surfaceNodeIdx + d] - positionsMinus[3 * surfaceNodeIdx + d]) /
                 (2_r * kFdEps);
             EXPECT_NEAR(0_r, fdDeriv, kFdTol)
-                << "DoF " << dofIdx << " should not affect visual node " << visNodeIdx
+                << "DoF " << dofIdx << " should not affect surface node " << surfaceNodeIdx
                 << " component " << d;
           }
           continue;
@@ -1439,23 +1489,23 @@ class MochiRodVisualMesh : public test::MochiSceneTestBase {
 
         for (int d = 0; d < 3; ++d) {
           real const fdDeriv =
-              (positionsPlus[3 * visNodeIdx + d] - positionsMinus[3 * visNodeIdx + d]) /
+              (positionsPlus[3 * surfaceNodeIdx + d] - positionsMinus[3 * surfaceNodeIdx + d]) /
               (2_r * kFdEps);
 
-          real const analyticDeriv = jac.Values(visNodeIdx)[localCol][d];
+          real const analyticDeriv = jac.Values(surfaceNodeIdx)[localCol][d];
 
           EXPECT_NEAR(analyticDeriv, fdDeriv, kFdTol)
-              << "Mismatch at dPosition_visual[" << visNodeIdx << "][" << d << "] / dDoF[" << dofIdx
-              << "]";
+              << "Mismatch at dPosition_surface[" << surfaceNodeIdx << "][" << d << "] / dDoF["
+              << dofIdx << "]";
         }
       }
     }
   }
 };
 
-TEST_F(MochiRodVisualMesh, ReferenceConfigQueriesMatchInput) {
+TEST_F(MochiRodSurfaceMeshes, ReferenceConfigQueriesMatchInput) {
   ShapeHandle shape = CreateRodShapeWithVisualMesh();
-  Actor* actor = CreateRodActorWithVisualMesh(shape);
+  Actor* actor = CreateTestRodActor(shape);
 
   auto const visualMesh = actor->GetVisualMesh();
 
@@ -1500,7 +1550,23 @@ TEST_F(MochiRodVisualMesh, ReferenceConfigQueriesMatchInput) {
   }
 }
 
-TEST_F(MochiRodVisualMesh, QueryWithoutVisualMeshFails) {
+TEST_F(MochiRodSurfaceMeshes, VisualOnlyRodHasNoSurfaceMesh) {
+  Actor* actor = CreateTestRodActor(CreateRodShapeWithVisualMesh());
+
+  EXPECT_EQ(MeshDataView{}, actor->GetSurfaceMesh());
+  actor->RegisterQuery(QueryType::SurfaceNodePositions, test::ExpectNotOK{});
+  actor->RegisterQuery(QueryType::SurfaceNodeNormals, test::ExpectNotOK{});
+
+  auto& reg = GetRegistry();
+  auto const entity = mochi::GetEntity(reg, actor->GetHandle(), test::ExpectOK{});
+  EXPECT_TRUE(reg.all_of<CFemSegmentDiscretization>(entity));
+  EXPECT_FALSE(reg.all_of<CRodContactSkin>(entity));
+  EXPECT_FALSE(reg.all_of<CRodContactSkinningData>(entity));
+  EXPECT_FALSE(reg.all_of<CFemSurfaceDiscretization>(entity));
+  EXPECT_FALSE(reg.all_of<TagRodSurfaceContact>(entity));
+}
+
+TEST_F(MochiRodSurfaceMeshes, QueryWithoutVisualMeshFails) {
   // Rod without visual mesh should fail visual query registration
   CreateRodShapeWithVisualMesh(); // populate _rodNodes
   // NOTE: DynamicArray fill constructor for Real3 is miscompiled by MSVC in double precision,
@@ -1518,12 +1584,12 @@ TEST_F(MochiRodVisualMesh, QueryWithoutVisualMeshFails) {
   actor->RegisterQuery(QueryType::VisualNodePositions, test::ExpectNotOK{});
 }
 
-TEST_F(MochiRodVisualMesh, UnskinnedVisualMeshIsIgnored) {
+TEST_F(MochiRodSurfaceMeshes, UnskinnedVisualMeshIsIgnored) {
   ShapeHandle shape =
       CreateRodShapeWithVisualMesh(/*isClosedLoop=*/false, /*includeSkinning=*/false);
 
   test::ExpectLoggingInScope expectWarning(_scene->GetContext(), LogChannel::Warning);
-  Actor* actor = CreateRodActorWithVisualMesh(shape);
+  Actor* actor = CreateTestRodActor(shape);
   ASSERT_NE(nullptr, actor);
 
   EXPECT_EQ(MeshDataView{}, actor->GetVisualMesh());
@@ -1540,56 +1606,35 @@ TEST_F(MochiRodVisualMesh, UnskinnedVisualMeshIsIgnored) {
   EXPECT_FALSE(reg.all_of<TagRodSurfaceContact>(entity));
 }
 
-TEST_F(MochiRodVisualMesh, UnskinnedVisualMeshCannotBeUsedForContact) {
-  ShapeHandle shape =
-      CreateRodShapeWithVisualMesh(/*isClosedLoop=*/false, /*includeSkinning=*/false);
-  RodActorParams params = GetRodActorParams(shape, /*useVisualMeshContact=*/true);
-  params.layer = "RejectedUnskinnedVisualMesh";
-  int const numActors = _scene->GetNumActors();
-  int const numContactLayers = _scene->GetNumContactLayers();
-
-  Actor* actor = CreateRodActor(_scene, params, test::ExpectNotOK{});
-  EXPECT_EQ(nullptr, actor);
-  EXPECT_EQ(numActors, _scene->GetNumActors());
-  EXPECT_EQ(numContactLayers, _scene->GetNumContactLayers());
-}
-
-TEST_F(MochiRodVisualMesh, VisualMeshContact_InitializesSkinningJacobianSparsity) {
-  ShapeHandle shape = CreateRodShapeWithVisualMesh();
-  Actor* actor = CreateRodActorWithVisualMesh(shape, /*useVisualMeshContact=*/true);
+TEST_F(MochiRodSurfaceMeshes, ContactSkinContact_InitializesSkinningJacobianSparsity) {
+  ShapeHandle shape = CreateRodShapeWithContactSkin();
+  Actor* actor = CreateTestRodActorWithContactSkin(shape);
 
   auto& reg = GetRegistry();
   auto entity = mochi::GetEntity(reg, actor->GetHandle(), test::ExpectOK{});
 
   ASSERT_TRUE((reg.all_of<
-               CVisualMesh,
-               CRodVisualMeshEmbedding,
                CRodContactSkin,
                CRodContactSkinningData,
                CFemSurfaceDiscretization,
                TagRodSurfaceContact>(entity)));
   EXPECT_FALSE(reg.all_of<CFemSegmentDiscretization>(entity));
 
-  auto const& visualMesh = reg.get<CVisualMesh const>(entity);
-  auto const& rodEmbedding = reg.get<CRodVisualMeshEmbedding const>(entity);
   auto const& contactSkin = reg.get<CRodContactSkin const>(entity);
   auto const& skinningData = reg.get<CRodContactSkinningData const>(entity);
 
-  EXPECT_EQ(contactSkin.mesh, visualMesh.mesh);
-  EXPECT_EQ(contactSkin.embedding, rodEmbedding.data);
-
   auto const& jac = skinningData.jacobian;
 
-  int const numVisualNodes = jac.Rows();
-  EXPECT_EQ(numVisualNodes, 3);
+  int const numSurfaceNodes = jac.Rows();
+  EXPECT_EQ(numSurfaceNodes, contactSkin.mesh->GetNumNodes());
   EXPECT_EQ(jac.Cols(), kNumNodes * fem::kNumRodFields);
 
-  for (int i = 0; i < numVisualNodes; ++i) {
+  for (int i = 0; i < numSurfaceNodes; ++i) {
     int const nnz = isize(jac.Indices(i));
-    EXPECT_EQ(nnz, 8) << "Visual node " << i << " should have 8 DoFs (2 nodes × 4 DoFs)";
+    EXPECT_EQ(nnz, 8) << "Surface node " << i << " should have 8 DoFs (2 nodes × 4 DoFs)";
   }
 
-  for (int i = 0; i < numVisualNodes; ++i) {
+  for (int i = 0; i < numSurfaceNodes; ++i) {
     auto const colIndices = jac.Indices(i);
 
     int const elemIdx = 1;
@@ -1605,22 +1650,232 @@ TEST_F(MochiRodVisualMesh, VisualMeshContact_InitializesSkinningJacobianSparsity
 
     ASSERT_EQ(isize(colIndices), isize(expectedDofs));
     for (int j = 0; j < isize(expectedDofs); ++j) {
-      EXPECT_EQ(colIndices[j], expectedDofs[j]) << "Visual node " << i << " DoF index " << j;
+      EXPECT_EQ(colIndices[j], expectedDofs[j]) << "Surface node " << i << " DoF index " << j;
     }
   }
 
-  EXPECT_EQ(jac.NumNonZeros(), isize(jac.Indices(0)) * numVisualNodes);
+  EXPECT_EQ(jac.NumNonZeros(), isize(jac.Indices(0)) * numSurfaceNodes);
+}
+TEST_F(MochiRodSurfaceMeshes, CenterlineContact_WhenContactSkinIsNotRequested) {
+  ShapeHandle shape = CreateRodShapeWithContactSkin();
+  Actor* actor = CreateTestRodActor(shape);
+
+  auto& reg = GetRegistry();
+  auto const entity = mochi::GetEntity(reg, actor->GetHandle(), test::ExpectOK{});
+  EXPECT_TRUE(reg.all_of<CFemSegmentDiscretization>(entity));
+  EXPECT_FALSE(reg.all_of<CRodContactSkin>(entity));
+  EXPECT_TRUE((reg.all_of<CSurfaceMesh, CRodSurfaceMeshEmbedding>(entity)));
+  EXPECT_EQ(kNumNodes, actor->GetMesh().GetNumNodes());
+  EXPECT_EQ(4, actor->GetSurfaceMesh().GetNumNodes());
 }
 
-TEST_F(MochiRodVisualMesh, ResolveContactSkinningJacobian_FiniteDifferenceConsistency) {
+TEST_F(MochiRodSurfaceMeshes, ContactSkinSurfaceQueriesUseCompactActiveNodeOrdering) {
+  ShapeHandle const shape = CreateRodShapeWithContactSkin(
+      /*includeVisualMesh=*/false,
+      /*isClosedLoop=*/false,
+      /*includeUnreferencedNode=*/true);
+  Actor* const actor = CreateTestRodActor(shape);
+
+  MeshDataView const surfaceMesh = actor->GetSurfaceMesh();
+  ASSERT_EQ(3, surfaceMesh.GetNumNodes());
+  ASSERT_EQ(1, surfaceMesh.GetNumElements());
+  constexpr std::array kExpectedConnectivity = {0, 1, 2};
+  EXPECT_SPAN_EQ(MakeConstSpan(kExpectedConnectivity), surfaceMesh.connectivity);
+
+  actor->RegisterQueryAndCompute(QueryType::SurfaceNodePositions, test::ExpectOK{});
+  actor->RegisterQueryAndCompute(QueryType::SurfaceNodeNormals, test::ExpectOK{});
+  DynamicArray<real> const referencePositions{
+      actor->GetSurfaceMeshNodePositionsLocal(test::ExpectOK{})};
+  EXPECT_SPAN_EQ(surfaceMesh.coordinates, MakeConstSpan(referencePositions));
+  DynamicArray<real> const referenceNormals{
+      actor->GetSurfaceMeshNodeNormalsLocal(test::ExpectOK{})};
+  auto const immediateNormals = MakeConstSpan(referenceNormals);
+  ASSERT_EQ(isize(surfaceMesh.coordinates), isize(immediateNormals));
+  for (int i = 0; i < surfaceMesh.GetNumNodes(); ++i) {
+    EXPECT_NEAR(Abs(immediateNormals[3 * i]), 1_r, kTolerance);
+    EXPECT_NEAR(immediateNormals[3 * i + 1], 0_r, kTolerance);
+    EXPECT_NEAR(immediateNormals[3 * i + 2], 0_r, kTolerance);
+  }
+
+  DynamicArray<int> const bcDofs = {4, 5, 6, 7, 8, 9, 10, 11};
+  DynamicArray<real> const bcValues = {0.25_r, 0_r, 0_r, 0_r, 0.5_r, 0.1_r, 0_r, 0_r};
+  actor->AddBoundaryConditionDofsWorld(
+      MakeConstSpan(bcDofs), MakeConstSpan(bcValues), test::ExpectOK{});
+  _scene->Step(0.1_r);
+
+  auto const deformedPositions =
+      Unflatten<Real3 const>(actor->GetSurfaceMeshNodePositionsLocal(test::ExpectOK{}));
+  auto const deformedNormals =
+      Unflatten<Real3 const>(actor->GetSurfaceMeshNodeNormalsLocal(test::ExpectOK{}));
+  auto const referencePositionVectors = Unflatten<Real3 const>(MakeConstSpan(referencePositions));
+  ASSERT_EQ(surfaceMesh.GetNumNodes(), isize(deformedPositions));
+  ASSERT_EQ(surfaceMesh.GetNumNodes(), isize(deformedNormals));
+  EXPECT_GT(NormSqr(deformedPositions[0] - referencePositionVectors[0]), 1e-6_r);
+
+  Real3 const expectedNormal = Normalize(Cross(
+      deformedPositions[1] - deformedPositions[0], deformedPositions[2] - deformedPositions[0]));
+  for (Real3 const& normal : deformedNormals) {
+    for (int d = 0; d < 3; ++d) {
+      EXPECT_NEAR(expectedNormal[d], normal[d], kTolerance);
+    }
+  }
+}
+
+TEST_F(MochiRodSurfaceMeshes, ContactSkinContact_UsesDedicatedSurface) {
+  ShapeHandle shape = CreateRodShapeWithContactSkin();
+  Actor* actor = CreateTestRodActorWithContactSkin(shape);
+
+  auto& reg = GetRegistry();
+  auto const entity = mochi::GetEntity(reg, actor->GetHandle(), test::ExpectOK{});
+  ASSERT_TRUE((reg.all_of<
+               CRodContactSkin,
+               CRodContactSkinningData,
+               CFemSurfaceDiscretization,
+               TagRodSurfaceContact>(entity)));
+  EXPECT_FALSE(reg.all_of<CFemSegmentDiscretization>(entity));
+
+  auto const& visualMesh = reg.get<CVisualMesh const>(entity);
+  auto const& contactSkin = reg.get<CRodContactSkin const>(entity);
+  EXPECT_NE(contactSkin.mesh, visualMesh.mesh);
+  EXPECT_EQ(4, contactSkin.mesh->GetNumNodes());
+  EXPECT_EQ(3, visualMesh.mesh->GetNumNodes());
+  EXPECT_EQ(3, actor->GetVisualMesh().GetNumNodes());
+  EXPECT_EQ(4, actor->GetSurfaceMesh().GetNumNodes());
+
+  actor->RegisterQueryAndCompute(QueryType::SurfaceNodePositions, test::ExpectOK{});
+  actor->RegisterQueryAndCompute(QueryType::SurfaceNodeNormals, test::ExpectOK{});
+  EXPECT_EQ(
+      3 * actor->GetSurfaceMesh().GetNumNodes(),
+      isize(actor->GetSurfaceMeshNodePositionsLocal(test::ExpectOK{})));
+  EXPECT_EQ(
+      3 * actor->GetSurfaceMesh().GetNumNodes(),
+      isize(actor->GetSurfaceMeshNodeNormalsLocal(test::ExpectOK{})));
+
+  _scene->Step(0_r);
+  Aabb const expectedBounds = contactSkin.mesh->GetAabb();
+  Aabb const actualBounds =
+      GetAabb(reg.get<CBoundingVolume<TimeStep::Current> const>(entity).localShape);
+  EXPECT_NEAR_EQ(expectedBounds.GetMin(), actualBounds.GetMin());
+  EXPECT_NEAR_EQ(expectedBounds.GetMax(), actualBounds.GetMax());
+}
+
+TEST_F(MochiRodSurfaceMeshes, ContactSkinContact_BoundsIncludePointCloudCollider) {
+  constexpr real kRadius = 0.05_r;
+
+  for (ColliderType const colliderType : {ColliderType::PointCloud, ColliderType::Auto}) {
+    SCOPED_TRACE(static_cast<int>(colliderType));
+    ShapeHandle const shape = CreateRodShapeWithContactSkin();
+    RodActorParams params = GetRodActorParams(shape, /*useContactSkin=*/true);
+    params.colliderType = colliderType;
+    params.pointCloudCollider.radius = kRadius;
+    Actor* const actor = CreateRodActor(_scene, params, test::ExpectOK{});
+    actor->RegisterQueryAndCompute(QueryType::SurfaceNodePositions, test::ExpectOK{});
+
+    auto& reg = GetRegistry();
+    auto const entity = mochi::GetEntity(reg, actor->GetHandle(), test::ExpectOK{});
+    ASSERT_TRUE(reg.all_of<CPointCloudColliderParams>(entity));
+
+    auto const& polylineMesh = reg.get<CPolylineMesh const>(entity);
+    auto expectBounds = [&] {
+      auto const surfacePositions =
+          Unflatten<Real3 const>(actor->GetSurfaceMeshNodePositionsLocal(test::ExpectOK{}));
+      Aabb const surfaceBounds = CalcAabb(surfacePositions);
+
+      auto const& displacements =
+          reg.get<CRodPose<TimeStep::Current> const>(entity).value.displacements;
+      DynamicArray<Real3> centerlinePositions(polylineMesh.nodes.size());
+      for (int i = 0; i < isize(polylineMesh.nodes); ++i) {
+        int const offset = i * fem::kNumRodFields;
+        centerlinePositions[i] = polylineMesh.nodes[i] +
+            Real3{displacements[offset], displacements[offset + 1], displacements[offset + 2]};
+      }
+      Aabb const pointCloudBounds = ExpandShape(CalcAabb(centerlinePositions), kRadius);
+      Aabb const expectedBounds = GetAabb(surfaceBounds, pointCloudBounds);
+      Aabb const actualBounds =
+          GetAabb(reg.get<CBoundingVolume<TimeStep::Current> const>(entity).localShape);
+      EXPECT_NEAR_EQ(expectedBounds.GetMin(), actualBounds.GetMin());
+      EXPECT_NEAR_EQ(expectedBounds.GetMax(), actualBounds.GetMax());
+    };
+
+    _scene->Step(0_r);
+    expectBounds();
+
+    auto& displacements = reg.get<CRodPose<TimeStep::Current>>(entity).value.displacements;
+    int const lastNodeDofOffset = (isize(polylineMesh.nodes) - 1) * fem::kNumRodFields;
+    displacements[lastNodeDofOffset] = 0.25_r;
+    displacements[lastNodeDofOffset + 2] = 0.3_r;
+    _scene->Step(0_r);
+    expectBounds();
+  }
+}
+
+TEST_F(MochiRodSurfaceMeshes, ContactSkinElementTypeControlsSurfaceQuadrature) {
+  ShapeHandle shape = CreateRodShapeWithContactSkin();
+
+  for (auto const& [elementType, expectedNumSamples] :
+       {std::pair{ActorBoundaryElementType::P1Q1, 2},
+        std::pair{ActorBoundaryElementType::P1Q6, 12}}) {
+    RodActorParams params = GetRodActorParams(shape, true, elementType);
+    Actor* actor = CreateRodActor(_scene, params, ErrorAssert{});
+    auto& reg = GetRegistry();
+    auto const entity = mochi::GetEntity(reg, actor->GetHandle(), test::ExpectOK{});
+
+    EXPECT_EQ(
+        expectedNumSamples, reg.get<CFemSurfaceDiscretization const>(entity).GetNumQuadPoints());
+    EXPECT_EQ(
+        expectedNumSamples,
+        isize(reg.get<CContactSamples<TimeStep::Current> const>(entity).positions));
+    EXPECT_EQ(
+        expectedNumSamples,
+        isize(reg.get<CContactSamples<TimeStep::StageStart> const>(entity).positions));
+  }
+}
+
+TEST_F(MochiRodSurfaceMeshes, ContactSkinContact_WithoutVisualMesh) {
+  ShapeHandle shape = CreateRodShapeWithContactSkin(/*includeVisualMesh=*/false);
+  Actor* actor = CreateTestRodActorWithContactSkin(shape);
+
+  auto& reg = GetRegistry();
+  auto const entity = mochi::GetEntity(reg, actor->GetHandle(), test::ExpectOK{});
+  EXPECT_TRUE(
+      (reg.all_of<CRodContactSkin, CFemSurfaceDiscretization, TagRodSurfaceContact>(entity)));
+  EXPECT_FALSE((reg.all_of<CVisualMesh, CFemSegmentDiscretization>(entity)));
+  EXPECT_EQ(4, actor->GetSurfaceMesh().GetNumNodes());
+  _scene->Step(0_r);
+}
+
+TEST_F(MochiRodSurfaceMeshes, ContactSkinContact_MissingContactSkinFails) {
   ShapeHandle shape = CreateRodShapeWithVisualMesh();
-  Actor* actor = CreateRodActorWithVisualMesh(shape);
+  RodActorParams params;
+  params.shape = shape;
+  params.useContactSkin = true;
+  EXPECT_EQ(nullptr, CreateRodActor(_scene, params, test::ExpectNotOK{}));
+}
+
+TEST_F(MochiRodSurfaceMeshes, ContactSkinContact_UnskinnedContactSkinFails) {
+  ShapeHandle shape = CreateRodShapeWithContactSkin(
+      /*includeVisualMesh=*/true,
+      /*isClosedLoop=*/false,
+      /*includeUnreferencedNode=*/false,
+      /*includeContactSkinning=*/false);
+  RodActorParams params = GetRodActorParams(shape);
+  params.useContactSkin = true;
+
+  EXPECT_EQ(nullptr, CreateRodActor(_scene, params, test::ExpectNotOK{}));
+}
+
+TEST_F(MochiRodSurfaceMeshes, ContactSkinJacobian_FiniteDifferenceConsistency) {
+  ShapeHandle shape = CreateRodShapeWithContactSkin();
+  Actor* actor = CreateTestRodActorWithContactSkin(shape);
   VerifySkinningJacobianFDAtRefAndDeformed(actor);
 }
 
-TEST_F(MochiRodVisualMesh, ResolveContactSkinningJacobian_FiniteDifferenceConsistency_ClosedLoop) {
-  ShapeHandle shape = CreateRodShapeWithVisualMesh(/*isClosedLoop=*/true);
-  Actor* actor = CreateRodActorWithVisualMesh(shape);
+TEST_F(
+    MochiRodSurfaceMeshes,
+    ResolveContactSkinningJacobian_FiniteDifferenceConsistency_ClosedLoop) {
+  ShapeHandle shape = CreateRodShapeWithContactSkin(
+      /*includeVisualMesh=*/false, /*isClosedLoop=*/true);
+  Actor* actor = CreateTestRodActorWithContactSkin(shape);
   VerifySkinningJacobianFDAtRefAndDeformed(actor);
 }
 
@@ -1652,9 +1907,10 @@ class MochiRodTubularCrossSection : public test::MochiSceneTestBase {
     Fill(MakeSpan(_frameAxes), Real3{0_r, 1_r, 0_r});
   }
 
-  Actor* CreateRodActorFromShape(ShapeHandle shape) {
+  Actor* CreateRodActorFromShape(ShapeHandle shape, bool useContactSkin = false) {
     RodActorParams params;
     params.shape = shape;
+    params.useContactSkin = useContactSkin;
     params.material.linearDensity = 1_r;
     params.material.linearRotationalInertia = 1_r;
     params.material.axialStiffness = 1e3_r;
@@ -1668,22 +1924,26 @@ TEST_F(MochiRodTubularCrossSection, TopologyMatchesExpected) {
   real constexpr kRadius = 0.01_r;
   ModelData const model = GenerateTubularRodModelData(
       _nodes, _frameAxes, kRadius, kNumCrossSectionSegments, /*isClosedLoop=*/false, ErrorAssert{});
+  EXPECT_FALSE(model.visualMesh.has_value());
+  ASSERT_TRUE(model.contactSkinMesh.has_value());
+  ASSERT_TRUE(model.contactSkinMesh->skinning.has_value());
   ShapeHandle shape = _scene->GetContext()->CreateModelShape(model, ErrorAssert{});
   ASSERT_TRUE(shape.IsValid());
 
   Actor* actor = CreateRodActorFromShape(shape);
   ASSERT_NE(actor, nullptr);
 
-  actor->RegisterQuery(QueryType::VisualNodePositions, ErrorAssert{});
+  actor->RegisterQuery(QueryType::VisualNodePositions, test::ExpectNotOK{});
+  actor->RegisterQuery(QueryType::SurfaceNodePositions, ErrorAssert{});
   _scene->Step(0_r);
 
-  int const expectedVisualNodes = kNumCrossSectionSegments * (kNumElements + 2) + 2;
-  auto positions = actor->GetVisualMeshNodePositionsLocal(ErrorAssert{});
-  EXPECT_EQ(isize(positions), 3 * expectedVisualNodes);
+  int const expectedSurfaceNodes = kNumCrossSectionSegments * (kNumElements + 2) + 2;
+  auto positions = actor->GetSurfaceMeshNodePositionsLocal(ErrorAssert{});
+  EXPECT_EQ(isize(positions), 3 * expectedSurfaceNodes);
 
   int const expectedTriangles =
       2 * kNumCrossSectionSegments * (kNumElements + 1) + 2 * kNumCrossSectionSegments;
-  auto connectivity = actor->GetVisualMesh().connectivity;
+  auto connectivity = actor->GetSurfaceMesh().connectivity;
   EXPECT_EQ(isize(connectivity) / 3, expectedTriangles);
 
   // Verify ring 0 vertices are at expected radius from centerline.
@@ -1698,24 +1958,57 @@ TEST_F(MochiRodTubularCrossSection, TopologyMatchesExpected) {
     EXPECT_NEAR(kRadius, distFromAxis, kTolerance)
         << "Ring vertex " << i << " is not at expected radius from centerline";
   }
+
+  auto& reg = GetRegistry();
+  auto const centerlineEntity = mochi::GetEntity(reg, actor->GetHandle(), test::ExpectOK{});
+  EXPECT_TRUE(reg.all_of<CFemSegmentDiscretization>(centerlineEntity));
+  EXPECT_FALSE(reg.all_of<CRodContactSkin>(centerlineEntity));
+
+  Actor* contactActor = CreateRodActorFromShape(shape, /*useContactSkin=*/true);
+  auto const contactEntity = mochi::GetEntity(reg, contactActor->GetHandle(), test::ExpectOK{});
+  EXPECT_TRUE((reg.all_of<CRodContactSkin, CFemSurfaceDiscretization>(contactEntity)));
+  EXPECT_FALSE(reg.all_of<CFemSegmentDiscretization>(contactEntity));
 }
 
 TEST_F(MochiRodTubularCrossSection, AutoGeneratedFrameAxes) {
   real constexpr kRadius = 0.01_r;
   ModelData const model = GenerateTubularRodModelData(
       _nodes, {}, kRadius, kNumCrossSectionSegments, /*isClosedLoop=*/false, ErrorAssert{});
+  EXPECT_FALSE(model.visualMesh.has_value());
+  ASSERT_TRUE(model.contactSkinMesh.has_value());
+  ASSERT_TRUE(model.contactSkinMesh->skinning.has_value());
   ShapeHandle shape = _scene->GetContext()->CreateModelShape(model, ErrorAssert{});
   ASSERT_TRUE(shape.IsValid());
 
   Actor* actor = CreateRodActorFromShape(shape);
   ASSERT_NE(actor, nullptr);
 
-  actor->RegisterQuery(QueryType::VisualNodePositions, ErrorAssert{});
+  actor->RegisterQuery(QueryType::SurfaceNodePositions, ErrorAssert{});
   _scene->Step(0_r);
 
-  int const expectedVisualNodes = kNumCrossSectionSegments * (kNumElements + 2) + 2;
-  auto positions = actor->GetVisualMeshNodePositionsLocal(ErrorAssert{});
-  EXPECT_EQ(isize(positions), 3 * expectedVisualNodes);
+  int const expectedSurfaceNodes = kNumCrossSectionSegments * (kNumElements + 2) + 2;
+  auto positions = actor->GetSurfaceMeshNodePositionsLocal(ErrorAssert{});
+  EXPECT_EQ(isize(positions), 3 * expectedSurfaceNodes);
+}
+
+TEST_F(MochiRodTubularCrossSection, ClosedLoopTopologyMatchesExpected) {
+  int constexpr kClosedLoopNumNodes = 6;
+  real constexpr kRadius = 0.01_r;
+  DynamicArray<Real3> nodes;
+  nodes.reserve(kClosedLoopNumNodes);
+  for (int i = 0; i < kClosedLoopNumNodes; ++i) {
+    real const angle = 2_r * kPI * static_cast<real>(i) / static_cast<real>(kClosedLoopNumNodes);
+    nodes.push_back(Real3{Cos(angle), 0_r, Sin(angle)});
+  }
+
+  ModelData const model = GenerateTubularRodModelData(
+      nodes, {}, kRadius, kNumCrossSectionSegments, /*isClosedLoop=*/true, ErrorAssert{});
+  EXPECT_FALSE(model.visualMesh.has_value());
+  ASSERT_TRUE(model.contactSkinMesh.has_value());
+  ASSERT_TRUE(model.contactSkinMesh->skinning.has_value());
+  EXPECT_EQ(kNumCrossSectionSegments * kClosedLoopNumNodes, model.contactSkinMesh->GetNumNodes());
+  EXPECT_EQ(
+      2 * kNumCrossSectionSegments * kClosedLoopNumNodes, model.contactSkinMesh->GetNumElements());
 }
 
 TEST_F(MochiRodTubularCrossSection, InvalidRadiusErrors) {
@@ -1774,7 +2067,7 @@ TEST_F(MochiRodTubularCrossSection, InsufficientNodesErrors) {
 
 } // namespace
 
-TEST_F(MochiRodVisualMesh, UnskinnedVisualMeshModelDataRoundTrip) {
+TEST_F(MochiRodSurfaceMeshes, UnskinnedVisualMeshModelDataRoundTrip) {
   ShapeHandle shape =
       CreateRodShapeWithVisualMesh(/*isClosedLoop=*/false, /*includeSkinning=*/false);
 
@@ -1794,8 +2087,8 @@ TEST_F(MochiRodVisualMesh, UnskinnedVisualMeshModelDataRoundTrip) {
   EXPECT_EQ(expectedModelData, newShapePtr->GetModelData(ErrorAssert{}));
 }
 
-TEST_IF_F(MOCHI_USE_HDF5, MochiRodVisualMesh, Hdf5RoundTrip) {
-  ShapeHandle shape = CreateRodShapeWithVisualMesh();
+TEST_IF_F(MOCHI_USE_HDF5, MochiRodSurfaceMeshes, Hdf5RoundTrip) {
+  ShapeHandle shape = CreateRodShapeWithContactSkin();
 
   // Get model data from shape via internal API
   auto* contextImpl = assert_cast<ContextImpl*>(_scene->GetContext());
@@ -1808,6 +2101,10 @@ TEST_IF_F(MOCHI_USE_HDF5, MochiRodVisualMesh, Hdf5RoundTrip) {
   ASSERT_TRUE(modelData.visualMesh->skinning.has_value());
   EXPECT_EQ(modelData.visualMesh->skinning->weightsPerNode, _weightsPerNode);
   EXPECT_EQ(isize(modelData.visualMesh->skinning->indices), isize(_elementIndices));
+  ASSERT_TRUE(modelData.contactSkinMesh.has_value());
+  ASSERT_TRUE(modelData.contactSkinMesh->skinning.has_value());
+  EXPECT_EQ(4, modelData.contactSkinMesh->GetNumNodes());
+  EXPECT_EQ(2, modelData.contactSkinMesh->GetNumElements());
 
   // Create a new shape from the model data (round-trip)
   auto newShapePtr = ContextImpl::CreateShapeFromModelData(std::move(modelData), ErrorAssert{});
@@ -1836,10 +2133,10 @@ TEST_IF_F(MOCHI_USE_HDF5, MochiRodVisualMesh, Hdf5RoundTrip) {
   }
 }
 
-TEST_F(MochiRodVisualMesh, SkinningUnderRotation) {
+TEST_F(MochiRodSurfaceMeshes, SkinningUnderRotation) {
   // Create a rod shape with a visual mesh
   ShapeHandle shape = CreateRodShapeWithVisualMesh();
-  Actor* actor = CreateRodActorWithVisualMesh(shape);
+  Actor* actor = CreateTestRodActor(shape);
   actor->RegisterQuery(QueryType::VisualNodePositions, ErrorAssert{});
 
   // Fix the first node and its twist to zero
@@ -1924,7 +2221,7 @@ TEST_F(MochiRodVisualMesh, SkinningUnderRotation) {
       << "Node 2 y-offset should become non-zero after twist";
 }
 
-TEST_F(MochiRodVisualMesh, MultiElementBlending) {
+TEST_F(MochiRodSurfaceMeshes, DistinctVisualAndContactMeshesSupportMultiElementSkinning) {
   // Test with weightsPerNode = 2, where a visual node is blended across two elements.
   // Also validates skinning Jacobian sparsity with K>1 (exercises deduplication logic).
 
@@ -1940,8 +2237,8 @@ TEST_F(MochiRodVisualMesh, MultiElementBlending) {
   _elementIndices = {0, 1, 0, 1, 0, 1};
   _weights = {0.5_r, 0.5_r, 0.5_r, 0.5_r, 0.5_r, 0.5_r};
 
-  ShapeHandle shape = CreateRodShapeWithVisualMesh();
-  Actor* actor = CreateRodActorWithVisualMesh(shape);
+  ShapeHandle shape = CreateRodShapeWithContactSkin();
+  Actor* actor = CreateTestRodActorWithContactSkin(shape);
   actor->RegisterQuery(QueryType::VisualNodePositions, ErrorAssert{});
 
   // At reference configuration, position should match the input
@@ -1964,23 +2261,21 @@ TEST_F(MochiRodVisualMesh, MultiElementBlending) {
     auto& reg = GetRegistry();
     auto entity = mochi::GetEntity(reg, actor->GetHandle(), test::ExpectOK{});
 
-    auto const& visualMesh = reg.get<CVisualMesh const>(entity);
-    auto const& rodEmbedding = reg.get<CRodVisualMeshEmbedding const>(entity);
+    auto const& contactSkin = reg.get<CRodContactSkin const>(entity);
     auto const& polylineMesh = reg.get<CPolylineMesh const>(entity);
     auto const& basePose = reg.get<CRodPose<TimeStep::Current> const>(entity);
 
-    CRodContactSkin contactSkin(visualMesh.mesh, rodEmbedding.data);
     CRodContactSkinningData skinningData;
     rod::InitializeContactSkinningJacobian(contactSkin, polylineMesh, skinningData);
     rod::ResolveContactSkinningJacobian(contactSkin, polylineMesh, basePose, skinningData);
 
     auto const& jac = skinningData.jacobian;
-    int const numVisualNodes = jac.Rows();
-    EXPECT_EQ(numVisualNodes, 3);
+    int const numSurfaceNodes = jac.Rows();
+    EXPECT_EQ(numSurfaceNodes, 4);
 
-    for (int i = 0; i < numVisualNodes; ++i) {
+    for (int i = 0; i < numSurfaceNodes; ++i) {
       int const nnz = isize(jac.Indices(i));
-      EXPECT_EQ(nnz, 12) << "Visual node " << i << " should have 12 DoFs (3 nodes × 4 DoFs)";
+      EXPECT_EQ(nnz, 12) << "Surface node " << i << " should have 12 DoFs (3 nodes × 4 DoFs)";
     }
 
     VerifySkinningJacobianFD(actor);
@@ -2030,13 +2325,16 @@ TEST_F(MochiRodVisualMesh, MultiElementBlending) {
 }
 
 // ============================================================================
-// Rod Visual Mesh Contact Tests
+// Rod Contact-Skin Contact Tests
 // ============================================================================
 
-// Parameterized by whether the box the rod settles on is static (true) or dynamic (false).
-// Static box → rod–box contact is async; dynamic box → rod–box contact is sync (same island).
-class MochiRodVisualMeshContactOnBox : public test::MochiSceneTestBase,
-                                       public ::testing::WithParamInterface<bool> {
+struct RodSurfaceContactTestParams {
+  bool boxIsStatic = false;
+};
+
+// Covers the contact skin against both asynchronous static contact and same-island dynamic contact.
+class MochiRodContactSkinOnBox : public test::MochiSceneTestBase,
+                                 public ::testing::WithParamInterface<RodSurfaceContactTestParams> {
  protected:
   static constexpr int kNumNodes = 17;
   static constexpr int kNumElements = kNumNodes - 1;
@@ -2085,7 +2383,7 @@ class MochiRodVisualMeshContactOnBox : public test::MochiSceneTestBase,
     ModelData const model = GenerateTubularRodModelData(
         nodes, frameAxes, kRadius, kNumCrossSectionSegments, /*isClosedLoop=*/false, ErrorAssert{});
     rodParams.shape = _scene->GetContext()->CreateModelShape(model, ErrorAssert{});
-    rodParams.useVisualMeshContact = true;
+    rodParams.useContactSkin = true;
     rodParams.contact.penaltyCoefficient = kPenaltyCoefficient;
 
     real const area = kPI * Sqr(kRadius);
@@ -2121,10 +2419,10 @@ class MochiRodVisualMeshContactOnBox : public test::MochiSceneTestBase,
     boxParams.name = "Box";
     boxParams.shape = boxShape;
     boxParams.colliderType = ColliderType::Box;
-    boxParams.isStatic = GetParam();
+    boxParams.isStatic = GetParam().boxIsStatic;
     boxParams.worldFromLocal.SetTranslation(Real3{-0.5_r, 0_r, -1_r});
     boxParams.contact.penaltyCoefficient = kPenaltyCoefficient;
-    if (!GetParam()) {
+    if (!GetParam().boxIsStatic) {
       boxParams.density = kBoxDensity;
     }
     _scene->CreateRigidActor(boxParams, ErrorAssert{});
@@ -2136,7 +2434,7 @@ class MochiRodVisualMeshContactOnBox : public test::MochiSceneTestBase,
   }
 };
 
-TEST_P(MochiRodVisualMeshContactOnBox, RodSettlesOnBox) {
+TEST_P(MochiRodContactSkinOnBox, RodSettlesOnBox) {
   int constexpr kNumSteps = 250;
   for (int step = 0; step < kNumSteps; ++step) {
     _scene->Step(kTimeStep);
@@ -2164,10 +2462,10 @@ TEST_P(MochiRodVisualMeshContactOnBox, RodSettlesOnBox) {
   EXPECT_NEAR(contactForce[1], expectedWeight, kForceRelativeTolerance * expectedWeight)
       << "Contact force y-component should balance the rod weight";
 
-  // The rod should settle on the box. With visual mesh contact and radius kRadius,
+  // The rod should settle on the box. With contact-skin contact and radius kRadius,
   // the centerline should be approximately kRadius (plus contact threshold) above the
   // box top surface. A loose relative tolerance accounts for finite penalty stiffness
-  // and geometric discretization of the tubular visual mesh.
+  // and geometric discretization of the tubular contact skin.
   real constexpr kHeightRelativeTolerance = 0.1_r;
   real constexpr kExpectedHeight = kBoxHeight + kRadius + ContactParams{}.penaltyThresholdDefault;
   EXPECT_NEAR(minY, kExpectedHeight, kHeightRelativeTolerance * (kExpectedHeight - kBoxHeight))
@@ -2176,11 +2474,11 @@ TEST_P(MochiRodVisualMeshContactOnBox, RodSettlesOnBox) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    BoxIsStatic,
-    MochiRodVisualMeshContactOnBox,
-    ::testing::Bool(),
-    [](::testing::TestParamInfo<bool> const& info) {
-      return info.param ? "StaticBox" : "DynamicBox";
+    SurfaceAndBoxType,
+    MochiRodContactSkinOnBox,
+    ::testing::Values(RodSurfaceContactTestParams{false}, RodSurfaceContactTestParams{true}),
+    [](::testing::TestParamInfo<RodSurfaceContactTestParams> const& info) {
+      return info.param.boxIsStatic ? "StaticBox" : "DynamicBox";
     });
 
 // =============================================================================

@@ -170,10 +170,10 @@ concept IsLowRankAugmentedMatrix = details::IsLowRankAugmentedMatrixDef<std::dec
 /// - T::Cols() -> Idx
 /// - ToMatrix(T const& A) -> Matrix<T::NonConstScalar>
 /// - FlopsPerApply(T const& A) -> Idx
-/// - GetRowRangesPerWorker(T const& A, int numWorkers) -> std::vector<Idx>
+/// - GetRowRangesPerWorker(T const& A, int numWorkers) -> std::vector<int>
 /// - Apply(T const& A, Input const& in, Output&& out) -> void
 /// - ApplyToRange(T const& A, Input const& in, Output&& out, Idx rowBegin, Idx rowEnd) -> void
-/// where Idx is an integer type that may be different in each of the methods and functions above.
+/// where each Idx is an integer type. Different operations may use different integer types.
 template <typename T>
 concept IsLinearOperator = IsAnyMatrix<T> || IsIslandOperators<T> || IsLowRankAugmentedMatrix<T>;
 
