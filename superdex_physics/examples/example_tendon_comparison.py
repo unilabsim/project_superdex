@@ -195,8 +195,8 @@ def add_rod_tendon(scene: Scene, art: TendonArticulation) -> Actor:
         np.float32
     )
 
-    # Build a polyline simulation mesh plus a tubular visual mesh (with embedding data)
-    # so the rod can use visual-mesh contact.
+    # Build a polyline simulation mesh plus a tubular contact skin (with embedding data)
+    # so the rod can use surface contact.
     model = sdp.experimental.generate_tubular_rod_model_data(
         nodes=nodes,
         element_frame_axes=element_frame_axes,
@@ -229,7 +229,7 @@ def add_rod_tendon(scene: Scene, art: TendonArticulation) -> Actor:
             material=material,
             layer="Tendon",
             contact=sdp.ContactParams(penalty_coefficient=PENALTY_COEFFICIENT),
-            use_visual_mesh_contact=True,
+            use_contact_skin=True,
         ),
     )
 

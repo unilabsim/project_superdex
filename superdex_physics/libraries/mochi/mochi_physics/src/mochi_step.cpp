@@ -381,12 +381,16 @@ static void UpdateActorQueriesAsync(TaskSemaphore sem, entt::registry& reg, entt
   // Writes CQueryNodePositions (must happen before queries that read it)
   ecs::TryInvokeOnEntity(&UpdateQueryNodePositions, reg, e);
 
+  // Contact-skinned rods
+  // Writes CQuerySurfaceNodePositions in compact active-node ordering.
+  ecs::TryInvokeOnEntity(&rod::UpdateQuerySurfaceNodePositions, reg, e);
+
   // Rigid & Soft
   // Reads CDisplacementSlice, and others
   // Writes CQuerySurfaceNodePositions (must happen before queries that read it)
   ecs::TryInvokeOnEntity(&UpdateQuerySurfaceNodePositions, reg, e);
 
-  // Soft & Rigid
+  // Soft, Rigid & contact-skinned Rod
   // Reads CQuerySurfaceNodePositions
   // Writes CQuerySurfaceNodeNormals
   ecs::TryScheduleInvokeOnEntity(

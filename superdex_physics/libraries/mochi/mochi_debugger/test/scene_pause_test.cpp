@@ -194,6 +194,7 @@ TEST_F(ScenePauseTest, StepBlocksWhenPaused) {
   std::atomic<bool> ready{false};
   std::atomic<int> stepCounter{0};
   auto thread = std::thread{[&]() {
+    assert_cast<SceneImpl*>(scene)->SetThreadAffinity();
     ready.store(true);
     for (int i = 0; i < 10; ++i) {
       scene->Step(kTimeStep);
@@ -306,6 +307,7 @@ TEST_F(ScenePauseTest, UnpauseWhenClientDisconnects) {
   std::atomic<bool> ready{false};
   std::atomic<int> stepCounter{0};
   auto thread = std::thread{[&]() {
+    assert_cast<SceneImpl*>(scene)->SetThreadAffinity();
     ready.store(true);
     for (int i = 0; i < 10; ++i) {
       scene->Step(kTimeStep);
@@ -338,6 +340,7 @@ TEST_F(ScenePauseTest, UnpauseWhenServerStops) {
   std::atomic<bool> ready{false};
   std::atomic<int> stepCounter{0};
   auto thread = std::thread{[&]() {
+    assert_cast<SceneImpl*>(scene)->SetThreadAffinity();
     ready.store(true);
     for (int i = 0; i < 10; ++i) {
       scene->Step(kTimeStep);
@@ -383,6 +386,7 @@ TEST_F(ScenePauseTest, PlayWaitsForRealTimeClock) {
   std::atomic<bool> stepStarted{false};
   std::atomic<bool> stepFinished{false};
   std::thread thread{[&]() {
+    assert_cast<SceneImpl*>(scene)->SetThreadAffinity();
     stepStarted.store(true);
     scene->Step(kTimeStep);
     stepFinished.store(true);
@@ -414,6 +418,7 @@ TEST_F(ScenePauseTest, PlayThrottlesEveryStepWithoutSpuriousReset) {
   std::atomic<int> stepCounter{0};
   std::atomic<bool> done{false};
   std::thread thread{[&]() {
+    assert_cast<SceneImpl*>(scene)->SetThreadAffinity();
     for (int i = 0; i < kNumSteps; ++i) {
       scene->Step(kTimeStep);
       ++stepCounter;
@@ -450,6 +455,7 @@ TEST_F(ScenePauseTest, PlayResetsThrottleAfterExternalStall) {
   {
     std::atomic<bool> finished{false};
     std::thread thread{[&]() {
+      assert_cast<SceneImpl*>(scene)->SetThreadAffinity();
       scene->Step(kTimeStep);
       finished.store(true);
     }};
@@ -466,6 +472,7 @@ TEST_F(ScenePauseTest, PlayResetsThrottleAfterExternalStall) {
   clock.store(kTimeStep + 10.0 * kTimeStep);
   std::atomic<bool> finished{false};
   std::thread thread{[&]() {
+    assert_cast<SceneImpl*>(scene)->SetThreadAffinity();
     scene->Step(kTimeStep);
     finished.store(true);
   }};
@@ -487,6 +494,7 @@ TEST_F(ScenePauseTest, FastForwardDoesNotWaitForRealTimeClock) {
   std::atomic<bool> stepsStarted{false};
   std::atomic<bool> stepsFinished{false};
   std::thread thread{[&]() {
+    assert_cast<SceneImpl*>(scene)->SetThreadAffinity();
     stepsStarted.store(true);
     scene->Step(kTimeStep);
     scene->Step(kTimeStep);

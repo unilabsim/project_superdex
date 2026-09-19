@@ -33,7 +33,7 @@ struct prefab::SceneParams [no_reflection] {
   // @details @ref AddToScene replaces the scene's gravity only when this value is
   // provided by the top-level prefab and @ref PrefabParams::applySceneSettings is true.
   // Otherwise, the existing scene gravity is preserved.
-  Optional<Real3> gravity [units(m/s^2)];
+  Optional<Real3> gravity [units("m/s^2")];
 
   // @brief Optional solver parameters.
   //
@@ -76,7 +76,7 @@ struct prefab::RigidActorPrefab(RigidActorParams) [no_reflection] {
   Quaternion shapeRotation;
 
   // @brief Translation [x, y, z] to bake into the shape file.
-  Real3 shapeTranslation [units(m)];
+  Real3 shapeTranslation [units("m")];
 
   // @brief Actor rotation quaternion [x, y, z, w] relative to the prefab's local frame
   // (i.e., the prefab-from-local rotation). Composes with @ref PrefabParams::rotation
@@ -91,7 +91,7 @@ struct prefab::RigidActorPrefab(RigidActorParams) [no_reflection] {
   // world-from-local translation.
   //
   // @note Must be finite.
-  Real3 translation [units(m)];
+  Real3 translation [units("m")];
 
   // @brief Optional path to a render model file (e.g. .glb) for visualization.
   //
@@ -112,7 +112,7 @@ struct prefab::RigidActorPrefab(RigidActorParams) [no_reflection] {
   // @brief Translation [x, y, z] to apply to the render model.
   //
   // @note Ignored if @ref renderModelFile is empty.
-  Real3 renderModelTranslation [units(m)];
+  Real3 renderModelTranslation [units("m")];
 }
 
 // @brief Prefab parameters for a soft actor.
@@ -187,7 +187,7 @@ struct prefab::SoftActorPrefab(SoftActorParams) [no_reflection] {
   Quaternion shapeRotation;
 
   // @brief Translation [x, y, z] to bake into the shape file.
-  Real3 shapeTranslation [units(m)];
+  Real3 shapeTranslation [units("m")];
 
   // @brief Actor rotation quaternion [x, y, z, w] relative to the prefab's local frame
   // (i.e., the prefab-from-local rotation). Composes with @ref PrefabParams::rotation
@@ -204,7 +204,7 @@ struct prefab::SoftActorPrefab(SoftActorParams) [no_reflection] {
   //
   // @note Must be finite when used in @ref ActorLists::soft.
   // @note Ignored when used in @ref SoftSkinnedActorPrefab::softParams.
-  Real3 translation [units(m)];
+  Real3 translation [units("m")];
 
   // @brief Optional path to a render model file (e.g. .glb) for visualization.
   //
@@ -225,7 +225,7 @@ struct prefab::SoftActorPrefab(SoftActorParams) [no_reflection] {
   // @brief Translation [x, y, z] to apply to the render model.
   //
   // @note Ignored if @ref renderModelFile is empty.
-  Real3 renderModelTranslation [units(m)];
+  Real3 renderModelTranslation [units("m")];
 }
 
 // @brief Joint parameters for an articulated actor prefab.
@@ -264,7 +264,7 @@ struct prefab::ArticulatedLinkPrefab(ArticulatedLinkParams) [equality, no_reflec
   // @brief Translation [x, y, z] to bake into the shape file.
   //
   // @note Ignored if @ref shapeFile is empty.
-  Real3 shapeTranslation [units(m)];
+  Real3 shapeTranslation [units("m")];
 
   // @brief Optional path to a render model file (e.g. .glb) for visualization.
   //
@@ -285,7 +285,7 @@ struct prefab::ArticulatedLinkPrefab(ArticulatedLinkParams) [equality, no_reflec
   // @brief Translation [x, y, z] to apply to the render model.
   //
   // @note Ignored if @ref renderModelFile is empty.
-  Real3 renderModelTranslation [units(m)];
+  Real3 renderModelTranslation [units("m")];
 }
 
 // @brief Skin parameters for an articulated actor prefab.
@@ -316,7 +316,7 @@ struct prefab::ArticulatedSkinPrefab(ArticulatedSkinParams) [equality, no_reflec
   // @brief Translation [x, y, z] to apply to the render model.
   //
   // @note Ignored if @ref renderModelFile is empty.
-  Real3 renderModelTranslation [units(m)];
+  Real3 renderModelTranslation [units("m")];
 }
 
 // @brief Prefab parameters for an articulated actor.
@@ -359,7 +359,7 @@ struct prefab::ArticulatedActorPrefab [equality, no_reflection] {
   // world-from-root translation.
   //
   // @note Must be finite.
-  Real3 translation [units(m)];
+  Real3 translation [units("m")];
 
   // @brief Cycle joints creating closed kinematic loops. Empty if no cycles exist.
   DynamicArray<ArticulatedCycleJointParams> cycles;
@@ -770,7 +770,7 @@ struct prefab::PrefabReference [no_reflection] {
   // @brief Translation [x, y, z] of the nested prefab in the parent's local space.
   //
   // @note Must be finite.
-  Real3 translation [units(m)];
+  Real3 translation [units("m")];
 
   // @brief Handle to the loaded nested prefab. Runtime state, populated at load time and never
   // serialized.
@@ -1133,7 +1133,7 @@ struct prefab::PrefabParams [no_reflection] {
   // @brief Translation (position) of the new prefab in world-space.
   //
   // @note Must be finite.
-  Real3 translation [units(m)];
+  Real3 translation [units("m")];
 
   // @brief Whether to apply top-level scene settings.
   //

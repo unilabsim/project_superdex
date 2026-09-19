@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <pybind11/pybind11.h>
+#include <nanobind/nanobind.h>
 
 #include <functional>
 #include <stdexcept>
@@ -27,31 +27,36 @@ namespace mochi {
 
 // Exception to throw when mochi::Error is not OK.
 //
-// PYBIND11_EXPORT gives the type default (exported) visibility so its RTTI is unified across
+// NB_EXPORT gives the type default (exported) visibility so its RTTI is unified across
 // extension `.so`/`.dylib` boundaries. Combined with the out-of-line key function
 // (~MochiErrorException, anchored in pybind_core.cpp), this makes the single exception
 // translator registered by the physics module catch throws originating in the bots/mpc
 // extensions — without per-module re-registration, which was previously needed because each
 // `.so` otherwise had its own distinct RTTI for this type (notably on macOS).
-class PYBIND11_EXPORT MochiErrorException : public std::runtime_error {
+class NB_EXPORT MochiErrorException : public std::runtime_error {
  public:
   explicit MochiErrorException(Error const& e) : std::runtime_error(e.ToString()) {}
+  MochiErrorException(MochiErrorException const&) = default;
+  MochiErrorException& operator=(MochiErrorException const&) = default;
+  MochiErrorException(MochiErrorException&&) = default;
+  MochiErrorException& operator=(MochiErrorException&&) = default;
 
   // Out-of-line key function: anchors the vtable and typeinfo to pybind_core.cpp.
   ~MochiErrorException() override;
 };
 
 // Creates the global context. Throws if one already exists.
-PYBIND11_EXPORT void InitGlobalContext(int numWorkerThreads);
+NB_EXPORT void InitGlobalContext(int numWorkerThreads);
 
-// Returns the global context pointer. May be null before initialization.
-PYBIND11_EXPORT Context* GetContext();
+// Returns the global context pointer. May be null before initialization. Context lifecycle
+// operations must not race ordinary binding calls.
+NB_EXPORT Context* GetContext();
 
 // Destroys the global context. Throws if none exists.
-PYBIND11_EXPORT void DestroyGlobalContext();
+NB_EXPORT void DestroyGlobalContext();
 
 // Throws if the global context has not been initialized.
-PYBIND11_EXPORT void CheckContext();
+NB_EXPORT void CheckContext();
 
 // --- Ordered teardown registry for dependent contexts (bots, mpc) -------------------------
 // bots/mpc build their contexts against the physics Context returned by GetContext(), and
@@ -66,14 +71,14 @@ PYBIND11_EXPORT void CheckContext();
 // Registers a teardown to run (in reverse registration order) immediately before the global
 // context is destroyed. Callbacks must be null-guarded and idempotent: the registry is never
 // cleared, so a context re-created after shutdown()+initialize() is torn down again next time.
-PYBIND11_EXPORT void RegisterContextDependent(std::function<void()> teardown);
+NB_EXPORT void RegisterContextDependent(std::function<void()> teardown);
 
 // Runs the registered dependent teardowns, most-recently-registered first. Best-effort: a
 // throwing teardown is logged and does not block the remaining teardowns.
-PYBIND11_EXPORT void RunContextDependentTeardowns();
+NB_EXPORT void RunContextDependentTeardowns();
 
 // Runs the dependent teardowns, then destroys the global context. This is the single entry
 // point for mochi.shutdown() and the physics atexit handler.
-PYBIND11_EXPORT void ShutdownGlobalContext();
+NB_EXPORT void ShutdownGlobalContext();
 
 } // namespace mochi

@@ -1073,7 +1073,7 @@ class MOCHI_EMPTY_BASE Matrix : public krylov::BaseMatrix<
     requires(kIsVector && std::is_floating_point_v<Scalar>)
   {
     this->Normalize();
-    return *this;
+    return std::move(*this);
   }
 
   // Return a matrix that owns a copy of the values.

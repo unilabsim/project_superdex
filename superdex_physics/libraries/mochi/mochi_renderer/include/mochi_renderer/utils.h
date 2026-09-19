@@ -46,6 +46,11 @@ namespace mochi_renderer {
 // whether `normals` is populated, and when true `normals` must hold exactly one
 // (x, y, z) normal per vertex (i.e. `normals.size() == positions.size()`). When
 // false the recipient is expected to compute normals if necessary.
+//
+// `emissive` is glTF's `emissiveFactor`, scaled by `emissiveStrength`
+// (`KHR_materials_emissive_strength`). The strength is carried separately rather
+// than folded into `emissive` because the core factor is clamped to [0, 1],
+// so premultiplying would cap emission at 1x and lose any HDR glow.
 struct MeshSection {
   std::vector<float> positions;
   std::vector<float> normals;
@@ -54,6 +59,8 @@ struct MeshSection {
   std::array<float, 4> baseColor = {0.5f, 0.5f, 0.5f, 1.0f};
   float metallic = 0.0f;
   float roughness = 0.5f;
+  std::array<float, 3> emissive = {0.0f, 0.0f, 0.0f};
+  float emissiveStrength = 1.0f;
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -88,10 +95,15 @@ std::vector<uint8_t> BuildGlbFromMeshSections(std::vector<MeshSection> const& se
 // primitive is non-indexed); NORMAL is unpacked when present (`hasNormals`). PBR
 // base color / metallic / roughness factors are read from the primitive's
 // material when it has a metallic-roughness model, otherwise the
-// @ref MeshSection defaults apply. Non-triangle primitives are skipped, and node
-// transforms are ignored. External `.bin` buffers are resolved relative to
-// `path`. Returns an empty vector on read / parse failure or when no triangle
-// geometry is found.
+// @ref MeshSection defaults apply. Emissive factor and strength are read from
+// any material, with or without a metallic-roughness model. Non-triangle
+// primitives are skipped.
+// Geometry is returned in world space: each mesh is emitted once per referencing
+// scene node, with that node's world transform applied, so node
+// placement/rotation/scale is preserved; GLBs with no node graph fall back to
+// emitting each mesh once at identity. External `.bin` buffers are resolved
+// relative to `path`. Returns an empty vector on read / parse failure or when no
+// triangle geometry is found.
 std::vector<MeshSection> ReadGlbFromFile(char const* path);
 
 // Reads a `.dae` (COLLADA) file from disk into one @ref MeshSection per geometry

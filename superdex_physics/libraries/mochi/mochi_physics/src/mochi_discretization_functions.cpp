@@ -97,6 +97,7 @@ void mochi::UpdateQueryNodePositions(
 }
 
 void mochi::UpdateQuerySurfaceNodePositions(
+    ecs::Excluded<TagRodActor>,
     CSurfaceMesh const& simplicial,
     CFinalDisplacementRef<TimeStep::Current> const* currSol,
     ecs::OptionalTag<TagRigidActor> isRigid,

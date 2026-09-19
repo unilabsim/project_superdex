@@ -15,12 +15,14 @@
 
 """Tests for mochi_mesh surface remeshing Python bindings."""
 
+import numpy as np
 from test.conftest import (
     create_cube_faces_closed,
     create_cube_faces_with_hole,
     create_cube_vertices,
     mochi_mesh,
     MochiMeshTestBase,
+    np_real,
 )
 
 
@@ -77,6 +79,12 @@ class SurfaceRemeshingTest(MochiMeshTestBase):
         self.assertGreater(result_verts.shape[0], 0)
         self.assertGreater(result_faces.shape[0], 0)
 
+    def test_remesh_method_preserves_integer_interop(self):
+        method = mochi_mesh.RemeshMethod.NONE
+
+        self.assertIsInstance(method, int)
+        self.assertEqual(method, method.value)
+
     def test_compute_mesh_statistics(self):
         vertices = create_cube_vertices()
         faces = create_cube_faces_closed()
@@ -100,3 +108,13 @@ class SurfaceRemeshingTest(MochiMeshTestBase):
         )
 
         self.assertGreaterEqual(stats.hausdorff_distance, 0.0)
+
+    def test_inputs_are_converted_to_native_dtype_and_contiguity(self):
+        alternate_real = np.float64 if np_real == np.float32 else np.float32
+        vertices = np.asfortranarray(create_cube_vertices().astype(alternate_real))
+        faces = np.asfortranarray(create_cube_faces_closed().astype(np.int64))
+
+        stats = mochi_mesh.compute_mesh_statistics(vertices, faces)
+
+        self.assertEqual(stats.num_vertices, 8)
+        self.assertEqual(stats.num_faces, 12)

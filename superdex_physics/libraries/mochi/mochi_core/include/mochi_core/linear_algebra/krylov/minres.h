@@ -43,8 +43,8 @@ namespace mochi::krylov {
  * @param[in,out] x Vector containing the initial guess at input and the solution at output.
  * @param[in] prec The preconditioner application functor.
  *            The preconditioner has to be symmetric positive definite.
- * @param[in] iterMax Maximum number of iterations.
- *            iterMax must be between 0 and the size of A.
+ * @param[in] iterMax Maximum number of iterations. Must be positive.
+ *            If it exceeds the number of unknowns, the number of unknowns is used instead.
  * @param[in] statusCheck A functor called at each iteration to check the stop criteria.
  * @param[in] verbosity Verbosity level for logging output.
  * @param[in] initialGuessHint Indicates whether @p x is known to be zero. The zero hint skips the
@@ -90,6 +90,7 @@ LinearSolverStatus MinRes(
       "The type 'StopCriterion' is currently not supported by MinRes.");
 
   int n = static_cast<int>(NumRows(x));
+  MOCHI_ASSERT_VERBOSE(iterMax > 0, "Maximum number of iterations must be positive.");
   MOCHI_ASSERT_VERBOSE(NumRows(x) == NumRows(rhs));
   MOCHI_ASSERT_VERBOSE(
       initialGuessHint != InitialGuessHint::Zero || dot(x, x) == 0,

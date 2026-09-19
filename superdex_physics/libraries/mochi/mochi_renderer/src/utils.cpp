@@ -89,6 +89,8 @@ std::vector<uint8_t> BuildGlbFromMeshSections(std::vector<MeshSection> const& se
     std::array<float, 4> baseColor;
     float metallic;
     float roughness;
+    std::array<float, 3> emissive;
+    float emissiveStrength;
   };
 
   std::vector<SectionLayout> layouts;
@@ -115,6 +117,8 @@ std::vector<uint8_t> BuildGlbFromMeshSections(std::vector<MeshSection> const& se
     layout.baseColor = s.baseColor;
     layout.metallic = s.metallic;
     layout.roughness = s.roughness;
+    layout.emissive = s.emissive;
+    layout.emissiveStrength = s.emissiveStrength;
 
     for (int j = 0; j < 3; ++j) {
       layout.minPos[j] = std::numeric_limits<float>::max();
@@ -164,12 +168,21 @@ std::vector<uint8_t> BuildGlbFromMeshSections(std::vector<MeshSection> const& se
 
   size_t const binSize = bin.size();
 
+  // A glTF extension must be declared at the top level before any material may reference it.
+  bool const usesEmissiveStrength =
+      std::any_of(layouts.begin(), layouts.end(), [](SectionLayout const& layout) {
+        return layout.emissiveStrength != 1.0f;
+      });
+
   // Build the glTF JSON descriptor. One primitive + one material per section;
   // three bufferViews + three accessors per section (POSITION, NORMAL, indices).
   std::string json;
   json.reserve(1024 + layouts.size() * 768);
-  json += R"({"asset":{"version":"2.0","generator":"mochi_renderer"},)"
-          R"("scene":0,"scenes":[{"nodes":[0]}],"nodes":[{"mesh":0}],)"
+  json += R"({"asset":{"version":"2.0","generator":"mochi_renderer"},)";
+  if (usesEmissiveStrength) {
+    json += R"("extensionsUsed":["KHR_materials_emissive_strength"],)";
+  }
+  json += R"("scene":0,"scenes":[{"nodes":[0]}],"nodes":[{"mesh":0}],)"
           R"("meshes":[{"primitives":[)";
   for (size_t i = 0; i < layouts.size(); ++i) {
     SectionLayout const& layout = layouts[i];
@@ -206,10 +219,27 @@ std::vector<uint8_t> BuildGlbFromMeshSections(std::vector<MeshSection> const& se
     AppendFloat(json, layout.metallic);
     json += R"(,"roughnessFactor":)";
     AppendFloat(json, layout.roughness);
+    json += '}';
+    // glTF defaults emissiveFactor to [0,0,0] and emissiveStrength to 1, so both are omitted when
+    // unused rather than written out redundantly.
+    if (layout.emissive != std::array<float, 3>{0.0f, 0.0f, 0.0f}) {
+      json += R"(,"emissiveFactor":[)";
+      AppendFloat(json, layout.emissive[0]);
+      json += ',';
+      AppendFloat(json, layout.emissive[1]);
+      json += ',';
+      AppendFloat(json, layout.emissive[2]);
+      json += ']';
+    }
+    if (layout.emissiveStrength != 1.0f) {
+      json += R"(,"extensions":{"KHR_materials_emissive_strength":{"emissiveStrength":)";
+      AppendFloat(json, layout.emissiveStrength);
+      json += R"(}})";
+    }
     // Imported DAE/OBJ/STL geometry often has inconsistent triangle winding;
     // render both faces so sections never silently disappear to back-face
     // culling. This is the minimum-viable choice (see @ref MeshSection).
-    json += R"(},"doubleSided":true})";
+    json += R"(,"doubleSided":true})";
   }
   json += R"(],"accessors":[)";
   for (size_t i = 0; i < layouts.size(); ++i) {
@@ -679,15 +709,26 @@ static std::optional<MeshSection> ExtractPrimitive(cgltf_primitive const& prim) 
     }
   }
 
-  if (prim.material != nullptr && prim.material->has_pbr_metallic_roughness) {
-    cgltf_pbr_metallic_roughness const& pbr = prim.material->pbr_metallic_roughness;
-    section.baseColor = {
-        pbr.base_color_factor[0],
-        pbr.base_color_factor[1],
-        pbr.base_color_factor[2],
-        pbr.base_color_factor[3]};
-    section.metallic = pbr.metallic_factor;
-    section.roughness = pbr.roughness_factor;
+  if (prim.material != nullptr) {
+    if (prim.material->has_pbr_metallic_roughness) {
+      cgltf_pbr_metallic_roughness const& pbr = prim.material->pbr_metallic_roughness;
+      section.baseColor = {
+          pbr.base_color_factor[0],
+          pbr.base_color_factor[1],
+          pbr.base_color_factor[2],
+          pbr.base_color_factor[3]};
+      section.metallic = pbr.metallic_factor;
+      section.roughness = pbr.roughness_factor;
+    }
+    // emissiveFactor sits on the material itself, not under pbrMetallicRoughness, so it is read
+    // even for materials with no metallic-roughness model.
+    section.emissive = {
+        prim.material->emissive_factor[0],
+        prim.material->emissive_factor[1],
+        prim.material->emissive_factor[2]};
+    if (prim.material->has_emissive_strength) {
+      section.emissiveStrength = prim.material->emissive_strength.emissive_strength;
+    }
   }
 
   if (section.positions.empty() || section.indices.empty()) {

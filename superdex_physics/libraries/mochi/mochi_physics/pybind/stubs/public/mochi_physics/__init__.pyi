@@ -2533,6 +2533,14 @@ class ModelData:
     """
     mesh: Optional[MeshData]
     visual_mesh: Optional[MeshData]
+    contact_skin_mesh: Optional[MeshData]
+    """Optional triangular mesh used for surface queries and, when selected as the
+    rod's contact geometry, for contact quadrature.
+
+    The skinning indices reference primary-mesh nodes for triangular and tetrahedral
+    meshes, and primary-mesh elements for polylines. Currently consumed only by rod
+    actors.
+    """
     @property
     def blending(self) -> Optional[DynamicArrayBlendingData]: ...
     @blending.setter
@@ -2564,6 +2572,7 @@ class ModelData:
         self,
         mesh: Optional[MeshData] = ...,
         visual_mesh: Optional[MeshData] = ...,
+        contact_skin_mesh: Optional[MeshData] = ...,
         blending: Optional[ArrayLikeBlendingData] = ...,
         constrained_nodes: Optional[ArrayLikeInt] = ...,
         element_frame_axes: Optional[ArrayLikeReal] = ...,
@@ -2591,6 +2600,14 @@ class ModelDataView:
     """
     mesh: Optional[MeshDataView]
     visual_mesh: Optional[MeshDataView]
+    contact_skin_mesh: Optional[MeshDataView]
+    """Optional triangular mesh used for surface queries and, when selected as the
+    rod's contact geometry, for contact quadrature.
+
+    The skinning indices reference primary-mesh nodes for triangular and tetrahedral
+    meshes, and primary-mesh elements for polylines. Currently consumed only by rod
+    actors.
+    """
     @property
     def blending(self) -> Optional[DynamicArrayBlendingDataView]: ...
     @blending.setter
@@ -2622,6 +2639,7 @@ class ModelDataView:
         self,
         mesh: Optional[MeshDataView] = ...,
         visual_mesh: Optional[MeshDataView] = ...,
+        contact_skin_mesh: Optional[MeshDataView] = ...,
         blending: Optional[ArrayLikeBlendingDataView] = ...,
         constrained_nodes: Optional[ArrayLikeInt] = ...,
         element_frame_axes: Optional[ArrayLikeReal] = ...,
@@ -4032,14 +4050,13 @@ class LinearSolverParams:
         Applies only to iterative solvers.
     """
     max_iter: int
-    """Maximum number of linear solver iterations.
+    """Maximum number of iterations for iterative solvers.
 
     Note:
         Applies only to iterative solvers.
 
     Note:
-        Must be non-negative or
-        :const:`~superdex.physics.AUTO_LINEAR_SOLVER_MAX_ITER`.
+        Must be positive or :const:`~superdex.physics.AUTO_LINEAR_SOLVER_MAX_ITER`.
 
     Note:
         :const:`~superdex.physics.AUTO_LINEAR_SOLVER_MAX_ITER` lets Mochi select the
@@ -7207,8 +7224,8 @@ class ContactPoint:
     Note:
         Units depend on the dimensionality of the colliding manifold of
         :attr:`~superdex.physics.ContactPoint.actor_a`: [m²] for surface contact
-        (e.g., rigid, articulated, soft, shell, and rod actors with visual-mesh
-        contact enabled), or [m] for rod actors using centerline contact.
+        (e.g., rigid, articulated, soft, shell, and rod actors using contact-skin
+        contact), or [m] for rod actors using centerline contact.
 
     Note:
         For surface contact, represents the surface area corresponding to the sample
@@ -8552,6 +8569,7 @@ def create_model_shape(model: ModelData) -> ShapeHandle:
 def create_model_shape(
     mesh: Optional[MeshData] = ...,
     visual_mesh: Optional[MeshData] = ...,
+    contact_skin_mesh: Optional[MeshData] = ...,
     blending: Optional[ArrayLikeBlendingData] = ...,
     constrained_nodes: Optional[ArrayLikeInt] = ...,
     element_frame_axes: Optional[ArrayLikeReal] = ...,
@@ -8758,8 +8776,9 @@ def get_shape_surface_mesh(shape: ShapeHandle) -> MeshDataView:
     The coordinate array contains exactly the surface nodes referenced by the
     returned connectivity; nodes present in the underlying main mesh but not
     referenced by any surface triangle are omitted. Connectivity values are indices
-    into this returned coordinate array. For shapes without a surface mesh, returns
-    an empty view.
+    into this returned coordinate array. For polyline shapes with an authored
+    contact skin, returns that skin. For shapes without a surface mesh, returns an
+    empty view.
 
     Args:
         shape (ShapeHandle): Handle to a valid shape.
@@ -9609,7 +9628,8 @@ class Actor:
             only (before skinning is applied).
 
         Note:
-            Does not change node velocities.
+            Does not change the elastic velocity DoFs, but changes the skinned node
+            velocities of nested soft actors.
 
         Note:
             Resets multi-step time integrators, e.g. BDF2 falls back to backward Euler
@@ -9705,8 +9725,9 @@ class Actor:
         simulation meshes, the surface is the boundary triangles. For triangular
         simulation meshes, the surface has the same triangle elements as the simulation
         mesh, but nodes not referenced by any surface triangle are omitted and remaining
-        nodes may be reindexed. Returns an empty view if the actor does not have a
-        surface mesh.
+        nodes may be reindexed. For rod actors with an authored contact skin, returns
+        that skin regardless of the actor's selected collision representation. Returns
+        an empty view if the actor does not have a surface mesh.
 
         Returns:
             A non-owning view of the actor's reference surface mesh, or an empty view if
@@ -9800,6 +9821,10 @@ class Actor:
             The node ordering corresponds to the mesh connectivity from
             :meth:`~superdex.physics.Actor.get_surface_mesh`.
 
+        Note:
+            Supported for rod actors whose shape has an authored contact skin,
+            regardless of whether that skin is selected for collision.
+
         See Also:
             :meth:`~superdex.physics.Actor.register_query`,
             :class:`SURFACE_NODE_POSITIONS <superdex.physics.QueryType>`,
@@ -9833,6 +9858,10 @@ class Actor:
         Note:
             The node ordering corresponds to the mesh connectivity from
             :meth:`~superdex.physics.Actor.get_surface_mesh`.
+
+        Note:
+            Supported for rod actors whose shape has an authored contact skin,
+            regardless of whether that skin is selected for collision.
 
         See Also:
             :meth:`~superdex.physics.Actor.register_query`, :class:`SURFACE_NODE_NORMALS
@@ -10125,8 +10154,8 @@ class Actor:
             and rod actors.
 
         Note:
-            For nested soft actors, it zeroes the elastic deformation and velocity only.
-            The skeleton-driven pose is unaffected.
+            For nested soft actors, it zeroes only elastic displacement and velocity.
+            Skeleton-driven displacement and velocity are preserved.
 
         Note:
             For rod actors, it zeroes both the translational displacement DoFs and the

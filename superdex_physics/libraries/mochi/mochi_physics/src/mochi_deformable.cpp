@@ -519,6 +519,7 @@ void mochi::deformable::RecordState(
     CVelocitySlice<real, TimeStep::Current> const& vel,
     CDisplacementSlice<real, TimeStep::Current, DisplacementLayer::Skinned> const* dispSkinned,
     CVelocitySlice<real, TimeStep::Current, DisplacementLayer::Skinned> const* velSkinned,
+    CIntegrationVelocitySlices<DisplacementLayer::Skinned> const* integrationVelSkinned,
     CRodPose<TimeStep::Current> const* rodPose,
     [[maybe_unused]] ecs::OptionalTag<TagSoftActor> isSoft,
     [[maybe_unused]] ecs::OptionalTag<TagShellActor> isShell,
@@ -561,8 +562,8 @@ void mochi::deformable::RecordState(
     RecordDataset("displacementSkinned", dims, dispSkinned->value.GetConstSpan(), outData);
   }
 
-  // Velocities of the skinned layer
-  if (velSkinned) {
+  // Velocities of the skinned layer (only if state)
+  if (velSkinned && integrationVelSkinned) {
     MOCHI_ASSERT_VERBOSE(isSoft, "Skinned velocities are only supported for soft actors");
     MOCHI_ASSERT(velSkinned->value.size() % 3 == 0, "Expected 3 values per node");
     MOCHI_ASSERT(isize(velSkinned->value) == isize(dispSpan), "Size mismatch");

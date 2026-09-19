@@ -53,14 +53,14 @@ class Scene [no_init, no_destruct] {
   // @return Gravity vector [m/s^2] in world frame.
   //
   // @see SetGravity
-  fn GetGravity() -> Real3 [pure, virtual, const, units(m/s^2)];
+  fn GetGravity() -> Real3 [pure, virtual, const, units("m/s^2")];
 
   // @brief Set the gravity vector in world frame.
   //
   // @param[in] gravity Gravity vector [m/s^2] in world frame.
   //
   // @see GetGravity
-  fn SetGravity(Real3 const& gravity [units(m/s^2)]) -> void [pure, virtual];
+  fn SetGravity(Real3 const& gravity [units("m/s^2")]) -> void [pure, virtual];
 
   // @brief Get the solver parameters.
   //
@@ -97,7 +97,7 @@ class Scene [no_init, no_destruct] {
   // @note If the time step is negative or NaN, no step is taken and an error is logged.
   //
   // @see IntegrationMethod
-  fn Step(double timeStepSec [units(s)]) -> void [pure, virtual, release_gil];
+  fn Step(double timeStepSec [units("s")]) -> void [pure, virtual, release_gil];
 
   // @brief Returns the time step size [s] from the most recent positive call to @ref Step.
   //
@@ -108,14 +108,14 @@ class Scene [no_init, no_destruct] {
   // @note @ref RestoreState and @ref RestoreStateFromBytes restore this value from the captured state.
   // @note Calling @ref Step with a zero time step (e.g. to refresh queries without advancing the
   // simulation) does not update this value (i.e. it retains the value from the last positive time step).
-  fn GetLastTimeStep() -> double [pure, virtual, const, units(s)];
+  fn GetLastTimeStep() -> double [pure, virtual, const, units("s")];
 
   // @brief Returns the total simulation time [s] in the scene.
   //
   // @return The total simulation time [s].
   //
   // @note May not match the real-time that has elapsed.
-  fn GetTotalSimulationTime() -> double [pure, virtual, const, units(s)];
+  fn GetTotalSimulationTime() -> double [pure, virtual, const, units("s")];
 
   // @brief Get solver convergence metrics from the last simulation step.
   //

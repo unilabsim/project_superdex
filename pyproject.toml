@@ -19,7 +19,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "superdex-dev"
 version = "1.0.0"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12"
 description = "Local editable development workspace for SuperDex"
 readme = "README.md"
 license = "Apache-2.0"
@@ -30,7 +30,7 @@ classifiers = ["Private :: Do Not Upload"]
 
 [project.optional-dependencies]
 build = [
-    "cmake>=3.25",
+    "cmake>=3.26",
     "ninja>=1.5",
     "scikit-build-core>=1.0",
 ]

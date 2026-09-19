@@ -834,6 +834,13 @@ class TestActor(MochiTestBase):
             [0.0] * 3, dof_values.tolist()
         )  # Initial displacement must be zero
 
+        read_only_values = np.ones(3, dtype=np_real)
+        read_only_values.setflags(write=False)
+        with self.assertRaises(TypeError):
+            actor.get_dof_values(
+                dof_indices=dof_indices, out_dof_values=read_only_values
+            )
+
         mochi.destroy_scene(scene)
 
     def test_actor_articulated_pose_methods(self):

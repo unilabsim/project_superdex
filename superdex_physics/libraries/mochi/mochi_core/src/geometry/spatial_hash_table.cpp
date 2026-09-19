@@ -33,7 +33,7 @@ SpatialHashTable::SpatialHashTable(real cellSize, int pointCapacity, int minNumB
       _binIndexMask(_numBins - 1),
       _binHeads(_numBins, kSentinelIndex),
       _binLists(_pointCapacity, kSentinelIndex) {
-  _activeBins.reserve(_numBins);
+  _activeBins.reserve(Min(_numBins, _pointCapacity));
 }
 
 void SpatialHashTable::Reset() {
@@ -66,7 +66,9 @@ void SpatialHashTable::AddPointToBin(int pointIndex, int binIndex) {
   // Track active bins for efficient reset operation.
   if (oldBinHead == kSentinelIndex) {
     _activeBins.push_back(binIndex);
-    MOCHI_ASSERT_VERBOSE(_activeBins.size() <= _numBins, "More active bins than total bins");
+    MOCHI_ASSERT_VERBOSE(
+        _activeBins.size() <= Min(_numBins, _pointCapacity),
+        "More active bins than possible for the table capacity.");
   }
 }
 

@@ -34,6 +34,7 @@ namespace mochi {
 
 // Forward declaration for ecs::Excluded in UpdateQueryVisualNodePositionsAndNormals
 struct CRodVisualMeshEmbedding;
+struct TagRodActor;
 
 /**************************************************************************
   Common ECS Utils related to discretization
@@ -48,6 +49,7 @@ void UpdateQueryNodePositions(
 // Compute the local-space positions of each node in the surface mesh
 // and store them in CQuerySurfaceNodePositions
 void UpdateQuerySurfaceNodePositions(
+    ecs::Excluded<TagRodActor>,
     CSurfaceMesh const& simplicial,
     CFinalDisplacementRef<TimeStep::Current> const* currSol,
     ecs::OptionalTag<TagRigidActor> isRigid,

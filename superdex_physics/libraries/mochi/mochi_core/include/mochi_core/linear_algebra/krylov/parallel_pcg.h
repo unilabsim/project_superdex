@@ -63,7 +63,7 @@ int GetNumParallelWorkers(MatType const& A) {
  * @param[in] b The right-hand side vector of \f$ A x = b\f$.
  * @param[in,out] x Vector containing the initial guess at input and the solution at output.
  * @param[in] prec The preconditioner.
- * @param[in] maxIter Maximum number of iterations.
+ * @param[in] maxIter Maximum number of iterations. Must be positive.
  * @param[in,out] statusCheck A functor called every iteration to check the stop criteria. The norm
  * used in the stop criteria is determined by this object.
  * @param[in] abortIfNotSpd Boolean to abort the solve if the matrix is detected not to be symmetric
@@ -79,7 +79,7 @@ int GetNumParallelWorkers(MatType const& A) {
  * @return Linear solver status. Contains the convergence status, number of iterations, and achieved
  * absolute and relative residuals.
  *
- * @note The preconditioner must implement a 'ConcurrentSolve' method.
+ * @note The preconditioner must implement @ref PrepareConcurrentSolve and @ref ConcurrentSolve.
  * @note The input matrix must be a supported matrix or linear operator type. Matrix application
  * functors are NOT supported.
  * @note CUDA matrices are not supported.
@@ -92,6 +92,9 @@ int GetNumParallelWorkers(MatType const& A) {
  * - Assess variations of PCG that require fewer synchronization points
  *   (https://www.sciencedirect.com/science/article/abs/pii/S0167819113000719).
  * - Assess using only a subset of the workers to perform BLAS1 operations.
+ * - If the @ref StatusResidualPreconditionerInduced specialization using a dot other than
+ *   @ref UsualDot becomes performance-sensitive, compute the status and recurrence dot products in
+ *   one collective reduction using the criterion's and solver's respective dot instances.
  */
 template <
     typename MatType,
@@ -126,22 +129,26 @@ LinearSolverStatus ParallelPCG(
   constexpr bool kNeedPrecResidual =
       std::is_same_v<StopCriterion, StatusPreconditionedResidualL2<Dot, NonConstScalar>> ||
       std::is_same_v<StopCriterion, StatusResidualPreconditionerInduced<Dot, NonConstScalar>>;
-  constexpr bool kCheckStatusComputesRTz =
+  // The criterion owns a separate Dot. Reusing its rTz or replacing its Dot with the solver's is
+  // safe only when both instances produce identical results. UsualDot guarantees this.
+  constexpr bool kCanReuseCriterionRTz = std::is_same_v<Dot, UsualDot> &&
       std::is_same_v<StopCriterion, StatusResidualPreconditionerInduced<Dot, NonConstScalar>>;
+  constexpr bool kPairStatusAndRTz = std::is_same_v<Dot, UsualDot> &&
+      std::is_same_v<StopCriterion, StatusPreconditionedResidualL2<Dot, NonConstScalar>>;
+  MOCHI_ASSERT_VERBOSE(maxIter > 0, "Maximum number of iterations must be positive.");
   MOCHI_ASSERT_VERBOSE(
       initialGuessHint != InitialGuessHint::Zero || dot(x, x) == 0,
       "InitialGuessHint::Zero requires an exactly zero initial guess.");
 
   auto* scheduler = TaskScheduler::TryGet();
   auto const numTargetWorkers = parallel_pcg::GetNumParallelWorkers(A);
-  std::atomic<bool> success = (scheduler && numTargetWorkers > 1); // At least 2 workers
+  std::atomic<bool> success = scheduler && numTargetWorkers > 1; // At least 2 workers
   LinearSolverStatus solverStatus = {};
   if (success) {
     auto r = vectorFactory.GetCopy(b);
     auto Ap = vectorFactory.GetSameAs(b);
     auto p = vectorFactory.GetSameAs(x);
     auto z = vectorFactory.GetSameAs(x);
-    statusCheck.SetScaling(r, prec, z);
 
     ParallelBarrier barrier(numTargetWorkers);
     ParallelDot<NonConstScalar> parDot(numTargetWorkers);
@@ -195,7 +202,9 @@ LinearSolverStatus ParallelPCG(
       // Notes:
       // - The task is executed by either none or all of the workers. If it's executed, the workers
       //   do NOT yield until the task is completed.
-      // - Workers write exclusively to their range of rows. Writing outside their range is illegal.
+      // - Workers write within their matrix-vector-product row range unless a preconditioner uses a
+      //   different prepared distribution. Such a preconditioner must synchronize cross-worker
+      //   writes before returning.
       // - Workers may read from rows outside their range, e.g. in matrix-vector products and
       //   preconditioner solves. Barriers are used in those cases to avoid race conditions.
       // - The master worker is defined as the worker with workerIdx = 0.
@@ -203,6 +212,10 @@ LinearSolverStatus ParallelPCG(
       //   workers to modify it.
       MOCHI_PROFILE_SCOPE_N("PcgWorkerTask");
       bool const isMaster = (workerIdx == 0);
+
+      // Copy the status check before workers wait for one another. After that wait, the master may
+      // modify statusCheck.
+      auto workerStatusCheckCopy = statusCheck;
       if (!areAllWorkersReady(timeoutTime, numWorkers, isMaster)) {
         success = false;
         return;
@@ -215,11 +228,18 @@ LinearSolverStatus ParallelPCG(
       MOCHI_ASSERT_VERBOSE(
           numRows >= 0 && rowBegin >= 0 && rowEnd <= A.Rows(), "Invalid row ranges.");
 
-      auto workerStatusCheck = statusCheck; // Worker copy to prevent race conditions.
+      auto& workerStatusCheck = isMaster ? statusCheck : workerStatusCheckCopy;
       auto workerBarrier = barrier; // Worker copy. The copy is mandatory for 'ParallelBarrier'.
       auto workerParDot = parDot; // Worker copy. The copy is mandatory for 'ParallelDot'.
       workerBarrier.ReduceNumWorkers(numWorkers, isMaster);
       workerParDot.ReduceNumWorkers(numWorkers, isMaster);
+
+      if (isMaster) {
+        prec.PrepareConcurrentSolve(MakeConstSpan(workerRowRanges));
+        // Before the first ConcurrentSolve, every worker reaches either the initial status-check
+        // dot or the explicit barrier below. Both wait for all workers, ensuring they all see the
+        // state prepared by the master.
+      }
 
       ParallelWorkerInfo workerInfo{workerIdx, numWorkers, rowBegin, rowEnd, workerBarrier};
 
@@ -231,6 +251,7 @@ LinearSolverStatus ParallelPCG(
 
       IterationStatus iterStatus = {};
       NonConstScalar beta = 0;
+      NonConstScalar rTz = 0;
       int iter = 0;
 
       auto computeBetaAndPrecResidual = [&]() {
@@ -238,27 +259,49 @@ LinearSolverStatus ParallelPCG(
           beta = workerParDot.Dot(dot, r, z, rowBegin, rowEnd, workerIdx); // r_i^T z_{i-1}
         } else {
           beta = 0;
-          workerBarrier.Wait(); // TODO: Not needed for some preconditioners.
+          if constexpr (kNeedPrecResidual) {
+            // TODO: Avoid this barrier for preconditioners with worker-local input reads. The first
+            // application must still synchronize after PrepareConcurrentSolve.
+            workerBarrier.Wait();
+          }
         }
         prec.ConcurrentSolve(r, z, workerInfo); // z_{i} = Prec^{-1} r_{i}
-        // Post-solve barrier not needed. The next 'Dot' serves as implicit barrier and prevents
-        // 'r' from being modified before the solve is complete.
+        // ConcurrentSolve completes and makes visible any writes to z rows owned by another
+        // worker before that row owner returns from ConcurrentSolve. The next parallel dot cannot
+        // complete until every worker has returned from ConcurrentSolve, so no worker can update
+        // r while another preconditioner worker may still be reading it. Therefore, no additional
+        // post-solve barrier is needed here.
       };
+
+      auto checkPreconditionedStatus = [&]() {
+        if constexpr (kPairStatusAndRTz) {
+          auto const [zNormSqr, rTzNew] =
+              workerParDot.DotPair(dot, z, z, dot, r, z, rowBegin, rowEnd, workerIdx);
+          rTz = rTzNew;
+          return workerStatusCheck.ParallelCheckStatus(iter, zNormSqr);
+        } else {
+          return workerStatusCheck.ParallelCheckStatus(
+              iter, r, z, {}, {}, rowBegin, rowEnd, workerIdx, workerParDot);
+        }
+      };
+
+      if constexpr (kNeedPrecResidual) {
+        computeBetaAndPrecResidual(); // z = Prec^{-1} b
+      }
+      workerStatusCheck.SetConcurrentScaling(r, z, rowBegin, rowEnd, workerIdx, workerParDot);
 
       if (initialGuessHint != InitialGuessHint::Zero) {
         // Pre- and post-ApplyToRange barriers not needed: 'x' is up-to-date and the next 'Dot'
         // prevents 'x' from being modified before the product is complete.
         ApplyToRange(A, x, Ap, rowBegin, rowEnd);
         rWorker -= ApWorker;
+        if constexpr (kNeedPrecResidual) {
+          computeBetaAndPrecResidual();
+        }
       }
 
       if constexpr (kNeedPrecResidual) {
-        // Even with x_0 = 0, do not reuse z from SetScaling(): it was computed with Solve(),
-        // whereas ParallelPCG uses ConcurrentSolve(). Reuse could therefore give iteration 0 a
-        // different effective preconditioner from subsequent iterations.
-        computeBetaAndPrecResidual();
-        iterStatus = workerStatusCheck.ParallelCheckStatus(
-            iter, r, z, {}, {}, rowBegin, rowEnd, workerIdx, workerParDot);
+        iterStatus = checkPreconditionedStatus();
       } else {
         iterStatus = workerStatusCheck.ParallelCheckStatus(
             iter, r, {}, {}, {}, rowBegin, rowEnd, workerIdx, workerParDot);
@@ -279,10 +322,9 @@ LinearSolverStatus ParallelPCG(
       }
 
       pWorker = zWorker;
-      NonConstScalar rTz{}; // r_0^T z_0
-      if constexpr (kCheckStatusComputesRTz) {
+      if constexpr (kCanReuseCriterionRTz) {
         rTz = workerStatusCheck.GetLatestResidualNormSqr();
-      } else {
+      } else if constexpr (!kPairStatusAndRTz) {
         rTz = workerParDot.Dot(dot, r, z, rowBegin, rowEnd, workerIdx);
       }
       for (iter = 1; iter <= maxIter; ++iter) {
@@ -319,11 +361,11 @@ LinearSolverStatus ParallelPCG(
         auto const alpha = rTz / pTAp;
         xWorker += alpha * pWorker; // x_i = x_{i-1} + alpha_i p_i
         rWorker -= alpha * ApWorker; // r_i = r_{i-1} - alpha_i A * p_i
+        auto const rTzPrev = rTz; // The status check may update rTz.
 
         if constexpr (kNeedPrecResidual) {
           computeBetaAndPrecResidual();
-          iterStatus = workerStatusCheck.ParallelCheckStatus(
-              iter, r, z, {}, {}, rowBegin, rowEnd, workerIdx, workerParDot);
+          iterStatus = checkPreconditionedStatus();
         } else {
           iterStatus = workerStatusCheck.ParallelCheckStatus(
               iter, r, {}, {}, {}, rowBegin, rowEnd, workerIdx, workerParDot);
@@ -345,10 +387,9 @@ LinearSolverStatus ParallelPCG(
           return;
         }
 
-        auto const rTzPrev = rTz;
-        if constexpr (kCheckStatusComputesRTz) {
+        if constexpr (kCanReuseCriterionRTz) {
           rTz = workerStatusCheck.GetLatestResidualNormSqr();
-        } else {
+        } else if constexpr (!kPairStatusAndRTz) {
           rTz = workerParDot.Dot(dot, r, z, rowBegin, rowEnd, workerIdx);
         }
 

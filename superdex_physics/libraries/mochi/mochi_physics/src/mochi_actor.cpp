@@ -28,6 +28,7 @@
 #include "mochi_ecs_utils.h"
 #include "mochi_group.h"
 #include "mochi_integration.h"
+#include "mochi_point_cloud_contact.h"
 #include "mochi_query.h"
 #include "mochi_rigid.h"
 #include "mochi_rod.h"
@@ -39,6 +40,7 @@
 #include "mochi_solve.h"
 #include "mochi_transmission.h"
 
+#include <mochi_core/articulated_body/articulated_body_hessian.h>
 #include <mochi_core/geometry/geometry_utils.h>
 #include <mochi_core/materials/batched_smith_neo_hookean.h>
 #include <mochi_core/materials/material_params_utils.h>
@@ -550,6 +552,25 @@ class ActorInterfaceImpl : public ActorInterface {
     MOCHI_ERROR_RETURN(error);
     ValidateContactParams(newParams, error);
     MOCHI_ERROR_RETURN(error);
+
+    if (auto const* pointCloudParams = reg.try_get<CPointCloudColliderParams const>(e)) {
+      ValidatePointCloudColliderParams(*pointCloudParams, newParams, error);
+      MOCHI_ERROR_RETURN(error);
+      real const oldContactThreshold = params->GetPenaltyThresholdDist(/*addPadding*/ true);
+      real const newContactThreshold = newParams.GetPenaltyThresholdDist(/*addPadding*/ true);
+      if (oldContactThreshold != newContactThreshold) {
+        auto const& colliderDiscretization = reg.get<CColliderPointCloudDiscretization const>(e);
+        auto newSpatialHash =
+            CreateSpatialHashTable(*pointCloudParams, colliderDiscretization, newContactThreshold);
+        UpdateSpatialHashTable(
+            ecs::Included<TagUsePointCloudContact>{},
+            colliderDiscretization,
+            reg.get<CFinalDisplacementRef<TimeStep::Current> const>(e),
+            newSpatialHash);
+        reg.get<CSpatialHashTable>(e) = std::move(newSpatialHash);
+      }
+    }
+
     *params = newParams;
   }
 
@@ -588,6 +609,10 @@ class ActorInterfaceImpl : public ActorInterface {
     MOCHI_ERROR_RETURN(error);
 
     currentDisplacement->value = AsConstView(displacements);
+
+    if (reg.all_of<TagNestedSoftActor>(e)) {
+      skinned::SynchronizeAfterExternalChange(reg, e);
+    }
 
     // External state changes invalidate step history.
     InvalidateActorStepHistory(reg, e);
@@ -1787,8 +1812,31 @@ class ActorInterfaceImpl : public ActorInterface {
   }
 
   void SetZeroDisplacementsAndVelocities(Error& error) override {
-    mochi::SetZeroDisplacements(reg, e, error);
-    mochi::SetZeroVelocities(reg, e, error);
+    MOCHI_ERROR_RETURN(error);
+    MOCHI_PROFILE_SCOPE();
+
+    auto* currDispl = reg.try_get<CDisplacementSlice<real, TimeStep::Current>>(e);
+    MOCHI_ERROR_IF(
+        currDispl == nullptr, error, "CDisplacementSlice<real, TimeStep::Current> required.");
+    auto* prevDispl = reg.try_get<CDisplacementSlice<real, TimeStep::Previous>>(e);
+    MOCHI_ERROR_IF(
+        prevDispl == nullptr, error, "CDisplacementSlice<real, TimeStep::Previous> required.");
+    auto* currVel = reg.try_get<CVelocitySlice<real, TimeStep::Current>>(e);
+    MOCHI_ERROR_IF(currVel == nullptr, error, "CVelocitySlice<real, TimeStep::Current> required.");
+    auto* prevVel = reg.try_get<CVelocitySlice<real, TimeStep::Previous>>(e);
+    MOCHI_ERROR_IF(prevVel == nullptr, error, "CVelocitySlice<real, TimeStep::Previous> required.");
+    MOCHI_ERROR_RETURN(error);
+    currDispl->value.SetZero();
+    prevDispl->value.SetZero();
+    currVel->value.SetZero();
+    prevVel->value.SetZero();
+
+    if (reg.all_of<TagNestedSoftActor>(e)) {
+      skinned::SynchronizeAfterExternalChange(reg, e);
+    }
+
+    // External state changes invalidate step history.
+    InvalidateActorStepHistory(reg, e);
   }
 
   Span<real const> GetElementsDeformationGradient(Error& error) const override {
@@ -2883,16 +2931,42 @@ void diffsim::SetArticulatedPoseFromJointsBackward(
   // controller target pose to the provided pose with zero target velocity. The input pose can
   // therefore own state, current-target, and previous-target gradients. Only add target gradients
   // that are still owned by SetArticulatedPoseFromJoints; later target setters may overwrite them.
-  AsView(outGradPose) = reg.get<CDiffStateGrad const>(e).value;
+  auto outGrad = AsView(outGradPose);
+  outGrad = reg.get<CDiffStateGrad const>(e).value;
+
+  // A pose reset also updates the link velocities as v_link = J(q) * v_joint. Account for
+  // d(v_link)/dq = dJ(q)/dq * v_joint using the articulation Hessian.
+  auto const& jacobian = reg.get<CArticulatedJacobian const>(e).value;
+  int const linkDofs = jacobian.Rows();
+  auto const dt = static_cast<real>(reg.ctx<CSceneTime const>().DeltaTime());
+  ColumnVector<real> linkVelocityGrad(
+      dt * reg.get<CDiffDerivedStepGrad const>(e).value.BottomRows(linkDofs));
+  DynamicArray<real> jointVelocity(outGrad.Rows());
+  actor->GetArticulatedJointVelocities(jointVelocity, ErrorAssert{});
+
+  auto const* joints = reg.get<CArticulatedBodyShape const>(e).shape->GetJointsData();
+  articulated::JacobianDerivativeDoubleContract(
+      joints->dofInfo,
+      joints->jointAxes,
+      reg.get<CArticulatedParents const>(e),
+      reg.get<CArticulatedRestTransforms const>(e),
+      reg.get<CRootTransform const>(e).worldFromLocal,
+      reg.get<CArticulatedJointTransforms<TimeStep::Current> const>(e),
+      reg.get<CArticulatedLinkTransforms<TimeStep::Current> const>(e),
+      linkVelocityGrad,
+      jacobian,
+      jointVelocity,
+      outGrad);
+
   if (reg.all_of<CControllerConstraints>(e)) {
     auto const& targetPoseGrad = reg.get<CDiffTargetPoseGrad const>(e);
     auto const& owner = reg.get<CTargetOwners const>(e);
     if (owner.newPoseOwner == TargetOwner::PoseFromJoints) {
-      AsView(outGradPose) += AsConstView(targetPoseGrad.current);
+      outGrad += AsConstView(targetPoseGrad.current);
     }
     if (owner.oldPoseStep == owner.newPoseStep &&
         owner.oldPoseOwner == TargetOwner::PoseFromJoints) {
-      AsView(outGradPose) += AsConstView(targetPoseGrad.previous);
+      outGrad += AsConstView(targetPoseGrad.previous);
     }
   }
 

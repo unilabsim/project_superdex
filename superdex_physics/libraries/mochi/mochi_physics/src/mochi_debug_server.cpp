@@ -15,6 +15,7 @@
  */
 
 #include "mochi_context.h"
+#include "mochi_debug_draw.h"
 #include "mochi_ecs.h"
 #include "mochi_scene.h"
 #include "mochi_scene_debugger.h"
@@ -279,6 +280,17 @@ static void FillSceneList(DebugServerImpl::State const& state, protocol::SceneLi
   }
 }
 
+// Copy the debug draw feature catalog into the message. Scenes start with debug draw off, and the
+// client is authoritative from then on, so all the flags are false.
+static void FillDbgDrawFeatures(protocol::DbgDrawFeatures& outFeatures) {
+  auto const catalog = GetDebugDrawFeatureCatalog();
+  outFeatures.features.resize(catalog.size());
+  for (int i = 0; i < isize(catalog); ++i) {
+    outFeatures.features[i].name = catalog[i].name;
+    outFeatures.features[i].description = catalog[i].description;
+  }
+}
+
 void DebugServerImpl::OnClientConnect(net::ClientId client) {
   _state.Mutate([&](auto& state) {
     MOCHI_ASSERT_VERBOSE(state.client == 0, "Currently only supports one client at a time");
@@ -295,6 +307,7 @@ void DebugServerImpl::OnClientConnect(net::ClientId client) {
     protocol::WelcomeMessage welcome;
     FillSceneList(state, welcome.scenes);
     welcome.coordinateSpace = state.coordinateSpace;
+    FillDbgDrawFeatures(welcome.debugDraw);
     _server.SendTo(client, welcome);
   });
 }
@@ -354,6 +367,8 @@ void DebugServerImpl::RegisterSceneRequest() {
 }
 
 void DebugServerImpl::RegisterProtocol() {
+  _server.Register<protocol::DebugDrawReply>();
+  RegisterSceneRequest<protocol::DebugDrawRequest>();
   _server.Register<protocol::LogMessage>();
   _server.Register<protocol::PingReply>();
   _server.Register<protocol::PingRequest>(

@@ -53,13 +53,13 @@ struct RecenteringParams {
   //
   // @note Recentering is applied if either rotation or translation change more than their respective
   // thresholds.
-  real rotationEpsilonDeg [units(deg)] = 0;
+  real rotationEpsilonDeg [units("deg")] = 0;
 
   // @brief Minimum translation threshold [m] to apply recentering.
   //
   // @note Recentering is applied if either rotation or translation change more than their respective
   // thresholds.
-  real translationEpsilon [units(m)] = 0;
+  real translationEpsilon [units("m")] = 0;
 }
 
 // @brief Parameters for subsampling boundary integrals such as contact.
@@ -89,17 +89,17 @@ struct ContactPairParamsOverride [equality] {
   // @brief Pair penalty coefficient [Pa/m] before role-dependent dimensional corrections.
   //
   // @see ContactParams::penaltyCoefficient
-  Optional<real> penaltyCoefficient [units(Pa/m)];
+  Optional<real> penaltyCoefficient [units("Pa/m")];
 
   // @brief Friction falloff velocity [m/s].
   //
   // @see ContactParams::frictionFalloffVel
-  Optional<real> frictionFalloffVel [units(m/s)];
+  Optional<real> frictionFalloffVel [units("m/s")];
 
   // @brief Pair viscous friction coefficient [s/m].
   //
   // @see ContactParams::viscousFrictionCoefficient
-  Optional<real> viscousFrictionCoefficient [units(s/m)];
+  Optional<real> viscousFrictionCoefficient [units("s/m")];
 
   // @brief Pair Coulomb friction coefficient.
   //
@@ -109,7 +109,7 @@ struct ContactPairParamsOverride [equality] {
   // @brief Pair normal viscous damping coefficient [s/m].
   //
   // @see ContactParams::normalViscousDampingCoefficient
-  Optional<real> normalViscousDampingCoefficient [units(s/m)];
+  Optional<real> normalViscousDampingCoefficient [units("s/m")];
 }
 
 // @brief Information describing an articulated shape's kinematic structure.
@@ -213,7 +213,7 @@ struct StepInfo {
   Scene* scene;
 
   // @brief Time step size [s] for this simulation step.
-  double timeStepSec [units(s)];
+  double timeStepSec [units("s")];
 }
 
 // @brief Parameters to create a rigid body actor.
@@ -287,7 +287,7 @@ struct RigidActorParams [equality] {
   // @note If neither is set, @ref kDefaultDensity is used.
   //
   // @see mass
-  Optional<real> density [units(kg/m^3)];
+  Optional<real> density [units("kg/m^3")];
 
   // @brief Total mass [kg] of the actor. Must be positive if provided.
   //
@@ -296,7 +296,7 @@ struct RigidActorParams [equality] {
   // @note If only mass is set, density is computed automatically from volume.
   //
   // @see density
-  Optional<real> mass [units(kg)];
+  Optional<real> mass [units("kg")];
 
   // @brief Position [m] of the center of mass in the actor's local frame.
   //
@@ -304,7 +304,7 @@ struct RigidActorParams [equality] {
   // @note Usually combined with explicit momentOfInertia.
   //
   // @see momentOfInertia
-  Optional<Real3> centerOfMass [units(m)];
+  Optional<Real3> centerOfMass [units("m")];
 
   // @brief Moment of inertia tensor [kg·m²] at the center of mass in the actor's local frame.
   //
@@ -325,7 +325,7 @@ struct RigidActorParams [equality] {
   // @note Usually combined with explicit centerOfMass.
   //
   // @see centerOfMass
-  Optional<Real6> momentOfInertia [units(kg*m^2)];
+  Optional<Real6> momentOfInertia [units("kg*m^2")];
 
   // @brief Finite element type for boundary discretization.
   //
@@ -349,14 +349,14 @@ struct RigidActorParams [equality] {
   // @note Not valid for static rigid actors or articulated links.
   //
   // @see Actor::GetLinearVelocity, Actor::SetVelocity
-  Optional<Real3> linearVelocity [units(m/s)];
+  Optional<Real3> linearVelocity [units("m/s")];
 
   // @brief Optional initial angular velocity in world frame [rad/s], zero otherwise.
   //
   // @note Not valid for static rigid actors or articulated links.
   //
   // @see Actor::GetAngularVelocity, Actor::SetVelocity
-  Optional<Real3> angularVelocity [units(rad/s)];
+  Optional<Real3> angularVelocity [units("rad/s")];
 }
 
 // @brief Parameters to create a soft deformable actor.
@@ -607,7 +607,7 @@ struct ArticulatedLinkParams [equality] {
   // @note If neither is set, @ref kDefaultDensity is used.
   //
   // @see mass
-  Optional<real> density [units(kg/m^3)];
+  Optional<real> density [units("kg/m^3")];
 
   // @brief Total mass [kg] of the actor. Must be positive if provided.
   //
@@ -615,7 +615,7 @@ struct ArticulatedLinkParams [equality] {
   // @note If mass is set, density is computed automatically from volume (and vice versa).
   //
   // @see density
-  Optional<real> mass [units(kg)];
+  Optional<real> mass [units("kg")];
 
   // @brief Position [m] of the center of mass in the link actor's local frame.
   //
@@ -623,7 +623,7 @@ struct ArticulatedLinkParams [equality] {
   // @note Usually combined with explicit momentOfInertia.
   //
   // @see momentOfInertia
-  Optional<Real3> centerOfMass [units(m)];
+  Optional<Real3> centerOfMass [units("m")];
 
   // @brief Moment of inertia tensor [kg·m²] at the center of mass in the actor's local frame.
   //
@@ -644,7 +644,7 @@ struct ArticulatedLinkParams [equality] {
   // @note Usually combined with explicit centerOfMass.
   //
   // @see centerOfMass
-  Optional<Real6> momentOfInertia [units(kg*m^2)];
+  Optional<Real6> momentOfInertia [units("kg*m^2")];
 
   // @brief Finite element type for boundary discretization.
   //
@@ -906,10 +906,10 @@ struct ConstraintParams [equality] {
 struct RigidSphericalJointConstraintParams(ConstraintParams) {
 
   // @brief Joint position [m] for rigid actor A in actor A's local frame.
-  Real3 localPosA [units(m)];
+  Real3 localPosA [units("m")];
 
   // @brief Joint position [m] for rigid actor B in actor B's local frame.
-  Real3 localPosB [units(m)];
+  Real3 localPosB [units("m")];
 
   // @brief Actor handle identifying rigid actor A.
   ActorHandle actorA;
@@ -944,10 +944,10 @@ struct RigidPrismaticJointConstraintParams(ConstraintParams) {
   ActorHandle actorB;
 
   // @brief Maximum translation [m] relative to rest position. Empty means unbounded.
-  Optional<real> max [units(m)];
+  Optional<real> max [units("m")];
 
   // @brief Minimum translation [m] relative to rest position. Empty means unbounded.
-  Optional<real> min [units(m)];
+  Optional<real> min [units("m")];
 }
 
 // @brief Parameters for creating a constraint coupling a node in a deformable actor to a node in
@@ -997,7 +997,7 @@ struct RodElementRotationToRigidConstraintParams(ConstraintParams) {
   // expressed as a rotation vector [rad].
   //
   // @note After creation, the frame remains fixed relative to the rigid actor.
-  Real3 refFrameRotVec [units(rad)];
+  Real3 refFrameRotVec [units("rad")];
 
   // @brief Actor handle identifying rigid actor.
   ActorHandle rigidActor;
@@ -1020,7 +1020,7 @@ struct DeformableNodeToRigidConstraintParams(ConstraintParams) {
   // is auto-computed based on the deformable node's initial position in the rigid actor's frame.
   // @note When @ref findClosest is also true, this field is still used as the search point that
   // selects which deformable node is picked.
-  Real3 rigidLocalPos [units(m)];
+  Real3 rigidLocalPos [units("m")];
 
   // @brief Node index in the deformable actor's reference simulation mesh, as returned by @ref
   // Actor::GetMesh. Ignored if @ref findClosest is true; otherwise it must identify a node in that
@@ -1063,19 +1063,19 @@ struct DeformableNodeToRigidConstraintParams(ConstraintParams) {
 struct JointRotationRangeConstraintParams(ConstraintParams) {
 
   // @brief Joint reference frame specified as a rotation vector [rad] with respect to world frame.
-  Real3 refFrameRotVec [units(rad)];
+  Real3 refFrameRotVec [units("rad")];
 
   // @brief Allowed range [min, max] [rad] for the X component of the relative rotation vector
   // (axis-angle), expressed in the joint reference frame.
-  Real2 angleRangeX [units(rad)] = kMinus2PiPlus2Pi;
+  Real2 angleRangeX [units("rad")] = kMinus2PiPlus2Pi;
 
   // @brief Allowed range [min, max] [rad] for the Y component of the relative rotation vector
   // (axis-angle), expressed in the joint reference frame.
-  Real2 angleRangeY [units(rad)] = kMinus2PiPlus2Pi;
+  Real2 angleRangeY [units("rad")] = kMinus2PiPlus2Pi;
 
   // @brief Allowed range [min, max] [rad] for the Z component of the relative rotation vector
   // (axis-angle), expressed in the joint reference frame.
-  Real2 angleRangeZ [units(rad)] = kMinus2PiPlus2Pi;
+  Real2 angleRangeZ [units("rad")] = kMinus2PiPlus2Pi;
 
   // @brief Actor handle identifying rigid actor A.
   ActorHandle actorA;
@@ -1097,10 +1097,10 @@ struct JointRotationRangeConstraintParams(ConstraintParams) {
 struct RigidPivotPositionConstraintParams(ConstraintParams) {
 
   // @brief Target position in world frame [m].
-  Real3 targetPosition [units(m)];
+  Real3 targetPosition [units("m")];
 
   // @brief Pivot point in rigid actor's local frame [m].
-  Real3 localPosition [units(m)];
+  Real3 localPosition [units("m")];
 
   // @brief Actor handle identifying the rigid actor.
   ActorHandle actor;
@@ -1120,7 +1120,7 @@ struct RigidPivotToRigidTargetConstraintParams(ConstraintParams) {
   TransformRT targetTransform;
 
   // @brief Pivot point in rigid actor's local frame [m].
-  Real3 localPosition [units(m)];
+  Real3 localPosition [units("m")];
 
   // @brief Actor handle identifying the rigid actor.
   ActorHandle actor;
@@ -1135,10 +1135,10 @@ struct RigidPivotToRigidTargetConstraintParams(ConstraintParams) {
 struct RigidPivotRotationConstraintParams(ConstraintParams) {
 
   // @brief Target rotation in world coordinates, as a rotation vector [rad].
-  Real3 targetRotation [units(rad)];
+  Real3 targetRotation [units("rad")];
 
   // @brief Pivot frame in rigid actor's local coordinates, as a rotation vector [rad].
-  Real3 localRotation [units(rad)];
+  Real3 localRotation [units("rad")];
 
   // @brief Actor handle identifying the rigid actor.
   ActorHandle actor;
@@ -1154,7 +1154,7 @@ struct DeformableNodePositionConstraintParams(ConstraintParams) [equality] {
   int nodeIndex = -1;
 
   // @brief Target position for the node in world frame [m].
-  Real3 position [units(m)];
+  Real3 position [units("m")];
 
   // @brief Actor handle identifying the deformable actor.
   ActorHandle actor;
@@ -1178,7 +1178,7 @@ struct JointRotationTrackingConstraintParams(ConstraintParams) {
   // expressed as a rotation vector [rad].
   //
   // @note After creation, the frame remains fixed relative to actor A.
-  Real3 refFrameRotVec [units(rad)];
+  Real3 refFrameRotVec [units("rad")];
 
   // @brief Actor handle identifying rigid actor A.
   ActorHandle actorA;
@@ -1289,10 +1289,10 @@ struct Articulated3dRotationRangeConstraintParams(ConstraintParams) {
   int jointIndex = 0;
 
   // @brief Minimum allowed value [rad] for each component of the joint-local rotation vector.
-  Real3 minValues [units(rad)];
+  Real3 minValues [units("rad")];
 
   // @brief Maximum allowed value [rad] for each component of the joint-local rotation vector.
-  Real3 maxValues [units(rad)];
+  Real3 maxValues [units("rad")];
 }
 
 // @brief Information about a contact point between two actors.
@@ -1325,27 +1325,27 @@ struct ContactPoint {
 
   // @brief Signed separation distance [m] between @ref posA (on @ref actorA) and the closest point
   // on the surface of @ref actorB. Negative if the point is inside (i.e. actors overlap).
-  real distance [units(m)];
+  real distance [units("m")];
 
   // @brief Contact position [m] on @ref actorA in world frame.
-  Real3 posA [units(m)];
+  Real3 posA [units("m")];
 
   // @brief Approximate contact position [m] on @ref actorB in world frame.
   //
   // @note Equivalent to (posA - normal * distance).
-  Real3 posB [units(m)];
+  Real3 posB [units("m")];
 
   // @brief Contact normal in world frame pointing away from @ref actorB. Unit length.
   Real3 normal;
 
   // @brief Contact force [N] applied to @ref actorA from @ref actorB in world frame.
-  Real3 force [units(N)];
+  Real3 force [units("N")];
 
   // @brief Velocity [m/s] of the contact point on @ref actorA in world frame.
-  Real3 pointVelocityA [units(m/s)];
+  Real3 pointVelocityA [units("m/s")];
 
   // @brief Velocity [m/s] of the contact point on @ref actorB in world frame.
-  Real3 pointVelocityB [units(m/s)];
+  Real3 pointVelocityB [units("m/s")];
 
   // @brief Sample point index of @ref actorA.
   int sampleIndex;
@@ -1355,7 +1355,7 @@ struct ContactPoint {
   //
   // @note Units depend on the dimensionality of the colliding manifold of
   // @ref actorA: [m²] for surface contact (e.g., rigid, articulated, soft, shell,
-  // and rod actors with visual-mesh contact enabled), or [m] for rod actors using
+  // and rod actors using contact-skin contact), or [m] for rod actors using
   // centerline contact.
   // @note For surface contact, represents the surface area corresponding to the
   // sample point. For rod centerline contact, represents the arc length.
@@ -1393,7 +1393,7 @@ struct NodeContactForce {
   int index;
 
   // @brief Contact force [N] applied to the node.
-  Real3 force [units(N)];
+  Real3 force [units("N")];
 }
 
 // @brief SDF distance information for active contact sample points.
@@ -1410,12 +1410,12 @@ struct SdfDistances {
   Span<int const> sampleIndices;
 
   // @brief Sample positions [m] in world frame.
-  Span<Real3 const> worldPositions [units(m)];
+  Span<Real3 const> worldPositions [units("m")];
 
   // @brief Signed distances [m] to the closest surface.
   //
   // @note Negative values indicate penetration inside the surface.
-  Span<real const> distances [units(m)];
+  Span<real const> distances [units("m")];
 
   // @brief SDF gradients at sample positions, in world frame.
   Span<Real3 const> distanceGrads;
@@ -1423,7 +1423,7 @@ struct SdfDistances {
   // @brief Maximum distance [m] at which SDF evaluation was performed.
   //
   // @note Non-zero only if the actor has far SDF evaluation enabled.
-  real maxSdfFarDistanceEvaluation [units(m)];
+  real maxSdfFarDistanceEvaluation [units("m")];
 }
 
 // @brief Parameters controlling the stepping behavior of an @ref AsyncScene.
@@ -1456,7 +1456,7 @@ struct AsyncStepParams [no_capi, no_python] {
   //
   // @see AsyncScene::RequestStepThenPause, AsyncStepParams::useFixedTimeStep,
   // AsyncStepParams::timeStepCallback
-  double fixedTimeStepSeconds [units(s)] = 0.01;
+  double fixedTimeStepSeconds [units("s")] = 0.01;
 
   // @brief Minimum time step size [s] in dynamic mode.
   //
@@ -1464,14 +1464,14 @@ struct AsyncStepParams [no_capi, no_python] {
   // is not set or returns a negative value.
   // @note Must be finite. Negative values are clamped to zero. Values greater than @ref
   // dynamicTimeStepMaxSeconds are clamped down to that maximum.
-  double dynamicTimeStepMinSeconds [units(s)] = 0.001;
+  double dynamicTimeStepMinSeconds [units("s")] = 0.001;
 
   // @brief Maximum time step size [s] in dynamic mode.
   //
   // @note Dynamic mode is only used when @ref useFixedTimeStep is false and @ref timeStepCallback either
   // is not set or returns a negative value.
   // @note Must be finite. Negative values are clamped to zero.
-  double dynamicTimeStepMaxSeconds [units(s)] = 0.01;
+  double dynamicTimeStepMaxSeconds [units("s")] = 0.01;
 
   // @brief Optional callback to provide custom time step size [s].
   //
@@ -1492,23 +1492,23 @@ struct PerformanceStats [equality] {
   // @brief Total wall-clock time [s] spent in the last call to @ref Scene::Step.
   //
   // @note Includes time spent in user-defined pre-step and post-step callbacks.
-  double totalStepDurationSec [units(s)];
+  double totalStepDurationSec [units("s")];
 
   // @brief Wall-clock time [s] spent solving physics in the last call to @ref Scene::Step.
   //
   // @note Does not include time spent in user-defined pre-step and post-step callbacks.
-  double solveStepDurationSec [units(s)];
+  double solveStepDurationSec [units("s")];
 
   // @brief Wall-clock time [s] spent executing user-defined pre-step callbacks in the last call to
   // @ref Scene::Step.
-  double preStepCallbacksDurationSec [units(s)];
+  double preStepCallbacksDurationSec [units("s")];
 
   // @brief Wall-clock time [s] spent executing user-defined post-step callbacks in the last call to
   // @ref Scene::Step.
-  double postStepCallbacksDurationSec [units(s)];
+  double postStepCallbacksDurationSec [units("s")];
 
   // @brief Wall-clock time [s] spent on recording in the last call to @ref Scene::Step.
-  double recordingStepDurationSec [units(s)];
+  double recordingStepDurationSec [units("s")];
 }
 
 // @brief Solver convergence metrics from the last simulation step.

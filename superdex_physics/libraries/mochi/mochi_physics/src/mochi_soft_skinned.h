@@ -23,6 +23,8 @@
 
 #include <mochi_core/utils/variant_jacobian.h>
 
+#include <type_traits>
+
 namespace mochi {
 
 // Forwards
@@ -141,6 +143,8 @@ void EntityPostStage(
     ecs::RequiredTag<TagNestedSoftActor>,
     CConvergenceStatus const& convergence,
     CTimeIntegratorState const& intState,
+    CDisplacementSlice<real, TimeStep::StageStart, DisplacementLayer::Skinned> const&
+        stageStartDispl,
     CDisplacementSlice<real, TimeStep::Current, DisplacementLayer::Skinned>& currDispl,
     CVelocitySlice<real, TimeStep::Current, DisplacementLayer::Skinned>& currVel,
     CIntegrationVelocitySlices<DisplacementLayer::Skinned>& intVels);
@@ -158,6 +162,29 @@ void PostLastStagePipeline(entt::registry& reg, Span<entt::entity const> entitie
 void ResolveAllNodeSkinningDisplacementsPipeline(
     entt::registry& reg,
     Span<entt::entity const> entities);
+
+/*
+ * Synchronize a nested soft actor's current skinned displacement and velocity after an external
+ * displacement and velocity change. If it belongs to a blended actor, republishes the parent's
+ * final displacement.
+ */
+void SynchronizeAfterExternalChange(entt::registry& reg, entt::entity e);
+
+// Compute world-space skinning velocity for nested soft actors.
+template <bool kIsState>
+void UpdateSkinningVelocity(
+    std::conditional_t<
+        kIsState,
+        ecs::Included<CIntegrationVelocitySlices<DisplacementLayer::Skinned>>,
+        ecs::Excluded<CIntegrationVelocitySlices<DisplacementLayer::Skinned>>>,
+    ecs::PartialRegistry<
+        CArticulatedLinkTransforms<TimeStep::Current> const,
+        CArticulatedFullVel const> reg,
+    CSkinnedComposition const& composition,
+    CVelocitySlice<real, TimeStep::Current> const& softVelocity,
+    CArticulatedSkinningData const& skinningData,
+    CNodePositions const& positions,
+    CVelocitySlice<real, TimeStep::Current, DisplacementLayer::Skinned>& outVelocity);
 
 /*
  * Pipeline to update quantities that are a function of the state (aka derived state) of the

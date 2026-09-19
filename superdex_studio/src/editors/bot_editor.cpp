@@ -16,6 +16,7 @@
 
 #include "editors/bot_editor.h"
 #include "app/app.h"
+#include "io/glb_export.h"
 #include "ui/asset_browser.h"
 #include "ui/imgui_widgets.h"
 
@@ -385,6 +386,7 @@ void BotEditor::ShowTabContents() {
   ImGui::EndDisabled();
   ImGui::EndChild(); // Viewport_Child
   ShowBatchRenameLinksJointsModal();
+  ShowExportSkeletalGlbModal();
 }
 
 std::vector<AssetEditor::WindowDeclaration> BotEditor::GetDefaultWindows() {
@@ -503,6 +505,10 @@ void BotEditor::ShowMainMenuItems() {
         superdex::robotics::SaveToUrdfFile(
             _botAsset->GetBotPrefab(), path.ToString().c_str(), error);
       }
+    }
+    // Export Skeletal GLB
+    if (ImGui::MenuItem("Export Skeletal GLB...")) {
+      OpenExportSkeletalGlbModal();
     }
     ImGui::Separator(ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
     // Batch Rename Links & Joints: mirror of the asset browser's batch-rename dialog, operating on
@@ -795,6 +801,112 @@ void BotEditor::ShowBatchRenameLinksJointsModal() {
       ImGui::CloseCurrentPopup();
     }
     ImGui::EndPopup();
+  }
+}
+
+void BotEditor::OpenExportSkeletalGlbModal() {
+  _glbExport = GlbExportState{};
+  _glbExport.open = true;
+}
+
+void BotEditor::ShowExportSkeletalGlbModal() {
+  if (_glbExport.open) {
+    ImGui::OpenPopup("Export Skeletal GLB");
+    _glbExport.open = false;
+  }
+  ImVec2 const center = ImGui::GetMainViewport()->GetCenter();
+  ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+  // Exactly one of these is shown at a time, chosen by the geometry checkboxes below.
+  constexpr auto kGeometryHints = std::to_array<char const*>(
+      {"Exported as two meshes sharing one skeleton.",
+       "Exported as one mesh bound to the skeleton.",
+       "Exports the joint hierarchy alone, with no mesh or skin."});
+
+  // Pin the width and let the height auto-fit
+  float hintWidth = 0.0f;
+  for (char const* hint : kGeometryHints) {
+    hintWidth = std::max(hintWidth, ImGui::CalcTextSize(hint).x);
+  }
+  float const modalWidth = std::max(420.0f, hintWidth + ImGui::GetStyle().WindowPadding.x * 2.0f);
+  ImGui::SetNextWindowSizeConstraints(ImVec2(modalWidth, 0.0f), ImVec2(modalWidth, FLT_MAX));
+  // A non-null p_open gives the window an ImGui close (X) button in the top-right.
+  bool popupOpen = true;
+  if (ImGui::BeginPopupModal(
+          "Export Skeletal GLB",
+          &popupOpen,
+          ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+              ImGuiWindowFlags_NoSavedSettings)) {
+    GlbExportOptions& options = _glbExport.options;
+
+    ImGui::TextUnformatted("Geometry");
+    ImGui::Checkbox("Render meshes", &options.includeRenderMeshes);
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip(
+          "Export each link's render model, materials included.\n"
+          "Links without a render model are skipped.");
+    }
+    ImGui::Checkbox("Collision meshes", &options.includeCollisionMeshes);
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Export each link's collision surface mesh.");
+    }
+    char const* geometryHint = nullptr;
+    if (options.includeRenderMeshes && options.includeCollisionMeshes) {
+      geometryHint = kGeometryHints[0];
+    } else if (options.includeRenderMeshes || options.includeCollisionMeshes) {
+      geometryHint = kGeometryHints[1];
+    } else {
+      geometryHint = kGeometryHints[2];
+    }
+    ImGui::TextDisabled("%s", geometryHint);
+
+    ImGui::Separator();
+
+    ImGui::TextUnformatted("Bind pose");
+    if (ImGui::RadioButton("Rest", options.bindPose == GlbBindPose::Rest)) {
+      options.bindPose = GlbBindPose::Rest;
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Bind to the bot's zero pose.");
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Bake current pose", options.bindPose == GlbBindPose::Current)) {
+      options.bindPose = GlbBindPose::Current;
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Freeze the current pose as the bind pose.");
+    }
+
+    ImGui::Separator();
+    if (ImGui::Button("Export...", ImVec2(120, 0))) {
+      _glbExport.requestExport = true;
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
+  }
+
+  // Run the file dialog only once the popup stack has unwound since its a blocking call
+  if (_glbExport.requestExport) {
+    _glbExport.requestExport = false;
+    mochi::ErrorLog error;
+    mochi::Path defaultPath = _botAsset->GetPath();
+    defaultPath.ReplaceExtension(".glb");
+    constexpr auto filters = std::to_array<char const*>({"*.glb"});
+    auto path = SuperDexStudio::GetFileDialogPath(
+        "Export Skeletal GLB", filters.data(), 1, "GLB (*.glb)", true, defaultPath);
+    if (!path.IsEmpty()) {
+      ExportSkeletalGlb(
+          path.ToString().c_str(),
+          _botAsset->GetBotPrefab(),
+          _studio->GetMochiContext(),
+          _studio->GetRoboticsContext(),
+          _studio->GetBotLoader(),
+          _glbExport.options,
+          error);
+    }
   }
 }
 

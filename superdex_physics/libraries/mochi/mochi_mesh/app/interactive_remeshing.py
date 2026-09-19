@@ -1190,7 +1190,7 @@ def _build_adaptive_section(ui: dict) -> None:
 
 
 def _sync_ui_to_params(ui: dict, p: SurfaceRemeshingParams) -> None:
-    """Copy UI dict values back into the pybind11 params object."""
+    """Copy UI dict values back into the native params object."""
     p.edge_size = ui["edge_size"]
     p.detect_features = ui["detect_features"]
     p.relative_to_mesh_size = ui["relative_to_mesh_size"]

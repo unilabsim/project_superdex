@@ -221,14 +221,15 @@ GetNodeCoordinates(entt::registry const& reg, entt::entity e, int index, Error& 
     if (auto const* tetMesh = reg.try_get<CTetrahedralMesh const>(e)) {
       // Soft actor
       return tetMesh->mesh->GetNodeCoordinates();
+    } else if (auto const* polylineMesh = reg.try_get<CPolylineMesh const>(e)) {
+      // Rod actor. Rod constraints always use centerline node indices, even when the actor exposes
+      // an authored surface mesh.
+      MOCHI_ASSERT_VERBOSE(reg.all_of<TagRodActor>(e), "Expected a rod actor");
+      return polylineMesh->nodes;
     } else if (auto const* surfMesh = reg.try_get<CSurfaceMesh const>(e)) {
       // Shell actor
       MOCHI_ASSERT_VERBOSE(reg.all_of<TagShellActor>(e), "Expected a shell actor");
       return surfMesh->mesh->GetNodeCoordinates();
-    } else if (auto const* polylineMesh = reg.try_get<CPolylineMesh const>(e)) {
-      // Rod actor
-      MOCHI_ASSERT_VERBOSE(reg.all_of<TagRodActor>(e), "Expected a rod actor");
-      return polylineMesh->nodes;
     } else {
       MOCHI_ERROR_SET(error, "Expected a soft, shell, or rod actor");
       return Span<Real3 const>{};

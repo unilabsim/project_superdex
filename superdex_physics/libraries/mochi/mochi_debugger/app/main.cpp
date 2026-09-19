@@ -357,11 +357,9 @@ void MochiDebuggerApp::SyncSceneData() {
     ImportActors(data);
 
     // Copy debug draw data to the render scene (only when new data is received).
-    if (_uiState.rendering.showDebugDraw) {
-      protocol::DbgDrawData const& dbg = data.debugDraw;
-      _renderScene->SetDebugLines(dbg.lineVertices.positions, dbg.lineVertices.colors);
-      _renderScene->SetDebugSpheres(dbg.spheres.positions, dbg.spheres.radii, dbg.spheres.colors);
-    }
+    protocol::DbgDrawData const& dbg = data.debugDraw;
+    _renderScene->SetDebugLines(dbg.lineVertices.positions, dbg.lineVertices.colors);
+    _renderScene->SetDebugSpheres(dbg.spheres.positions, dbg.spheres.radii, dbg.spheres.colors);
   });
 
   // 3. Derive the combo index for the UI. GetSelectedScene() returns an invalid handle when nothing

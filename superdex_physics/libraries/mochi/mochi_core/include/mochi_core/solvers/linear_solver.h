@@ -69,6 +69,10 @@ struct PrecApplyer {
       ParallelWorkerInfo const& data) const {
     prec.get().ConcurrentSolve(x, Px, data);
   }
+
+  void PrepareConcurrentSolve(Span<int const> workerRowRanges) const {
+    prec.get().PrepareConcurrentSolve(workerRowRanges);
+  }
 };
 
 inline constexpr bool IsCudaSolver(LinearSolverType const& solverType) {
@@ -225,7 +229,9 @@ class LinearSolver {
 
   /// @brief Set the parameters of the solver.
   void SetParams(KrylovSolverParams const& params) {
-    MOCHI_ASSERT(params.maxIter >= 0, "Maximum number of linear iterations must not be negative.");
+    MOCHI_ASSERT(
+        params.maxIter > 0,
+        "Maximum number of iterations for iterative linear solvers must be positive.");
     MOCHI_ASSERT(params.solverType != LinearSolverType::Auto, "Solver type must have been set.");
     if (params.preconditionerLifespan > 1 && details::IsCudaSolver(params.solverType)) {
       MOCHI_LOG_WARNING_ONCE("Preconditioner recycling not supported with CUDA solvers.");

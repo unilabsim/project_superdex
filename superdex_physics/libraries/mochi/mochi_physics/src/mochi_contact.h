@@ -37,6 +37,7 @@
 #include <mochi_core/geometry/base_map.h>
 #include <mochi_core/geometry/bvh_tree.h>
 #include <mochi_core/geometry/geometry_utils.h>
+#include <mochi_core/geometry/sphere_tree.h>
 #include <mochi_core/linear_algebra/block_sparse_matrix.h>
 #include <mochi_core/utils/basic_utils.h>
 #include <mochi_core/utils/constants.h>
@@ -525,46 +526,6 @@ struct CDeformablePointAsyncCollisionsResponse {
   }
 };
 
-template <typename BvType>
-class ContactSamplesBvh : public NoCopy {
-  // BvhTree stores a raw pointer to PointSetBvhObject. Use unique_ptr's to avoid dangling pointers.
-  std::unique_ptr<PointSetBvhObject<BvType>> _object;
-  std::unique_ptr<BvhTree<BvType>> _bvh;
-
- public:
-  ContactSamplesBvh(Span<Real3 const> points)
-      : _object(std::make_unique<PointSetBvhObject<BvType>>(points)),
-        _bvh(
-            std::make_unique<BvhTree<BvType>>(
-                _object.get(),
-                BvhTreeParams{.splittingAlgorithm = BvhSplittingAlgorithm::TopDown_Mean})) {}
-
-  template <typename BvOther>
-  void FindIntersectingSamples(BvOther const& bv, DynamicArray<int>& outIntersectingSamples) const {
-    _bvh->template FindIntersectingElements</*kSkipElementBvCheck*/ true>(
-        bv, outIntersectingSamples);
-  }
-
-  void FindIntersectingSamples(
-      AnyBoundingVolume const& anyBv,
-      DynamicArray<int>& outIntersectingSamples) const {
-    std::visit([&](auto const& bv) { FindIntersectingSamples(bv, outIntersectingSamples); }, anyBv);
-  }
-
-  void Refit() {
-    _bvh->Refit();
-  }
-
-  int NumSamplePoints() const {
-    return _object->GetNumElements();
-  }
-
-  /// @brief Read-only access to the underlying bounding volume hierarchy (used for debug drawing).
-  BvhTree<BvType> const& GetBvh() const {
-    return *_bvh;
-  }
-};
-
 /// @brief Contains a vector of potential contact points of an actor in local space.
 struct ContactSamples : public NoCopy {
   /// @brief Non-default constructor for sizing of members used by all actor types.
@@ -593,7 +554,7 @@ struct ContactSamples : public NoCopy {
 
   /// @brief Optional BSH tree to accelerate collision detection by culling only sample points that
   /// are potentially in contact.
-  std::optional<ContactSamplesBvh<Sphere>> bsh;
+  std::optional<SphereOctTree> bsh;
 };
 
 /**
@@ -1141,7 +1102,7 @@ void AssembleIslandSyncContact(
 // Assemble async contact for a single colliding actor whose contact samples are tied to its DoFs
 // through skinning/embedding (i.e. it carries CSkinnedContactSnle). Currently used for articulated
 // actors with skinned contact meshes, nested soft actors configured as colliding actors, and rod
-// actors that use visual-mesh contact. Results are written to CSkinnedContactSnle.
+// actors that use contact-skin surface contact. Results are written to CSkinnedContactSnle.
 void AssembleAsyncSkinnedContact(
     AssemblyParams const& params,
     bool useBlockSparse3x3,
@@ -1161,10 +1122,7 @@ void AssembleAsyncSkinnedContact(
 
 Aabb ExpandConservativeBoundsWithContactPadding(
     Aabb bounds,
-    ecs::PartialRegistry<
-        CContactParams const,
-        CRequiresFarSdfEvaluation const,
-        CPointCloudColliderParams const> reg,
+    ecs::PartialRegistry<CContactParams const, CRequiresFarSdfEvaluation const> reg,
     entt::entity e);
 
 inline real GetColliderPadding(ContactParams const& contactParams) {

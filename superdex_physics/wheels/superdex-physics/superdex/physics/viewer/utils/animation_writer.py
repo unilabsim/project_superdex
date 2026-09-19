@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import pathlib
 import threading
 
 import imageio
 import numpy as np
 import numpy.typing as npt
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 ########################################################################################
 
@@ -43,6 +46,7 @@ class AnimationWriter:
     _fps: int
     _fmt: str
     _jobs: list[threading.Thread]
+    _errors: list[Exception]
 
     ####################################################################################
     # Constructor
@@ -61,10 +65,23 @@ class AnimationWriter:
         self._fps = fps
         self._fmt = fmt
         self._jobs = []
+        self._errors = []
 
     def __del__(self) -> None:
-        """Flush the animations to disk before the object is destroyed."""
-        self.flush()
+        """Best-effort flush on garbage collection.
+
+        ``__del__`` cannot propagate exceptions -- Python only prints "Exception ignored
+        in __del__" -- so this joins the writer threads without re-raising. Callers that
+        need to observe encoding/filesystem failures must call ``flush()`` explicitly.
+        """
+        self._join_writers()
+        if self._errors:
+            logger.error(
+                "%d animation writer error(s) ignored during __del__: %s",
+                len(self._errors),
+                "; ".join(str(error) for error in self._errors),
+            )
+            self._errors = []
 
     ####################################################################################
     # Methods
@@ -114,7 +131,12 @@ class AnimationWriter:
 
         # Prepare arguments to the writer thread.
         fpath = self._output_path / f"{name}.{self._fmt}"
-        args = {"fpath": fpath, "images": list(self._images), "fps": self._fps}
+        args = {
+            "fpath": fpath,
+            "images": list(self._images),
+            "fps": self._fps,
+            "errors": self._errors,
+        }
         self._images = []
 
         # Spawn the writer thread, remove finished jobs, and run the new thread.
@@ -123,15 +145,27 @@ class AnimationWriter:
         self._jobs.append(thread)
         thread.start()
 
-    def flush(self) -> None:
-        """
-        Flushes the animations to disk. This function blocks until all animations have
-        been written to disk.
-        """
+    def _join_writers(self) -> None:
+        """Block until every writer thread has finished; does not raise."""
         for thread in self._jobs:
             if thread.is_alive():
                 thread.join()
         self._jobs = []
+
+    def flush(self) -> None:
+        """
+        Flushes the animations to disk. This function blocks until all animations have
+        been written to disk, then re-raises writer-thread errors so an encoding or
+        filesystem failure is surfaced instead of silently swallowed. All collected
+        errors are reported (as an ``ExceptionGroup`` when more than one writer failed).
+        """
+        self._join_writers()
+        if self._errors:
+            errors = self._errors
+            self._errors = []
+            if len(errors) == 1:
+                raise errors[0]
+            raise ExceptionGroup("Animation writer failed", errors)
 
     def has_frames(self) -> bool:
         """Returns true if the animation writer has any frames to write."""
@@ -142,6 +176,14 @@ class AnimationWriter:
 
     @staticmethod
     def _write_image_to_disk(
-        fpath: pathlib.Path, images: list[npt.NDArray], fps: int
+        fpath: pathlib.Path,
+        images: list[npt.NDArray],
+        fps: int,
+        errors: list[Exception],
     ) -> None:
-        imageio.mimsave(uri=str(fpath), ims=images, fps=fps)
+        # Runs on a worker thread; capture failures so flush() can re-raise them on the
+        # calling thread instead of letting them die silently in the worker.
+        try:
+            imageio.mimsave(uri=str(fpath), ims=images, fps=fps)
+        except Exception as error:
+            errors.append(error)

@@ -17,8 +17,10 @@
 #pragma once
 #include <superdex_physics.h>
 #include <superdex_robotics/superdex_robotics.h>
-#if MOCHI_INTERNAL
+#if SUPERDEXROBOTICS_WITH_BOT_SCENE
 #include <superdex_robotics/internal/bot_scene.h>
+#endif
+#if MOCHI_INTERNAL
 #include <superdex_robotics/internal/internal.h>
 #endif
 
@@ -563,7 +565,7 @@ SaveToFile(ModBotPrefab const& modBotPrefab, std::string_view path, superdex::Er
 // BotScenePrefab
 // ---------------------------------------------------------------------------
 
-#if MOCHI_INTERNAL
+#if SUPERDEXROBOTICS_WITH_BOT_SCENE
 /* @brief Save bot scene prefab to a .mochi_bot_scene JSON file.
  *
  * Creates parent directories if they do not exist.
@@ -573,7 +575,7 @@ SaveToFile(ModBotPrefab const& modBotPrefab, std::string_view path, superdex::Er
  * @param[in,out] error Error status. */
 MOCHI_API void
 SaveToFile(BotScenePrefab const& scenePrefab, std::string_view path, superdex::Error& error);
-#endif // MOCHI_INTERNAL
+#endif // SUPERDEXROBOTICS_WITH_BOT_SCENE
 
 // ---------------------------------------------------------------------------
 // URDF

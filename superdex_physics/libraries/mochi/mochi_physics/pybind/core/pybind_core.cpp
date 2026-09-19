@@ -16,6 +16,7 @@
 
 #include "pybind_core.h"
 
+#include <mochi_core/utils/guarded.h>
 #include <mochi_core/utils/log.h>
 
 #include <exception>
@@ -30,34 +31,43 @@ namespace mochi {
 MochiErrorException::~MochiErrorException() = default;
 
 namespace {
-Context* g_context = nullptr;
-} // namespace
+Guarded<Context*> g_context{nullptr};
 
-void InitGlobalContext(int numWorkerThreads) {
-  if (g_context) {
-    throw std::runtime_error("Mochi has already been initialized.");
-  }
-  g_context = mochi::CreateContext(numWorkerThreads);
-}
-
-Context* GetContext() {
-  return g_context;
-}
-
-void DestroyGlobalContext() {
-  if (!g_context) {
+void DestroyGlobalContextLocked(Context*& context) {
+  if (!context) {
     throw std::runtime_error("Mochi is not currently initialized.");
   }
   // Before destroying the context, clear the log callback. It may hold a reference to a
   // Python function that the user didn't release; otherwise, the interpreter can crash on exit
   // with: "Fatal Python error: gilstate_tss_set: failed to set current tstate (TSS)".
-  g_context->SetLogCallback(nullptr);
-  mochi::DestroyContext(g_context);
-  g_context = nullptr;
+  context->SetLogCallback(nullptr);
+  mochi::DestroyContext(context);
+  context = nullptr;
+}
+} // namespace
+
+void InitGlobalContext(int numWorkerThreads) {
+  g_context.Mutate([numWorkerThreads](Context*& context) {
+    if (context) {
+      throw std::runtime_error("Mochi has already been initialized.");
+    }
+    context = mochi::CreateContext(numWorkerThreads);
+  });
+}
+
+Context* GetContext() {
+  // Shutdown holds this guard while dependent teardown callbacks run. Those callbacks may query
+  // the still-live context, so this snapshot remains lock-free under the documented requirement
+  // that lifecycle operations do not race ordinary binding calls.
+  return g_context.UnsafeRead([](Context* context) { return context; });
+}
+
+void DestroyGlobalContext() {
+  g_context.Mutate(DestroyGlobalContextLocked);
 }
 
 void CheckContext() {
-  if (!g_context) {
+  if (!GetContext()) {
     throw std::runtime_error("Please call mochi.initialize(num_worker_threads) first.");
   }
 }
@@ -65,18 +75,20 @@ void CheckContext() {
 namespace {
 // Function-local static so registration works regardless of static-initialization order across
 // the shared-library boundary. Intentionally never cleared (see RegisterContextDependent).
-std::vector<std::function<void()>>& ContextDependents() {
-  static std::vector<std::function<void()>> dependents;
+Guarded<std::vector<std::function<void()>>>& ContextDependents() {
+  static Guarded<std::vector<std::function<void()>>> dependents;
   return dependents;
 }
 } // namespace
 
 void RegisterContextDependent(std::function<void()> teardown) {
-  ContextDependents().push_back(std::move(teardown));
+  ContextDependents().Mutate([&teardown](std::vector<std::function<void()>>& dependents) {
+    dependents.push_back(std::move(teardown));
+  });
 }
 
 void RunContextDependentTeardowns() {
-  auto& dependents = ContextDependents();
+  auto dependents = ContextDependents().Load();
   for (auto it = dependents.rbegin(); it != dependents.rend(); ++it) {
     try {
       (*it)();
@@ -89,8 +101,10 @@ void RunContextDependentTeardowns() {
 }
 
 void ShutdownGlobalContext() {
-  RunContextDependentTeardowns();
-  DestroyGlobalContext();
+  g_context.Mutate([](Context*& context) {
+    RunContextDependentTeardowns();
+    DestroyGlobalContextLocked(context);
+  });
 }
 
 } // namespace mochi

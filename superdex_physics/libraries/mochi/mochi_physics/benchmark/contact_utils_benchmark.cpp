@@ -497,28 +497,11 @@ struct DummyPlaneBv {
   real y = 0_r;
 };
 
-// Single overlap test for BvTree
-MOCHI_FORCE_INLINE bool HasOverlap(DummyPlaneBv const& planeBv, Sphere const& sphere) {
-  return sphere.GetCenter()[1] + sphere.GetRadius() >= planeBv.y;
-}
-
 template <int kBatchSize>
-MOCHI_FORCE_INLINE Simd<real, kBatchSize> HasOverlap(
+static MOCHI_FORCE_INLINE Simd<real, kBatchSize> HasOverlap(
     DummyPlaneBv const& planeBv,
     BatchSphere<kBatchSize> const& sphere) {
   return (sphere.center[1] + sphere.radius) >= planeBv.y;
-}
-
-// Batch overlap test for BvhTree
-template <int kMaxBatchSize>
-void HasOverlapBatch(
-    int batchSize,
-    DummyPlaneBv const& planeBv,
-    Span<Sphere const> spheres,
-    Span<bool> outHasOverlap) {
-  for (int i = 0; i < batchSize; ++i) {
-    outHasOverlap[i] = spheres[i].GetCenter()[1] + spheres[i].GetRadius() >= planeBv.y;
-  }
 }
 
 } // namespace
@@ -560,40 +543,24 @@ static void BenchmarkFindIntersectingSamples_Bsh(
 static void FindIntersectingSamples_Mesh_vs_Bsh(
     benchmark::State& state,
     std::string_view meshPath,
-    real percentVolumeOverlap,
-    bool useNewBsh) {
+    real percentVolumeOverlap) {
   auto* context = mochi::CreateContext(0);
   MOCHI_DEFER(mochi::DestroyContext(context));
   auto positions = GetSamplesPositionsFromMesh(context, meshPath);
-  if (useNewBsh) {
-    // (kMaxPerLeaf == 8) matches the behavior of ContactSamplesBvh, making it a fair comparison.
-    int constexpr kMaxPerLeaf = 8;
-    auto bsh = SphereTree<8>::FromPoints(positions, kMaxPerLeaf);
-    BenchmarkFindIntersectingSamples_Bsh(state, bsh, positions, percentVolumeOverlap);
-  } else {
-    ContactSamplesBvh<Sphere> bsh(positions);
-    BenchmarkFindIntersectingSamples_Bsh(state, bsh, positions, percentVolumeOverlap);
-  }
+  int constexpr kMaxPerLeaf = 8;
+  auto bsh = SphereTree<8>::FromPoints(positions, kMaxPerLeaf);
+  BenchmarkFindIntersectingSamples_Bsh(state, bsh, positions, percentVolumeOverlap);
 }
 
 // clang-format off
-BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct00, kMeshPath, 0.00_r, false)->Name("FindIntersectingSamples/MeshVsBsh/OverlapPct00");
-BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct01, kMeshPath, 0.01_r, false)->Name("FindIntersectingSamples/MeshVsBsh/OverlapPct01");
-BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct05, kMeshPath, 0.05_r, false)->Name("FindIntersectingSamples/MeshVsBsh/OverlapPct05");
-BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct10, kMeshPath, 0.1_r, false)->Name("FindIntersectingSamples/MeshVsBsh/OverlapPct10");
-BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct25, kMeshPath, 0.25_r, false)->Name("FindIntersectingSamples/MeshVsBsh/OverlapPct25");
-BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct50, kMeshPath, 0.5_r, false)->Name("FindIntersectingSamples/MeshVsBsh/OverlapPct50");
-BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct75, kMeshPath, 0.75_r, false)->Name("FindIntersectingSamples/MeshVsBsh/OverlapPct75");
-BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct100, kMeshPath, 1.0_r, false)->Name("FindIntersectingSamples/MeshVsBsh/OverlapPct100");
-
-BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct00, kMeshPath, 0.00_r, true)->Name("FindIntersectingSamples/MeshVsBshNew/OverlapPct00");
-BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct01, kMeshPath, 0.01_r, true)->Name("FindIntersectingSamples/MeshVsBshNew/OverlapPct01");
-BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct05, kMeshPath, 0.05_r, true)->Name("FindIntersectingSamples/MeshVsBshNew/OverlapPct05");
-BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct10, kMeshPath, 0.1_r, true)->Name("FindIntersectingSamples/MeshVsBshNew/OverlapPct10");
-BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct25, kMeshPath, 0.25_r, true)->Name("FindIntersectingSamples/MeshVsBshNew/OverlapPct25");
-BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct50, kMeshPath, 0.5_r, true)->Name("FindIntersectingSamples/MeshVsBshNew/OverlapPct50");
-BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct75, kMeshPath, 0.75_r, true)->Name("FindIntersectingSamples/MeshVsBshNew/OverlapPct75");
-BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct100, kMeshPath, 1.0_r, true)->Name("FindIntersectingSamples/MeshVsBshNew/OverlapPct100");
+BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct00, kMeshPath, 0.00_r)->Name("FindIntersectingSamples/MeshVsBsh/OverlapPct00");
+BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct01, kMeshPath, 0.01_r)->Name("FindIntersectingSamples/MeshVsBsh/OverlapPct01");
+BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct05, kMeshPath, 0.05_r)->Name("FindIntersectingSamples/MeshVsBsh/OverlapPct05");
+BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct10, kMeshPath, 0.1_r)->Name("FindIntersectingSamples/MeshVsBsh/OverlapPct10");
+BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct25, kMeshPath, 0.25_r)->Name("FindIntersectingSamples/MeshVsBsh/OverlapPct25");
+BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct50, kMeshPath, 0.5_r)->Name("FindIntersectingSamples/MeshVsBsh/OverlapPct50");
+BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct75, kMeshPath, 0.75_r)->Name("FindIntersectingSamples/MeshVsBsh/OverlapPct75");
+BENCHMARK_CAPTURE(FindIntersectingSamples_Mesh_vs_Bsh, FindIntersectingSamples_Mesh_vs_Bsh_OverlapPct100, kMeshPath, 1.0_r)->Name("FindIntersectingSamples/MeshVsBsh/OverlapPct100");
 // clang-format on
 
 // This benchmark uses both BSH culling and an SDF collider, similar to the actual code in
@@ -602,8 +569,7 @@ static void BenchmarkFindPointContact_SdfWithBsh(
     benchmark::State& state,
     GridSdf const* sdf,
     Span<Real3 const> positions,
-    real percentVolumeOverlap,
-    bool useNewBsh) {
+    real percentVolumeOverlap) {
   MOCHI_ASSERT(sdf != nullptr);
 
   // Adjust points based on percentVolumeOverlap (same as existing SDF benchmark)
@@ -615,10 +581,8 @@ static void BenchmarkFindPointContact_SdfWithBsh(
   }
 
   // Build BSH from adjusted points
-  ContactSamplesBvh<Sphere> bsh(adjustedPoints);
-
   int constexpr kMaxPerLeaf = 16;
-  auto bsh2 = SphereTree<8>::FromPoints(adjustedPoints, kMaxPerLeaf);
+  auto bsh = SphereTree<8>::FromPoints(adjustedPoints, kMaxPerLeaf);
 
   ContactDetectionParams cdParams;
   // Match the fine-contact tolerance so culling cannot reject valid contacts.
@@ -662,11 +626,7 @@ static void BenchmarkFindPointContact_SdfWithBsh(
 
   std::function<void()> const benchmarkIteration = [&]() {
     // Step 1: BSH culling
-    if (useNewBsh) {
-      bsh2.FindIntersectingSamples(sdfBv, culledIndices);
-    } else {
-      bsh.FindIntersectingSamples(sdfBv, culledIndices);
-    }
+    bsh.FindIntersectingSamples(sdfBv, culledIndices);
 
     // Step 2: Gather culled positions
     culledPositions.resize_noinit(culledIndices.size());
@@ -716,8 +676,7 @@ static void BenchmarkFindPointContact_SdfWithBsh(
 static void FindPointContacts_Mesh_vs_SdfWithBsh(
     benchmark::State& state,
     std::string_view meshPath,
-    real percentVolumeOverlap,
-    bool useNewBsh) {
+    real percentVolumeOverlap) {
   // Create multi-threaded context for SDF construction
   auto* context = mochi::CreateContext(TaskScheduler::GetNumSupportedPhysicalProcessors());
   MOCHI_DEFER(mochi::DestroyContext(context));
@@ -730,26 +689,18 @@ static void FindPointContacts_Mesh_vs_SdfWithBsh(
 
   context->SetIsSingleThreaded(true); // Benchmark is single-threaded
   BenchmarkFindPointContact_SdfWithBsh(
-      state, static_cast<GridSdf const*>(s_sdf.get()), positions, percentVolumeOverlap, useNewBsh);
+      state, static_cast<GridSdf const*>(s_sdf.get()), positions, percentVolumeOverlap);
 }
 
 // clang-format off
-BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBsh_OverlapPct00, kMeshPath, 0.00_r, false)->Name("FindPointContacts/MeshVsSdfWithBsh/OverlapPct00");
-BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBsh_OverlapPct01, kMeshPath, 0.01_r, false)->Name("FindPointContacts/MeshVsSdfWithBsh/OverlapPct01");
-BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBsh_OverlapPct05, kMeshPath, 0.05_r, false)->Name("FindPointContacts/MeshVsSdfWithBsh/OverlapPct05");
-BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBsh_OverlapPct10, kMeshPath, 0.1_r, false)->Name("FindPointContacts/MeshVsSdfWithBsh/OverlapPct10");
-BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBsh_OverlapPct25, kMeshPath, 0.25_r, false)->Name("FindPointContacts/MeshVsSdfWithBsh/OverlapPct25");
-BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBsh_OverlapPct50, kMeshPath, 0.5_r, false)->Name("FindPointContacts/MeshVsSdfWithBsh/OverlapPct50");
-BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBsh_OverlapPct75, kMeshPath, 0.75_r, false)->Name("FindPointContacts/MeshVsSdfWithBsh/OverlapPct75");
-BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBsh_OverlapPct100, kMeshPath, 1.0_r, false)->Name("FindPointContacts/MeshVsSdfWithBsh/OverlapPct100");
-BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBshNew_OverlapPct00, kMeshPath, 0.00_r, true)->Name("FindPointContacts/MeshVsSdfWithBshNew/OverlapPct00");
-BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBshNew_OverlapPct01, kMeshPath, 0.01_r, true)->Name("FindPointContacts/MeshVsSdfWithBshNew/OverlapPct01");
-BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBshNew_OverlapPct05, kMeshPath, 0.05_r, true)->Name("FindPointContacts/MeshVsSdfWithBshNew/OverlapPct05");
-BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBshNew_OverlapPct10, kMeshPath, 0.1_r, true)->Name("FindPointContacts/MeshVsSdfWithBshNew/OverlapPct10");
-BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBshNew_OverlapPct25, kMeshPath, 0.25_r, true)->Name("FindPointContacts/MeshVsSdfWithBshNew/OverlapPct25");
-BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBshNew_OverlapPct50, kMeshPath, 0.5_r, true)->Name("FindPointContacts/MeshVsSdfWithBshNew/OverlapPct50");
-BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBshNew_OverlapPct75, kMeshPath, 0.75_r, true)->Name("FindPointContacts/MeshVsSdfWithBshNew/OverlapPct75");
-BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBshNew_OverlapPct100, kMeshPath, 1.0_r, true)->Name("FindPointContacts/MeshVsSdfWithBshNew/OverlapPct100");
+BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBsh_OverlapPct00, kMeshPath, 0.00_r)->Name("FindPointContacts/MeshVsSdfWithBsh/OverlapPct00");
+BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBsh_OverlapPct01, kMeshPath, 0.01_r)->Name("FindPointContacts/MeshVsSdfWithBsh/OverlapPct01");
+BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBsh_OverlapPct05, kMeshPath, 0.05_r)->Name("FindPointContacts/MeshVsSdfWithBsh/OverlapPct05");
+BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBsh_OverlapPct10, kMeshPath, 0.1_r)->Name("FindPointContacts/MeshVsSdfWithBsh/OverlapPct10");
+BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBsh_OverlapPct25, kMeshPath, 0.25_r)->Name("FindPointContacts/MeshVsSdfWithBsh/OverlapPct25");
+BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBsh_OverlapPct50, kMeshPath, 0.5_r)->Name("FindPointContacts/MeshVsSdfWithBsh/OverlapPct50");
+BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBsh_OverlapPct75, kMeshPath, 0.75_r)->Name("FindPointContacts/MeshVsSdfWithBsh/OverlapPct75");
+BENCHMARK_CAPTURE(FindPointContacts_Mesh_vs_SdfWithBsh, FindPointContacts_MeshVsSdfWithBsh_OverlapPct100, kMeshPath, 1.0_r)->Name("FindPointContacts/MeshVsSdfWithBsh/OverlapPct100");
 // clang-format on
 
 #endif // MOCHI_INTERNAL

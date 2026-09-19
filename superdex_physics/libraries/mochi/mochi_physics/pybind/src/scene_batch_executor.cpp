@@ -28,6 +28,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <new>
 #include <optional>
 #include <stdexcept>
 #include <thread>
@@ -40,7 +41,15 @@
 namespace mochi {
 namespace {
 
-namespace py = pybind11;
+namespace nb = nanobind;
+
+using RealArray = nb::ndarray<nb::numpy, real, nb::c_contig, nb::device::cpu>;
+using RealConstArray =
+    nb::ndarray<nb::numpy, real const, nb::c_contig, nb::device::cpu>;
+using IntConstArray =
+    nb::ndarray<nb::numpy, int const, nb::c_contig, nb::device::cpu>;
+using Uint8Array =
+    nb::ndarray<nb::numpy, uint8_t, nb::c_contig, nb::device::cpu>;
 
 class SceneBatchExecutor {
 public:
@@ -52,24 +61,24 @@ public:
   static constexpr uint32_t kReadAll = kReadQpos | kReadQvel | kReadLinks |
                                         kReadContacts | kReadDiverged;
 
-  SceneBatchExecutor(py::sequence scenes, py::sequence actors,
-                     py::sequence links, py::sequence contactSources,
-                     py::sequence contactOthers, py::sequence contactKinds,
-                     py::sequence contactDistances, size_t numWorkers) {
+  SceneBatchExecutor(nb::sequence scenes, nb::sequence actors,
+                     nb::sequence links, nb::sequence contactSources,
+                     nb::sequence contactOthers, nb::sequence contactKinds,
+                     nb::sequence contactDistances, size_t numWorkers) {
     CheckContext();
     if (numWorkers == 0) {
       throw std::invalid_argument(
           "SceneBatchExecutor requires num_workers >= 1");
     }
-    if (py::len(scenes) == 0 || py::len(scenes) != py::len(actors) ||
-        py::len(scenes) != py::len(links) ||
-        py::len(scenes) != py::len(contactSources) ||
-        py::len(scenes) != py::len(contactOthers)) {
+    if (nb::len(scenes) == 0 || nb::len(scenes) != nb::len(actors) ||
+        nb::len(scenes) != nb::len(links) ||
+        nb::len(scenes) != nb::len(contactSources) ||
+        nb::len(scenes) != nb::len(contactOthers)) {
       throw std::invalid_argument(
           "scenes, actors, links, contact_sources, and contact_others must be "
           "non-empty and have equal length");
     }
-    numWorkers = std::min(numWorkers, static_cast<size_t>(py::len(scenes)));
+    numWorkers = std::min(numWorkers, static_cast<size_t>(nb::len(scenes)));
     if (GetContext()->GetNumThreads() != 0) {
       throw std::invalid_argument(
           "SceneBatchExecutor requires initialize(num_worker_threads=0); "
@@ -81,13 +90,13 @@ public:
     int dofCount = -1;
     int linkCount = -1;
     int contactCount = -1;
-    if (py::len(contactKinds) != py::len(contactDistances)) {
+    if (nb::len(contactKinds) != nb::len(contactDistances)) {
       throw std::invalid_argument(
           "contact_kinds and contact_distances must have equal length");
     }
-    for (size_t i = 0; i < static_cast<size_t>(py::len(contactKinds)); ++i) {
-      auto kind = py::cast<int>(contactKinds[i]);
-      auto distance = py::cast<double>(contactDistances[i]);
+    for (size_t i = 0; i < static_cast<size_t>(nb::len(contactKinds)); ++i) {
+      auto kind = nb::cast<int>(contactKinds[i]);
+      auto distance = nb::cast<double>(contactDistances[i]);
       if (kind < 0 || kind > 2 || !std::isfinite(distance) || distance < 0) {
         throw std::invalid_argument(
             "contact kinds must be 0..2 and distances finite/non-negative");
@@ -95,9 +104,9 @@ public:
       _contactKinds.push_back(kind);
       _contactDistances.push_back(static_cast<real>(distance));
     }
-    for (size_t i = 0; i < static_cast<size_t>(py::len(scenes)); ++i) {
-      auto scene = py::cast<Scene *>(scenes[i]);
-      auto actor = py::cast<Actor *>(actors[i]);
+    for (size_t i = 0; i < static_cast<size_t>(nb::len(scenes)); ++i) {
+      auto scene = nb::cast<Scene *>(scenes[i]);
+      auto actor = nb::cast<Actor *>(actors[i]);
       if (!scene || !actor || scene->GetContext() != GetContext() ||
           actor->GetContext() != GetContext() || actor->GetScene() != scene) {
         throw std::invalid_argument(
@@ -121,17 +130,17 @@ public:
       _scenes.push_back(scene);
       _actors.push_back(actor);
 
-      auto sceneLinks = py::cast<py::sequence>(links[i]);
+      auto sceneLinks = nb::cast<nb::sequence>(links[i]);
       if (linkCount < 0) {
-        linkCount = static_cast<int>(py::len(sceneLinks));
-      } else if (static_cast<int>(py::len(sceneLinks)) != linkCount) {
+        linkCount = static_cast<int>(nb::len(sceneLinks));
+      } else if (static_cast<int>(nb::len(sceneLinks)) != linkCount) {
         throw std::invalid_argument("all link actor lists must have equal length");
       }
       std::vector<Actor *> nativeLinks;
-      nativeLinks.reserve(static_cast<size_t>(py::len(sceneLinks)));
-      for (size_t linkIndex = 0; linkIndex < static_cast<size_t>(py::len(sceneLinks));
+      nativeLinks.reserve(static_cast<size_t>(nb::len(sceneLinks)));
+      for (size_t linkIndex = 0; linkIndex < static_cast<size_t>(nb::len(sceneLinks));
            ++linkIndex) {
-        auto link = py::cast<Actor *>(sceneLinks[linkIndex]);
+        auto link = nb::cast<Actor *>(sceneLinks[linkIndex]);
         if (!link || link->GetScene() != scene) {
           throw std::invalid_argument("link actors must belong to their scene");
         }
@@ -139,11 +148,11 @@ public:
       }
       _links.push_back(std::move(nativeLinks));
 
-      auto sceneSources = py::cast<py::sequence>(contactSources[i]);
-      auto sceneOthers = py::cast<py::sequence>(contactOthers[i]);
-      if (static_cast<int>(py::len(sceneSources)) !=
+      auto sceneSources = nb::cast<nb::sequence>(contactSources[i]);
+      auto sceneOthers = nb::cast<nb::sequence>(contactOthers[i]);
+      if (static_cast<int>(nb::len(sceneSources)) !=
               static_cast<int>(_contactKinds.size()) ||
-          py::len(sceneSources) != py::len(sceneOthers)) {
+          nb::len(sceneSources) != nb::len(sceneOthers)) {
         throw std::invalid_argument(
             "each contact source/other list must match contact_kinds");
       }
@@ -153,7 +162,7 @@ public:
       nativeOthers.reserve(_contactKinds.size());
       for (size_t contactIndex = 0; contactIndex < _contactKinds.size();
            ++contactIndex) {
-        auto source = py::cast<Actor *>(sceneSources[contactIndex]);
+        auto source = nb::cast<Actor *>(sceneSources[contactIndex]);
         if (!source || source->GetScene() != scene) {
           throw std::invalid_argument("contact sources must belong to their scene");
         }
@@ -161,7 +170,7 @@ public:
         if (sceneOthers[contactIndex].is_none()) {
           nativeOthers.push_back(nullptr);
         } else {
-          auto other = py::cast<Actor *>(sceneOthers[contactIndex]);
+          auto other = nb::cast<Actor *>(sceneOthers[contactIndex]);
           if (!other || other->GetScene() != scene) {
             throw std::invalid_argument("contact actors must belong to their scene");
           }
@@ -221,9 +230,9 @@ public:
   [[nodiscard]] bool IsClosed() const { return _closed; }
 
   void Step(double timeStepSec,
-            py::array_t<real, py::array::c_style> generalizedForces,
-            py::object qposOut, py::object qvelOut, py::object linkStateOut,
-            py::object contactOut, py::object divergedOut,
+            RealConstArray generalizedForces,
+            nb::object qposOut, nb::object qvelOut, nb::object linkStateOut,
+            nb::object contactOut, nb::object divergedOut,
             uint32_t readbackMask) {
     CheckContext();
     if (!std::isfinite(timeStepSec) || timeStepSec < 0) {
@@ -256,16 +265,16 @@ public:
     }
 
     auto const *forceData = generalizedForces.data();
-    auto *qposData = qpos ? qpos->mutable_data() : nullptr;
-    auto *qvelData = qvel ? qvel->mutable_data() : nullptr;
-    auto *linkStateData = links ? links->mutable_data() : nullptr;
-    auto *contactData = contacts ? contacts->mutable_data() : nullptr;
-    auto *divergedData = diverged ? diverged->mutable_data() : nullptr;
+    auto *qposData = qpos ? qpos->data() : nullptr;
+    auto *qvelData = qvel ? qvel->data() : nullptr;
+    auto *linkStateData = links ? links->data() : nullptr;
+    auto *contactData = contacts ? contacts->data() : nullptr;
+    auto *divergedData = diverged ? diverged->data() : nullptr;
     std::exception_ptr failure;
     {
       // Keep all pybind arrays alive with the GIL held. Only the pure C++
       // scheduler barrier may execute without it.
-      py::gil_scoped_release release;
+      nb::gil_scoped_release release;
       failure = DispatchAndWait(timeStepSec, forceData, qposData, qvelData,
                                 linkStateData, contactData, divergedData,
                                 readbackMask);
@@ -275,26 +284,26 @@ public:
     }
   }
 
-  void StepControl(double timeStepSec, py::array_t<real, py::array::c_style> controls,
-                   py::array_t<int, py::array::c_style> qposIndices,
-                   py::array_t<int, py::array::c_style> qvelIndices,
-                   py::array_t<real, py::array::c_style> kp,
-                   py::array_t<real, py::array::c_style> kd,
-                   py::array_t<real, py::array::c_style> gear,
-                   py::array_t<real, py::array::c_style> forceRanges,
-                   int numSteps, py::object qposOut, py::object qvelOut,
-                   py::object linkStateOut, py::object contactOut,
-                   py::object divergedOut, uint32_t readbackMask) {
+  void StepControl(double timeStepSec, RealConstArray controls,
+                   IntConstArray qposIndices,
+                   IntConstArray qvelIndices,
+                   RealConstArray kp,
+                   RealConstArray kd,
+                   RealConstArray gear,
+                   RealConstArray forceRanges,
+                   int numSteps, nb::object qposOut, nb::object qvelOut,
+                   nb::object linkStateOut, nb::object contactOut,
+                   nb::object divergedOut, uint32_t readbackMask) {
     CheckContext();
     if (numSteps < 1 || !std::isfinite(timeStepSec) || timeStepSec < 0) {
       throw std::invalid_argument("step_control requires positive num_steps and finite dt");
     }
-    if (controls.ndim() != 2 || controls.shape(0) != static_cast<py::ssize_t>(_scenes.size())) {
+    if (controls.ndim() != 2 || controls.shape(0) != static_cast<size_t>(_scenes.size())) {
       throw std::invalid_argument("controls must have shape [num_scenes, num_actuators]");
     }
     auto const actuatorCount = static_cast<size_t>(controls.shape(1));
     auto validateVector = [actuatorCount](char const *name, auto const &array) {
-      if (array.ndim() != 1 || array.shape(0) != static_cast<py::ssize_t>(actuatorCount)) {
+      if (array.ndim() != 1 || array.shape(0) != static_cast<size_t>(actuatorCount)) {
         throw std::invalid_argument(std::string(name) + " must have shape [num_actuators]");
       }
     };
@@ -303,16 +312,16 @@ public:
     validateVector("kp", kp);
     validateVector("kd", kd);
     validateVector("gear", gear);
-    if (forceRanges.ndim() != 2 || forceRanges.shape(0) != static_cast<py::ssize_t>(actuatorCount) ||
+    if (forceRanges.ndim() != 2 || forceRanges.shape(0) != static_cast<size_t>(actuatorCount) ||
         forceRanges.shape(1) != 2) {
       throw std::invalid_argument("force_ranges must have shape [num_actuators, 2]");
     }
     for (size_t i = 0; i < actuatorCount; ++i) {
-      auto const q = qposIndices.at(i), v = qvelIndices.at(i);
+      auto const q = qposIndices.data()[i], v = qvelIndices.data()[i];
       if (q < 0 || q >= _dofCount || v < 0 || v >= _dofCount ||
-          !std::isfinite(kp.at(i)) || !std::isfinite(kd.at(i)) ||
-          !std::isfinite(gear.at(i)) || !std::isfinite(forceRanges.at(i, 0)) ||
-          !std::isfinite(forceRanges.at(i, 1)) || forceRanges.at(i, 0) > forceRanges.at(i, 1)) {
+          !std::isfinite(kp.data()[i]) || !std::isfinite(kd.data()[i]) ||
+          !std::isfinite(gear.data()[i]) || !std::isfinite(forceRanges.data()[2 * i + 0]) ||
+          !std::isfinite(forceRanges.data()[2 * i + 1]) || forceRanges.data()[2 * i + 0] > forceRanges.data()[2 * i + 1]) {
         throw std::invalid_argument("invalid actuator control metadata");
       }
     }
@@ -325,13 +334,13 @@ public:
     std::unique_lock callLock(_callMutex);
     if (_closed) throw std::runtime_error("SceneBatchExecutor is closed");
     auto const *controlData = controls.data();
-    auto *qposData = qpos ? qpos->mutable_data() : nullptr;
-    auto *qvelData = qvel ? qvel->mutable_data() : nullptr;
-    auto *linkData = links ? links->mutable_data() : nullptr;
-    auto *contactData = contacts ? contacts->mutable_data() : nullptr;
-    auto *divergedData = diverged ? diverged->mutable_data() : nullptr;
+    auto *qposData = qpos ? qpos->data() : nullptr;
+    auto *qvelData = qvel ? qvel->data() : nullptr;
+    auto *linkData = links ? links->data() : nullptr;
+    auto *contactData = contacts ? contacts->data() : nullptr;
+    auto *divergedData = diverged ? diverged->data() : nullptr;
     {
-      py::gil_scoped_release release;
+      nb::gil_scoped_release release;
       {
         std::lock_guard lock(_mutex);
         _controlMode = true;
@@ -540,11 +549,11 @@ private:
     }
   }
 
-  void ValidateArray(char const *name,
-                     py::array_t<real, py::array::c_style> const &array,
+  template <typename Array>
+  void ValidateArray(char const *name, Array const &array,
                      int ndim = 2, int dim1 = -1, int dim2 = -1) const {
     if (array.ndim() != ndim ||
-        array.shape(0) != static_cast<py::ssize_t>(_scenes.size()) ||
+        array.shape(0) != static_cast<size_t>(_scenes.size()) ||
         (ndim == 2 && array.shape(1) != _dofCount) ||
         (ndim == 3 && (array.shape(1) != dim1 || array.shape(2) != dim2))) {
       throw std::invalid_argument(
@@ -559,17 +568,17 @@ private:
     }
   }
 
-  void ValidateVector(char const *name,
-                      py::array_t<uint8_t, py::array::c_style> const &array) const {
+  template <typename Array>
+  void ValidateVector(char const *name, Array const &array) const {
     if (array.ndim() != 1 ||
-        array.shape(0) != static_cast<py::ssize_t>(_scenes.size())) {
+        array.shape(0) != static_cast<size_t>(_scenes.size())) {
       throw std::invalid_argument(std::string(name) +
                                   " must have shape [num_scenes]");
     }
   }
 
-  std::optional<py::array_t<real, py::array::c_style>> RequireArray(
-      char const *name, py::object const &object, bool requested, int ndim = 2,
+  std::optional<RealArray> RequireArray(
+      char const *name, nb::object const &object, bool requested, int ndim = 2,
       int dim1 = -1, int dim2 = -1) const {
     if (!requested) {
       if (!object.is_none()) {
@@ -583,13 +592,13 @@ private:
       throw std::invalid_argument(std::string(name) +
                                   " is required by readback_mask");
     }
-    auto array = object.cast<py::array_t<real, py::array::c_style>>();
+    auto array = nb::cast<RealArray>(object);
     ValidateArray(name, array, ndim, dim1, dim2);
     return array;
   }
 
-  std::optional<py::array_t<uint8_t, py::array::c_style>> RequireVector(
-      char const *name, py::object const &object, bool requested) const {
+  std::optional<Uint8Array> RequireVector(
+      char const *name, nb::object const &object, bool requested) const {
     if (!requested) {
       if (!object.is_none()) {
         throw std::invalid_argument(std::string(name) +
@@ -601,7 +610,7 @@ private:
       throw std::invalid_argument(std::string(name) +
                                   " is required by readback_mask");
     }
-    auto array = object.cast<py::array_t<uint8_t, py::array::c_style>>();
+    auto array = nb::cast<Uint8Array>(object);
     ValidateVector(name, array);
     return array;
   }
@@ -691,88 +700,110 @@ private:
 
 } // namespace
 
-void DefineSceneBatchExecutor(py::module_ &m) {
-  py::class_<SceneBatchExecutor, std::shared_ptr<SceneBatchExecutor>>(
-      m, "SceneBatchExecutor")
-      .def(py::init(
-               [](py::sequence scenes, py::sequence actors, py::sequence links,
-                  py::sequence contactSources, py::sequence contactOthers,
-                  py::sequence contactKinds, py::sequence contactDistances,
-                  size_t numWorkers) {
-                 auto executor = std::make_shared<SceneBatchExecutor>(
-                     scenes, actors, links, contactSources, contactOthers,
-                     contactKinds, contactDistances, numWorkers);
-                 RegisterContextDependent(
-                     [weak = std::weak_ptr<SceneBatchExecutor>(executor)]() {
-                       if (auto active = weak.lock()) {
-                         active->Close();
-                       }
-                     });
-                 return executor;
-               }),
-           py::arg("scenes"), py::arg("actors"), py::arg("links"),
-           py::arg("contact_sources"), py::arg("contact_others"),
-           py::arg("contact_kinds"), py::arg("contact_distances"),
-           py::arg("num_workers"))
-      .def_property_readonly("num_workers", &SceneBatchExecutor::GetNumWorkers)
-      .def_property_readonly("num_scenes", &SceneBatchExecutor::GetNumScenes)
-      .def_property_readonly("num_dofs", &SceneBatchExecutor::GetNumDofs)
-      .def_property_readonly("num_links", &SceneBatchExecutor::GetNumLinks)
-      .def_property_readonly("num_contacts", &SceneBatchExecutor::GetNumContacts)
-      .def_property_readonly("closed", &SceneBatchExecutor::IsClosed)
+namespace {
+
+template <typename Executor>
+void RegisterExecutorTeardown(nb::handle executorObject) {
+  // The context registry is never cleared. Hold a weak Python reference rather
+  // than the C++ object so an executor can be collected before mochi.shutdown().
+  PyObject *executorWeak = PyWeakref_NewRef(executorObject.ptr(), nullptr);
+  if (!executorWeak) {
+    throw std::runtime_error("failed to create SceneBatchExecutor weakref");
+  }
+  RegisterContextDependent([executorWeak]() {
+    PyObject *executorPy = PyWeakref_GetObject(executorWeak);
+    if (!executorPy || executorPy == Py_None) {
+      return;
+    }
+    if (auto *executor = nb::cast<Executor *>(nb::handle(executorPy))) {
+      executor->Close();
+    }
+  });
+}
+
+}  // namespace
+
+void DefineSceneBatchExecutor(nb::module_ &m) {
+  nb::class_<SceneBatchExecutor>(m, "SceneBatchExecutor",
+                                 nb::is_weak_referenceable())
+      .def("__init__",
+           [](nb::pointer_and_handle<SceneBatchExecutor> executor,
+              nb::sequence scenes, nb::sequence actors, nb::sequence links,
+              nb::sequence contactSources, nb::sequence contactOthers,
+              nb::sequence contactKinds, nb::sequence contactDistances,
+              size_t numWorkers) {
+             new (executor.p) SceneBatchExecutor(
+                 scenes, actors, links, contactSources, contactOthers,
+                 contactKinds, contactDistances, numWorkers);
+             RegisterExecutorTeardown<SceneBatchExecutor>(executor.h);
+           },
+           nb::arg("scenes"), nb::arg("actors"), nb::arg("links"),
+           nb::arg("contact_sources"), nb::arg("contact_others"),
+           nb::arg("contact_kinds"), nb::arg("contact_distances"),
+           nb::arg("num_workers"))
+      .def_prop_ro("num_workers", &SceneBatchExecutor::GetNumWorkers)
+      .def_prop_ro("num_scenes", &SceneBatchExecutor::GetNumScenes)
+      .def_prop_ro("num_dofs", &SceneBatchExecutor::GetNumDofs)
+      .def_prop_ro("num_links", &SceneBatchExecutor::GetNumLinks)
+      .def_prop_ro("num_contacts", &SceneBatchExecutor::GetNumContacts)
+      .def_prop_ro("closed", &SceneBatchExecutor::IsClosed)
       .def("step_control",
            [](SceneBatchExecutor& self, double dt,
-              py::array_t<real, py::array::c_style> controls,
-              py::array_t<int, py::array::c_style> qpos_indices,
-              py::array_t<int, py::array::c_style> qvel_indices,
-              py::array_t<real, py::array::c_style> kp,
-              py::array_t<real, py::array::c_style> kd,
-              py::array_t<real, py::array::c_style> gear,
-              py::array_t<real, py::array::c_style> force_ranges,
-              int num_steps, py::object qpos_out, py::object qvel_out,
-              py::object link_state_out, py::object contact_out,
-              py::object diverged_out, uint32_t readback_mask) {
+              RealConstArray controls,
+              IntConstArray qpos_indices,
+              IntConstArray qvel_indices,
+              RealConstArray kp,
+              RealConstArray kd,
+              RealConstArray gear,
+              RealConstArray force_ranges,
+              int num_steps, nb::object qpos_out, nb::object qvel_out,
+              nb::object link_state_out, nb::object contact_out,
+              nb::object diverged_out, uint32_t readback_mask) {
              self.StepControl(dt, controls, qpos_indices, qvel_indices, kp, kd,
                               gear, force_ranges, num_steps, qpos_out, qvel_out,
                               link_state_out, contact_out, diverged_out,
                               readback_mask);
            },
-           py::arg("time_step_sec"), py::arg("controls"),
-           py::arg("qpos_indices"), py::arg("qvel_indices"), py::arg("kp"),
-           py::arg("kd"), py::arg("gear"), py::arg("force_ranges"),
-           py::arg("num_steps"), py::arg("qpos_out"), py::arg("qvel_out"),
-           py::arg("link_state_out"), py::arg("contact_out"),
-           py::arg("diverged_out"), py::arg("readback_mask"))
+           nb::arg("time_step_sec"), nb::arg("controls"),
+           nb::arg("qpos_indices"), nb::arg("qvel_indices"), nb::arg("kp"),
+           nb::arg("kd"), nb::arg("gear"), nb::arg("force_ranges"),
+           nb::arg("num_steps"), nb::arg("qpos_out").none(),
+           nb::arg("qvel_out").none(), nb::arg("link_state_out").none(),
+           nb::arg("contact_out").none(), nb::arg("diverged_out").none(),
+           nb::arg("readback_mask"))
       .def(
           "step",
           [](SceneBatchExecutor& self, double timeStepSec,
-             py::array_t<real, py::array::c_style> generalizedForces,
-             py::object qposOut, py::object qvelOut, py::object linkStateOut,
-             py::object contactOut, py::object divergedOut,
+             RealConstArray generalizedForces,
+             nb::object qposOut, nb::object qvelOut, nb::object linkStateOut,
+             nb::object contactOut, nb::object divergedOut,
              uint32_t readbackMask) {
             self.Step(timeStepSec, generalizedForces, qposOut, qvelOut,
                       linkStateOut, contactOut, divergedOut, readbackMask);
           },
-          py::arg("time_step_sec"), py::arg("generalized_forces"),
-          py::arg("qpos_out"), py::arg("qvel_out"), py::arg("link_state_out"),
-          py::arg("contact_out"), py::arg("diverged_out"),
-          py::arg("readback_mask"))
+          nb::arg("time_step_sec"), nb::arg("generalized_forces"),
+          nb::arg("qpos_out").none(), nb::arg("qvel_out").none(),
+          nb::arg("link_state_out").none(), nb::arg("contact_out").none(),
+          nb::arg("diverged_out").none(),
+          nb::arg("readback_mask"))
       .def("close", [](SceneBatchExecutor& self) {
-        py::gil_scoped_release release;
+        nb::gil_scoped_release release;
         self.Close();
       })
       .def(
           "__enter__",
-          [](SceneBatchExecutor &self) -> SceneBatchExecutor & { return self; })
-      .def("__exit__", [](SceneBatchExecutor& self, py::object, py::object,
-                          py::object) {
-        py::gil_scoped_release release;
+          [](SceneBatchExecutor &self) -> SceneBatchExecutor & { return self; },
+          nb::rv_policy::reference)
+      .def("__exit__", [](SceneBatchExecutor& self, nb::handle, nb::handle,
+                          nb::handle) {
+        nb::gil_scoped_release release;
         self.Close();
-      });
+      },
+           nb::arg().none(), nb::arg().none(), nb::arg().none());
 }
 
-void OverrideLeasedSceneDestroy(py::module_ &m) {
-  py::delattr(m, "destroy_scene");
+void OverrideLeasedSceneDestroy(nb::module_ &m) {
+  nb::delattr(m, "destroy_scene");
   m.def(
       "destroy_scene",
       [](Scene *scene) {
@@ -783,14 +814,12 @@ void OverrideLeasedSceneDestroy(py::module_ &m) {
         }
         GetContext()->DestroyScene(scene);
       },
-      py::arg("scene"));
+      nb::arg("scene"));
 }
 
-void OverrideLeasedActorDestroy(py::module_ &m) {
-  using SceneClass =
-      py::class_<Scene, std::unique_ptr<Scene, py::nodelete>>;
-  auto sceneClass = py::cast<SceneClass>(m.attr("Scene"));
-  py::delattr(sceneClass, "destroy_actor");
+void OverrideLeasedActorDestroy(nb::module_ &m) {
+  auto sceneClass = nb::borrow<nb::class_<Scene>>(m.attr("Scene"));
+  nb::delattr(sceneClass, "destroy_actor");
   sceneClass.def(
       "destroy_actor",
       [](Scene &self, Actor *actor) {
@@ -801,7 +830,7 @@ void OverrideLeasedActorDestroy(py::module_ &m) {
         }
         self.DestroyActor(actor);
       },
-      py::arg("actor"),
+      nb::arg("actor"),
       "Destroy an actor and remove it from the scene.\n\n"
       "Raises:\n"
       "    RuntimeError: If the actor belongs to a leased SceneBatchExecutor "
@@ -817,14 +846,14 @@ void OverrideLeasedActorDestroy(py::module_ &m) {
         }
         self.DestroyActor(actor);
       },
-      py::arg("actor"),
+      nb::arg("actor"),
       "Destroy an actor and remove it from the scene.\n\n"
       "Raises:\n"
       "    RuntimeError: If the actor belongs to a leased SceneBatchExecutor "
       "scene. Close the executor first.");
 }
 
-void OverrideLeasedSceneCallbacks(py::module_& m) {
+void OverrideLeasedSceneCallbacks(nb::module_& m) {
   auto sceneClass = m.attr("Scene");
   auto registerCallback = [](Scene& scene, std::string_view debugName,
                              std::function<void(StepInfo const&)> callback, int priority,
@@ -836,20 +865,20 @@ void OverrideLeasedSceneCallbacks(py::module_& m) {
     return preStep ? scene.RegisterPreStepCallback(debugName, std::move(callback), priority)
                    : scene.RegisterPostStepCallback(debugName, std::move(callback), priority);
   };
-  py::delattr(sceneClass, "register_pre_step_callback");
-  py::delattr(sceneClass, "register_post_step_callback");
-  sceneClass.attr("register_pre_step_callback") = py::cpp_function(
+  nb::delattr(sceneClass, "register_pre_step_callback");
+  nb::delattr(sceneClass, "register_post_step_callback");
+  sceneClass.attr("register_pre_step_callback") = nb::cpp_function(
       [registerCallback](Scene& scene, std::string_view debugName,
                          std::function<void(StepInfo const&)> callback, int priority) {
         return registerCallback(scene, debugName, std::move(callback), priority, true);
       },
-      py::is_method(sceneClass));
-  sceneClass.attr("register_post_step_callback") = py::cpp_function(
+      nb::is_method());
+  sceneClass.attr("register_post_step_callback") = nb::cpp_function(
       [registerCallback](Scene& scene, std::string_view debugName,
                          std::function<void(StepInfo const&)> callback, int priority) {
         return registerCallback(scene, debugName, std::move(callback), priority, false);
       },
-      py::is_method(sceneClass));
+      nb::is_method());
 }
 
 } // namespace mochi

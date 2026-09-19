@@ -48,6 +48,9 @@ inline ModelDataView::ModelDataView(ModelData const& src)
   if (src.visualMesh) {
     this->visualMesh.emplace(MeshDataView{*src.visualMesh});
   }
+  if (src.contactSkinMesh) {
+    this->contactSkinMesh.emplace(MeshDataView{*src.contactSkinMesh});
+  }
   if (src.blending) {
     DynamicArray<BlendingDataView> blendingDataViewArray;
     blendingDataViewArray.reserve(src.blending->size());
@@ -80,6 +83,9 @@ inline ModelData::ModelData(ModelDataView const& src)
   }
   if (src.visualMesh) {
     this->visualMesh.emplace(MeshData{*src.visualMesh});
+  }
+  if (src.contactSkinMesh) {
+    this->contactSkinMesh.emplace(MeshData{*src.contactSkinMesh});
   }
   if (src.blending) {
     DynamicArray<BlendingData> blendingDataArray;

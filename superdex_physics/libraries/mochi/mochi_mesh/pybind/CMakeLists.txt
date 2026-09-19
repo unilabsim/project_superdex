@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-pybind11_add_module(mochi_mesh_pybind mesh_tools_pybind.cpp)
+nanobind_add_module(mochi_mesh_pybind mesh_tools_pybind.cpp)
 target_link_libraries(mochi_mesh_pybind PUBLIC mochi_mesh)
 target_include_directories(mochi_mesh_pybind PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}

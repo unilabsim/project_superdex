@@ -3561,7 +3561,7 @@
 ///
 /// @brief Quadrature integration weight of the sample point on the colliding manifold of @ref mochi::ContactPoint::actorA "actorA".
 ///
-/// @note Units depend on the dimensionality of the colliding manifold of @ref mochi::ContactPoint::actorA "actorA": [m²] for surface contact (e.g., rigid, articulated, soft, shell, and rod actors with visual-mesh contact enabled), or [m] for rod actors using centerline contact.
+/// @note Units depend on the dimensionality of the colliding manifold of @ref mochi::ContactPoint::actorA "actorA": [m²] for surface contact (e.g., rigid, articulated, soft, shell, and rod actors using contact-skin contact), or [m] for rod actors using centerline contact.
 /// @note For surface contact, represents the surface area corresponding to the sample point. For rod centerline contact, represents the arc length.
 /// @note Useful for contact area/length estimation and other post-processing.
 /// @note @ref mochi::ContactPoint::force "force" is already weighted by this value.
@@ -4490,7 +4490,7 @@
 ///
 /// @brief Get a view of the shape's surface mesh data.
 ///
-/// @details Returns a triangle mesh (3 nodes per element) representing the shape's surface. The coordinate array contains exactly the surface nodes referenced by the returned connectivity; nodes present in the underlying main mesh but not referenced by any surface triangle are omitted. Connectivity values are indices into this returned coordinate array. For shapes without a surface mesh, returns an empty view.
+/// @details Returns a triangle mesh (3 nodes per element) representing the shape's surface. The coordinate array contains exactly the surface nodes referenced by the returned connectivity; nodes present in the underlying main mesh but not referenced by any surface triangle are omitted. Connectivity values are indices into this returned coordinate array. For polyline shapes with an authored contact skin, returns that skin. For shapes without a surface mesh, returns an empty view.
 ///
 /// @param[in] shape Handle to a valid shape.
 /// @param[in,out] error Error status. Check @ref mochi::Error::IsOK "Error::IsOK" for success.
@@ -5152,7 +5152,7 @@
 ///
 /// @note Only supported for standalone soft actors, nested soft actors, and shell actors.
 /// @note For nested soft actors, displacements are the elastic deformation component only (before skinning is applied).
-/// @note Does not change node velocities.
+/// @note Does not change the elastic velocity DoFs, but changes the skinned node velocities of nested soft actors.
 /// @note Resets multi-step time integrators, e.g. BDF2 falls back to backward Euler in the first time step after this method is called.
 ///
 /// @see @ref mochi::Actor::GetDisplacements "GetDisplacements", @ref mochi::Actor::SetNodePositionsLocal "SetNodePositionsLocal"
@@ -5202,7 +5202,7 @@
 ///
 /// @brief Get a view of the actor's reference surface mesh.
 ///
-/// @details Returns a compact triangle mesh for the actor's surface. For volumetric simulation meshes, the surface is the boundary triangles. For triangular simulation meshes, the surface has the same triangle elements as the simulation mesh, but nodes not referenced by any surface triangle are omitted and remaining nodes may be reindexed. Returns an empty view if the actor does not have a surface mesh.
+/// @details Returns a compact triangle mesh for the actor's surface. For volumetric simulation meshes, the surface is the boundary triangles. For triangular simulation meshes, the surface has the same triangle elements as the simulation mesh, but nodes not referenced by any surface triangle are omitted and remaining nodes may be reindexed. For rod actors with an authored contact skin, returns that skin regardless of the actor's selected collision representation. Returns an empty view if the actor does not have a surface mesh.
 ///
 /// @return A non-owning view of the actor's reference surface mesh, or an empty view if the actor has no surface mesh.
 ///
@@ -5239,6 +5239,7 @@
 /// @note Requires registering @ref mochi::QueryType::SurfaceNodePositions "QueryType::SurfaceNodePositions" before the simulation step. Results are available after the simulation step completes.
 /// @note Requires the actor to support @ref mochi::QueryType::SurfaceNodePositions "QueryType::SurfaceNodePositions".
 /// @note The node ordering corresponds to the mesh connectivity from @ref mochi::Actor::GetSurfaceMesh "GetSurfaceMesh".
+/// @note Supported for rod actors whose shape has an authored contact skin, regardless of whether that skin is selected for collision.
 ///
 /// @see @ref mochi::Actor::RegisterQuery "RegisterQuery", @ref mochi::QueryType::SurfaceNodePositions "QueryType::SurfaceNodePositions", @ref mochi::Actor::GetSurfaceMesh "GetSurfaceMesh", @ref mochi::Actor::GetSurfaceMeshNodeNormalsLocal "GetSurfaceMeshNodeNormalsLocal"
 ///
@@ -5253,6 +5254,7 @@
 /// @note Requires registering @ref mochi::QueryType::SurfaceNodeNormals "QueryType::SurfaceNodeNormals" before the simulation step. Results are available after the simulation step completes.
 /// @note Requires the actor to support @ref mochi::QueryType::SurfaceNodeNormals "QueryType::SurfaceNodeNormals".
 /// @note The node ordering corresponds to the mesh connectivity from @ref mochi::Actor::GetSurfaceMesh "GetSurfaceMesh".
+/// @note Supported for rod actors whose shape has an authored contact skin, regardless of whether that skin is selected for collision.
 ///
 /// @see @ref mochi::Actor::RegisterQuery "RegisterQuery", @ref mochi::QueryType::SurfaceNodeNormals "QueryType::SurfaceNodeNormals", @ref mochi::Actor::GetSurfaceMesh "GetSurfaceMesh", @ref mochi::Actor::GetSurfaceMeshNodePositionsLocal "GetSurfaceMeshNodePositionsLocal"
 ///
@@ -5405,7 +5407,7 @@
 /// @param[in,out] error Error status. Check @ref mochi::Error::IsOK "Error::IsOK" for success.
 ///
 /// @note Only supported for standalone soft actors, nested soft actors, shell actors, and rod actors.
-/// @note For nested soft actors, it zeroes the elastic deformation and velocity only. The skeleton-driven pose is unaffected.
+/// @note For nested soft actors, it zeroes only elastic displacement and velocity. Skeleton-driven displacement and velocity are preserved.
 /// @note For rod actors, it zeroes both the translational displacement DoFs and the twist-angle DoFs.
 /// @note Resets multi-step time integrators, e.g. BDF2 falls back to backward Euler in the first time step after this method is called.
 ///

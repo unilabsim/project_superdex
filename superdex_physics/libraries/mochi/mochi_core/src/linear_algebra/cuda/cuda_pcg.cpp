@@ -259,6 +259,7 @@ std::pair<int, LinearSolverConvergenceStatus> CudaPCG_impl(
     bool usePolakRibiere) {
   // Check that Scalar is either float or double
   static_assert(std::is_same_v<Scalar, float> || std::is_same_v<Scalar, double>);
+  MOCHI_ASSERT_VERBOSE(maxIter > 0, "Maximum number of iterations must be positive.");
 
   auto blasHandle = reinterpret_cast<cublasHandle_t>(mochi::details::GetCuBLASHandle());
   auto sparseHandle = reinterpret_cast<cusparseHandle_t>(mochi::details::GetCuSparseHandle());

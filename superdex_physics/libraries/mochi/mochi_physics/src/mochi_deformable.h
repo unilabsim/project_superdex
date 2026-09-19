@@ -205,6 +205,7 @@ void RecordState(
     CVelocitySlice<real, TimeStep::Current> const& vel,
     CDisplacementSlice<real, TimeStep::Current, DisplacementLayer::Skinned> const* dispSkinned,
     CVelocitySlice<real, TimeStep::Current, DisplacementLayer::Skinned> const* velSkinned,
+    CIntegrationVelocitySlices<DisplacementLayer::Skinned> const* integrationVelSkinned,
     CRodPose<TimeStep::Current> const* rodPose,
     ecs::OptionalTag<TagSoftActor> isSoft,
     ecs::OptionalTag<TagShellActor> isShell,

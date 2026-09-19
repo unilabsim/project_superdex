@@ -19,7 +19,6 @@
 #include "dskinning.h"
 
 #include <mochi_core/linear_algebra/krylov_interop.h>
-#include <mochi_core/utils/dtransform.h>
 #include <mochi_core/utils/dynamic_array.h>
 #include <mochi_core/utils/lie.h>
 #include <mochi_core/utils/task_scheduler.h>
@@ -33,9 +32,8 @@ namespace details {
 constexpr int kMaxStackBones = 64;
 constexpr size_t kBoneJacobiansStackSize =
     kMaxStackBones * sizeof(VMatrix3x3r) + alignof(VMatrix3x3r);
-constexpr size_t kBoneParameterJacobiansStackSize =
-    kMaxStackBones * (sizeof(VMatrix3x3r) + sizeof(VMatrix4x4r)) + alignof(VMatrix3x3r) +
-    alignof(VMatrix4x4r);
+constexpr size_t kBoneTransformsStackSize =
+    kMaxStackBones * sizeof(VMatrix4x4r) + alignof(VMatrix4x4r);
 
 template <bool kTranspose>
 void ComputeBoneJacobians(
@@ -44,15 +42,12 @@ void ComputeBoneJacobians(
     DynamicArray<VMatrix3x3r>& jacobians) {
   jacobians.reserve(dskinning.GetBoneCount());
   for (int boneId = 0; boneId < dskinning.GetBoneCount(); ++boneId) {
-    auto const& pre = dskinning.GetBonePreTransform(boneId);
-    auto const& post = dskinning.GetBonePostTransform(boneId);
-    real const scale = pre.GetScale() * post.GetScale();
-    Quaternion const rot =
-        post.GetRotation() * boneTransforms[boneId].GetRotation() * pre.GetRotation();
+    Quaternion const rotation =
+        boneTransforms[boneId].GetRotation() * dskinning.GetBonePreTransform(boneId).GetRotation();
     if constexpr (kTranspose) {
-      jacobians.emplace_back(scale * ToVMatrix3x3Transpose(rot));
+      jacobians.emplace_back(ToVMatrix3x3Transpose(rotation));
     } else {
-      jacobians.emplace_back(scale * ToVMatrix3x3(rot));
+      jacobians.emplace_back(ToVMatrix3x3(rotation));
     }
   }
 }
@@ -69,30 +64,18 @@ MOCHI_FORCE_INLINE VMatrix3x3r WeightedVertexJacobian(
   return weightedJacobian;
 }
 
-// Precompute per-bone derivatives:
-// - Translation derivatives are independent of the input and directly precomputed.
-// - Rotation derivatives require the products of matrix transforms, which are precomputed.
-template <bool kTransposePostMat>
-void ComputeBoneParameterJacobians(
+// Precompute the transformed points used by the rotation derivatives. Translation derivatives are
+// weight-scaled identities and are written directly at the call sites.
+inline void ComputeRotatedPreTransforms(
     DSkinningTransform const& dskinning,
     Span<TransformRT const> boneTransforms,
-    DynamicArray<VMatrix3x3r>& postMat,
     DynamicArray<VMatrix4x4r>& preMatT) {
-  postMat.reserve(dskinning.GetBoneCount());
   preMatT.reserve(dskinning.GetBoneCount());
   for (int boneId = 0; boneId < dskinning.GetBoneCount(); ++boneId) {
-    auto const& pre = dskinning.GetBonePreTransform(boneId);
-    auto const& post = dskinning.GetBonePostTransform(boneId);
+    TransformRT const& pre = dskinning.GetBonePreTransform(boneId);
     Quaternion const& boneRotation = boneTransforms[boneId].GetRotation();
-
-    if constexpr (kTransposePostMat) {
-      postMat.emplace_back(post.GetScale() * ToVMatrix3x3Transpose(post.GetRotation()));
-    } else {
-      postMat.emplace_back(post.GetScale() * ToVMatrix3x3(post.GetRotation()));
-    }
-
-    TransformSRT const bonePreTransform{
-        pre.GetScale(), boneRotation * pre.GetRotation(), boneRotation * pre.VGetTranslation()};
+    // Bone translation does not affect the radius used by the rotation derivative.
+    TransformRT const bonePreTransform = TransformRT{boneRotation} * pre;
     preMatT.emplace_back(ToVMatrix4x4Transpose(bonePreTransform));
   }
 }
@@ -111,14 +94,12 @@ void DSkinningTransform::Transform(
 
   // Precompute per-bone full transform and store its transpose to later operate with DotVecMat,
   // which is faster than DotMatVec.
-  MOCHI_FILO_STACK_ALLOCATOR(alloc, 4096); // Capacity for 64 transforms with 32-bit floats.
+  MOCHI_FILO_STACK_ALLOCATOR(alloc, details::kBoneTransformsStackSize);
   DynamicArray<VMatrix4x4r> transformT(&alloc);
   transformT.reserve(GetBoneCount());
   for (int boneId = 0; boneId < GetBoneCount(); ++boneId) {
-    auto pre = ToVMatrix4x4(GetBonePreTransform(boneId));
-    auto bone = ToVMatrix4x4(boneTransforms[boneId]);
-    auto post = ToVMatrix4x4(GetBonePostTransform(boneId));
-    transformT.emplace_back(Transpose4x4(Dot4x4(post, Dot4x4(bone, pre))));
+    transformT.emplace_back(
+        ToVMatrix4x4Transpose(boneTransforms[boneId] * GetBonePreTransform(boneId)));
   }
 
   auto workerTask = [&](int loopStart, int loopEnd) {
@@ -228,11 +209,9 @@ void DSkinningTransform::DTransformDBonesTimesVector(
       unposedPositions.Rows() % RigidSize::kDim == 0 && unposedPositions.Rows() == output.Rows());
   MOCHI_ASSERT_VERBOSE(input.Rows() == GetBoneCount() * RigidSize::kDAll);
 
-  MOCHI_FILO_STACK_ALLOCATOR(alloc, details::kBoneParameterJacobiansStackSize);
-  DynamicArray<VMatrix3x3r> postMatT(&alloc); // postMatT = (spost * Rpost)^T
-  DynamicArray<VMatrix4x4r> preMatT(&alloc); // preMatT = (R * (spre Rpre, tpre))^T
-  details::ComputeBoneParameterJacobians</* kTransposePostMat */ true>(
-      *this, boneTransforms, postMatT, preMatT);
+  MOCHI_FILO_STACK_ALLOCATOR(alloc, details::kBoneTransformsStackSize);
+  DynamicArray<VMatrix4x4r> preMatT(&alloc); // preMatT = (R * preTransform)^T
+  details::ComputeRotatedPreTransforms(*this, boneTransforms, preMatT);
 
   auto workerTask = [&](int loopBegin, int loopEnd) {
     for (int i = loopBegin; i < loopEnd; ++i) {
@@ -247,7 +226,7 @@ void DSkinningTransform::DTransformDBonesTimesVector(
             Load<RigidSize::kDRot, Vec4r>(&input[boneOffset + RigidSize::kDTrans]);
         Vec4r const transformedPoint = DotVecMat4x4(unposedPosition, preMatT[boneId]);
         Vec4r const velocity = translationVelocity + Cross3(angularVelocity, transformedPoint);
-        result += weight * DotVecMat3x3(velocity, postMatT[boneId]);
+        result += weight * velocity;
       }
       Store<RigidSize::kDim>(&output[vertexId * RigidSize::kDim], result);
     }
@@ -282,11 +261,9 @@ void DSkinningTransform::DTransformDBones(
   MOCHI_ASSERT_VERBOSE(boneTransforms.size() == GetBoneCount());
   MOCHI_ASSERT_VERBOSE(input.Rows() % RigidSize::kDim == 0 && input.Rows() == outputDBones.Rows());
 
-  MOCHI_FILO_STACK_ALLOCATOR(alloc, details::kBoneParameterJacobiansStackSize);
-  DynamicArray<VMatrix3x3r> postMat(&alloc); // postMat = spost * Rpost
-  DynamicArray<VMatrix4x4r> preMatT(&alloc); // preMatT = (R * (spre Rpre, tpre))^T
-  details::ComputeBoneParameterJacobians</* kTransposePostMat */ false>(
-      *this, boneTransforms, postMat, preMatT);
+  MOCHI_FILO_STACK_ALLOCATOR(alloc, details::kBoneTransformsStackSize);
+  DynamicArray<VMatrix4x4r> preMatT(&alloc); // preMatT = (R * preTransform)^T
+  details::ComputeRotatedPreTransforms(*this, boneTransforms, preMatT);
 
   auto workerTask = [&](int loopBegin, int loopEnd) {
     for (int i = loopBegin; i < loopEnd; ++i) {
@@ -309,13 +286,16 @@ void DSkinningTransform::DTransformDBones(
             isize(outRowValues));
 
         // Derivatives w.r.t. translation parameters.
-        outBlock.template LeftCols<RigidSize::kDTrans>(RigidSize::kDTrans) =
-            weight * AsMatrixView(postMat[boneId]);
+        auto translationBlock = outBlock.template LeftCols<RigidSize::kDTrans>(RigidSize::kDTrans);
+        translationBlock.SetZero();
+        translationBlock(0, 0) = weight;
+        translationBlock(1, 1) = weight;
+        translationBlock(2, 2) = weight;
 
         // Derivatives w.r.t. rotation parameters.
-        auto inPointTransformed = weight * DotVecMat4x4(inPoint, preMatT[boneId]);
+        auto const inPointTransformed = weight * DotVecMat4x4(inPoint, preMatT[boneId]);
         outBlock.template RightCols<RigidSize::kDRot>(RigidSize::kDRot) =
-            AsMatrixView(lie::DMultMatRotVecDRot(postMat[boneId], inPointTransformed));
+            AsMatrixView(lie::DMultRotVecDRot(inPointTransformed));
 
         colOffset += RigidSize::kDAll;
       }
@@ -350,7 +330,7 @@ SparseMatrix<real> DSkinningTransform::CreateDBones() const {
     }
   }
 
-  return {boneCount * kNumParams, Graph<int, int>(std::move(ptr), std::move(cols))};
+  return {GetBoneCount() * kNumParams, Graph<int, int>(std::move(ptr), std::move(cols))};
 }
 
 } // namespace mochi

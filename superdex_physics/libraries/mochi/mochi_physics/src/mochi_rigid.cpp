@@ -1055,9 +1055,18 @@ static void InitRigidActor_Dynamic(
         }
       }
 
-      // Create BSH tree to accelerate collision detection.
-      contactSamples.bsh = activeBoundaryFaces ? MakeConstSpan(contactSamples.activePositions)
-                                               : MakeConstSpan(contactSamples.positions);
+      // Create SphereTree to accelerate collision detection.
+      // Increasing kMaxSamplePointsPerLeaf makes the spatial partitioning faster/coarser.
+      // Decreasing it makes the partitioning slower/finer. Do not decrease it too much because we
+      // don't want to have leaf nodes with only one point (might as well test the point not the
+      // sphere).
+      int constexpr kMaxSamplePointsPerLeaf = 16;
+      auto const samplePoints = activeBoundaryFaces ? MakeConstSpan(contactSamples.activePositions)
+                                                    : MakeConstSpan(contactSamples.positions);
+      contactSamples.bsh = SphereOctTree::FromPoints(samplePoints, kMaxSamplePointsPerLeaf);
+#if MOCHI_DEBUG && MOCHI_ASSERT_ENABLED
+      contactSamples.bsh->AssertTreeIsValid(samplePoints);
+#endif
     });
 
     // Emplace helper component to map stage-start and current contact results

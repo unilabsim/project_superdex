@@ -274,7 +274,7 @@ class TestStructs(MochiTestBase):
     def test_non_linear_solver_params(self):
         # Test a few default values to prove the C++ constructor ran
         params = mochi.NonLinearSolverParams()
-        self.assertEqual(mochi.NonLinearSolverType.DEFAULT, params.solver_type)
+        self.assertEqual(mochi.NonLinearSolverType.NEWTON, params.solver_type)
         self.assertEqual(4, params.max_iter)
         self.assertTrue(params.explosion_control)
 
@@ -363,7 +363,7 @@ class TestStructs(MochiTestBase):
     def test_linear_solver_params(self):
         # Test a few default values to prove the C++ constructor ran
         params = mochi.LinearSolverParams()
-        self.assertEqual(mochi.LinearSolverType.DEFAULT, params.solver_type)
+        self.assertEqual(mochi.LinearSolverType.AUTO, params.solver_type)
         self.assertEqual(1000, params.restart_size)
 
         # Test keyword argument constructor with all fields in shuffled order.

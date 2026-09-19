@@ -16,20 +16,32 @@
 
 #pragma once
 
-#include <pybind11/functional.h>
-#include <pybind11/numpy.h>
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/stl_bind.h>
+#include <nanobind/make_iterator.h>
+#include <nanobind/nanobind.h>
+#include <nanobind/ndarray.h>
+#include <nanobind/operators.h>
+#include <nanobind/stl/array.h>
+#include <nanobind/stl/function.h>
+#include <nanobind/stl/optional.h>
+#include <nanobind/stl/pair.h>
+#include <nanobind/stl/string.h>
+#include <nanobind/stl/tuple.h>
+#include <nanobind/stl/vector.h>
 
+#include <array>
+#include <memory>
+#include <type_traits>
 #include <typeindex>
 #include <unordered_map>
 
+#include <mochi_core/utils/dynamic_array.h>
 #include <mochi_physics/mochi_physics.h>
 #include <mochi_physics/mochi_physics_experimental.h>
 #include <mochi_physics/utils/mochi_prefab.h>
 
 namespace mochi {
+
+namespace nb = nanobind;
 
 // Name of the module for single- or double-precision
 #if MOCHI_USE_DOUBLE_PRECISION
@@ -66,20 +78,149 @@ inline std::string ToPyReplString(T const& obj) {
   return Format("%s(%s)", SReflect::GetTypeInfo<T>()._name, ToPyString(obj).c_str());
 }
 
-// Types like Optional<T> don't need to be registered. Pybind handles them automatically. This
+// Types like Optional<T> don't need to be registered. Nanobind handles them automatically. This
 // function exists because the code generator emits DefX for every template class X, including
 // "Optional".
 template <class T>
-void DefOptional(pybind11::module& /*m*/, char const* /*name*/) {}
+void DefOptional(nb::module_& /*m*/, char const* /*name*/) {}
 
-// Type-erased registry of already-declared pybind11 classes, keyed by C++ type.
+// Build an owning 1-D numpy array holding a copy of the given contiguous data.
+template <typename T>
+inline nb::object MakeOwningNumpy1D(T const* data, size_t size) {
+  using Array = nb::ndarray<nb::numpy, T const, nb::ndim<1>>;
+  if (size == 0) {
+    T const emptyValue{};
+    return Array(&emptyValue, {size}).cast(nb::rv_policy::copy);
+  }
+  return Array(data, {size}).cast(nb::rv_policy::copy);
+}
+
+template <typename>
+inline constexpr bool kUnsupportedPythonBufferType = false;
+
+template <typename T>
+constexpr char const* PythonBufferFormat() {
+  using U = std::remove_cv_t<T>;
+  if constexpr (std::is_same_v<U, bool>) {
+    return "?";
+  } else if constexpr (std::is_same_v<U, char> || std::is_same_v<U, signed char>) {
+    return "b";
+  } else if constexpr (std::is_same_v<U, unsigned char>) {
+    return "B";
+  } else if constexpr (std::is_same_v<U, short>) {
+    return "h";
+  } else if constexpr (std::is_same_v<U, unsigned short>) {
+    return "H";
+  } else if constexpr (std::is_same_v<U, int>) {
+    return "i";
+  } else if constexpr (std::is_same_v<U, unsigned int>) {
+    return "I";
+  } else if constexpr (std::is_same_v<U, long>) {
+    return "l";
+  } else if constexpr (std::is_same_v<U, unsigned long>) {
+    return "L";
+  } else if constexpr (std::is_same_v<U, long long>) {
+    return "q";
+  } else if constexpr (std::is_same_v<U, unsigned long long>) {
+    return "Q";
+  } else if constexpr (std::is_same_v<U, float>) {
+    return "f";
+  } else if constexpr (std::is_same_v<U, double>) {
+    return "d";
+  } else {
+    static_assert(kUnsupportedPythonBufferType<U>, "Unsupported Python buffer scalar type");
+  }
+}
+
+struct PythonBufferLayout {
+  DynamicArray<Py_ssize_t> shape;
+  DynamicArray<Py_ssize_t> strides;
+};
+
+template <typename Fn>
+bool TranslatePythonCasterExceptions(Fn&& fn, char const* fallbackMessage) noexcept {
+  try {
+    return fn();
+  } catch (std::bad_alloc const&) {
+    PyErr_NoMemory();
+  } catch (nb::python_error& error) {
+    error.restore();
+  } catch (std::exception const& error) {
+    PyErr_SetString(PyExc_RuntimeError, error.what());
+  } catch (...) {
+    PyErr_SetString(PyExc_RuntimeError, fallbackMessage);
+  }
+  return false;
+}
+
+inline int FillPythonBuffer(
+    PyObject* exporter,
+    Py_buffer* view,
+    int flags,
+    void* data,
+    Py_ssize_t itemSize,
+    char const* format,
+    bool readOnly,
+    Py_ssize_t const* shape,
+    size_t numDims) noexcept {
+  try {
+    Py_ssize_t length = itemSize;
+    for (size_t i = numDims; i-- > 0;) {
+      length *= shape[i];
+    }
+
+    std::unique_ptr<PythonBufferLayout> layout;
+    if ((flags & PyBUF_ND) != 0) {
+      layout = std::make_unique<PythonBufferLayout>();
+      layout->shape.assign(shape, shape + numDims);
+      layout->strides.resize(numDims);
+      Py_ssize_t stride = itemSize;
+      for (size_t i = numDims; i-- > 0;) {
+        layout->strides[i] = stride;
+        stride *= layout->shape[i];
+      }
+    }
+
+    if (PyBuffer_FillInfo(view, exporter, data, length, readOnly, flags) != 0) {
+      return -1;
+    }
+
+    view->itemsize = itemSize;
+    if ((flags & PyBUF_FORMAT) != 0) {
+      view->format = const_cast<char*>(format);
+    }
+    if ((flags & PyBUF_ND) == 0) {
+      return 0;
+    }
+
+    view->ndim = static_cast<int>(numDims);
+    view->shape = layout->shape.data();
+    view->strides = (flags & PyBUF_STRIDES) ? layout->strides.data() : nullptr;
+    if ((flags & PyBUF_F_CONTIGUOUS) == PyBUF_F_CONTIGUOUS && !PyBuffer_IsContiguous(view, 'F')) {
+      Py_CLEAR(view->obj);
+      PyErr_SetString(PyExc_BufferError, "Mochi buffer is not Fortran-contiguous");
+      return -1;
+    }
+    view->internal = layout.release();
+    return 0;
+  } catch (...) {
+    PyErr_NoMemory();
+    return -1;
+  }
+}
+
+inline void ReleasePythonBuffer(PyObject*, Py_buffer* view) noexcept {
+  delete static_cast<PythonBufferLayout*>(view->internal);
+  view->internal = nullptr;
+}
+
+// Type-erased registry of already-declared nanobind classes, keyed by C++ type.
 //
 // Enables two-phase registration of the generated bindings: a declaration phase
-// registers every py::class_ up front (via StoreClass) so that all types exist before
+// registers every nb::class_ up front (via StoreClass) so that all types exist before
 // any constructor default argument is converted to a Python object; a later definition
 // phase retrieves the same handle (via GetClass) to attach members. Handles are stored
-// type-erased as pybind11::object and recovered as the concrete
-// pybind11::class_<T, Opts...> on retrieval.
+// type-erased as nb::object and recovered as the concrete nb::class_<T, Opts...> on retrieval.
 //
 // This is a local object created during module initialization and passed by reference
 // to the generated Declare*/Define* functions; it is not a global and holds no state
@@ -89,26 +230,26 @@ class PybindRegistry {
  public:
   // Registers a freshly-declared class handle, keyed by its C++ type T.
   template <typename T, typename... Opts>
-  void StoreClass(pybind11::class_<T, Opts...> cls) {
+  void StoreClass(nb::class_<T, Opts...> cls) {
     auto [it, inserted] = _handles.emplace(std::type_index(typeid(T)), std::move(cls));
     (void)it;
     MOCHI_ASSERT(inserted);
   }
 
   // Retrieves the handle previously stored for T, reinterpreted as its concrete
-  // pybind11::class_<T, Opts...>. Opts must match the declaration exactly.
+  // nb::class_<T, Opts...>. Opts must match the declaration exactly.
   template <typename T, typename... Opts>
-  pybind11::class_<T, Opts...> GetClass() const {
+  nb::class_<T, Opts...> GetClass() const {
     auto it = _handles.find(std::type_index(typeid(T)));
     MOCHI_ASSERT(it != _handles.end());
-    return pybind11::reinterpret_borrow<pybind11::class_<T, Opts...>>(it->second);
+    return nb::borrow<nb::class_<T, Opts...>>(it->second);
   }
 
  private:
-  std::unordered_map<std::type_index, pybind11::object> _handles;
+  std::unordered_map<std::type_index, nb::object> _handles;
 };
 
 // Entry point for the generated bindings. Declares all classes and functions in the extension.
-void DefineAll(pybind11::module& m);
+void DefineAll(nb::module_& m);
 
 } // namespace mochi

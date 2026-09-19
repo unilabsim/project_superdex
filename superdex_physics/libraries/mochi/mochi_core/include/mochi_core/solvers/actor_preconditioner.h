@@ -34,14 +34,61 @@
 
 namespace mochi {
 
+/** @brief Execution model for concurrent application of an actor preconditioner. */
+enum class ActorPreconditionerParallelMode {
+  /** Apply the complete actor preconditioner serially on one worker. */
+  SingleWorker,
+
+  /** Apply disjoint actor-local row ranges without worker synchronization. */
+  IndependentRows,
+
+  /** Apply disjoint actor-local row ranges using a dedicated synchronized worker team. */
+  SynchronizedTeam,
+
+  /** Number of execution modes. Not a valid execution mode. */
+  Count,
+};
+
+/** @brief Concurrent application requirements for an actor preconditioner. */
+struct ActorPreconditionerParallelism {
+  /** @brief Execution mode. Must be set to a valid value before use. */
+  ActorPreconditionerParallelMode mode = ActorPreconditionerParallelMode::Count;
+
+  /** @brief Number of actor-local rows in each indivisible work block.
+   *
+   * @note Ignored for @ref ActorPreconditionerParallelMode::SingleWorker. For other modes, it must
+   * be positive and divide the actor row count; every row range passed to @ref ConcurrentSolve
+   * begins and ends on a block boundary.
+   */
+  int rowBlockSize = 1;
+};
+
 /** @brief Abstract class for the preconditioner of an actor.
  *
  * REQUIREMENTS: All child classes must satisfy the following requirements:
- * - ConcurrentSolve must NOT perform synchronization (synchronization may be problematic if workers
- *   are responsible for a subset of the rows of multiple actors).
+ * - @ref ActorPreconditionerParallelMode::SingleWorker preconditioners are applied through @ref
+ *   Solve by exactly one worker.
+ * - In @ref ActorPreconditionerParallelMode::IndependentRows and
+ *   @ref ActorPreconditionerParallelMode::SynchronizedTeam, `[data.rBegin, data.rEnd)` is the
+ *   actor-local output range assigned to this call. Across one application, these ranges are
+ *   disjoint and cover every actor row. A call may read any row of `x` but must write only this
+ *   range of `Px`.
+ * - In @ref ActorPreconditionerParallelMode::IndependentRows, `data.workerId` is the caller's index
+ *   in the full solve worker group, `data.numWorkers` is the full group size, and `data.barrier`
+ *   spans the full group. Not every group member is guaranteed to receive a call, so the barrier
+ *   must not be used.
+ * - In @ref ActorPreconditionerParallelMode::SynchronizedTeam, every member of the assigned team
+ *   receives a call. `data.workerId` is the caller's zero-based team-local index,
+ *   `data.numWorkers` is the team size, and `data.barrier` spans exactly that team. Every member
+ *   must execute the same sequence of barrier waits. The preconditioner must support every team
+ *   size from one through the actor's row-block count.
+ * - @ref ActorPreconditionerParallelism::rowBlockSize is ignored for
+ *   @ref ActorPreconditionerParallelMode::SingleWorker. For other modes, it must be positive,
+ *   divide the actor row count, and divide the start and end rows passed to @ref ConcurrentSolve.
  * - It must be safe to reuse the preconditioner across multiple linear solves. This implies all the
  *   data must either be owned by the preconditioner or be a reference/view to an object that will
  *   outlive the preconditioner.
+ * - An instance must not participate in multiple linear solves concurrently.
  */
 template <typename T>
 struct ActorPreconditioner {
@@ -56,15 +103,17 @@ struct ActorPreconditioner {
    *
    * @param[in] x Input column vector.
    * @param[out] Px Output column vector.
-   * @param[in] data Parallel information for each worker.
+   * @param[in] data Parallel information for the calling worker.
    *
-   * @note Marked as pure virtual to ensure that all preconditioners in the per-actor framework are
-   * compatible with parallel solvers.
+   * @note Not called for @ref ActorPreconditionerParallelMode::SingleWorker preconditioners.
+   * Implementations selecting another mode must override this method.
    */
   virtual void ConcurrentSolve(
-      ColumnVectorView<T const> x,
-      ColumnVectorView<T> Px,
-      ParallelWorkerInfo const& data) const = 0;
+      ColumnVectorView<T const> /*x*/,
+      ColumnVectorView<T> /*Px*/,
+      ParallelWorkerInfo const& /*data*/) const {
+    MOCHI_ASSERT(false, "Parallel solve not supported for this actor preconditioner.");
+  }
 
   /** @brief Update the preconditioner's data with new values of the involved matrices.
    *
@@ -83,6 +132,17 @@ struct ActorPreconditioner {
    * preconditioners to each subdomain.
    */
   virtual constexpr PreconditionerType GetType() const = 0;
+
+  /** @brief Get the concurrent-solve requirements.
+   *
+   * @return Requirements that remain constant for the lifetime of this preconditioner.
+   *
+   * @note Defaults to serial application by one worker.
+   */
+  [[nodiscard]] virtual constexpr ActorPreconditionerParallelism GetConcurrentSolveRequirements()
+      const {
+    return {ActorPreconditionerParallelMode::SingleWorker, 1};
+  }
 };
 
 /**
@@ -112,6 +172,11 @@ class BlockJacobiActorPrec : public ActorPreconditioner<T> {
     prec.Update(actorMatrix);
   }
 
+  [[nodiscard]] constexpr ActorPreconditionerParallelism GetConcurrentSolveRequirements()
+      const override {
+    return {ActorPreconditionerParallelMode::IndependentRows, kBlockSize};
+  }
+
   constexpr PreconditionerType GetType() const override {
     return kBlockSize > 1 ? PreconditionerType::BlockJacobi : PreconditionerType::Jacobi;
   }
@@ -138,6 +203,11 @@ class SymInverseActorPrec : public ActorPreconditioner<T> {
 
   void Update(ActorPseudoMatrix<T> const& A) override {
     prec.Update(A);
+  }
+
+  [[nodiscard]] constexpr ActorPreconditionerParallelism GetConcurrentSolveRequirements()
+      const override {
+    return {ActorPreconditionerParallelMode::IndependentRows, 1};
   }
 
   constexpr PreconditionerType GetType() const override {
@@ -206,6 +276,11 @@ class AMGActorPrec : public ActorPreconditioner<T> {
     prec->Update(Afine);
   }
 
+  [[nodiscard]] constexpr ActorPreconditionerParallelism GetConcurrentSolveRequirements()
+      const override {
+    return {ActorPreconditionerParallelMode::SynchronizedTeam, kBlockSize};
+  }
+
   constexpr PreconditionerType GetType() const override {
     return PreconditionerType::AMG;
   }
@@ -272,6 +347,11 @@ class ColoredSSORActorPrec : public ActorPreconditioner<T> {
     prec->Update(A);
   }
 
+  [[nodiscard]] constexpr ActorPreconditionerParallelism GetConcurrentSolveRequirements()
+      const override {
+    return {ActorPreconditionerParallelMode::SynchronizedTeam, kBlockSize};
+  }
+
   constexpr PreconditionerType GetType() const override {
     return PreconditionerType::ColoredSSOR;
   }
@@ -298,13 +378,6 @@ class ILU0ActorPrec : public ActorPreconditioner<T> {
 
   void Solve(ColumnVectorView<T const> x, ColumnVectorView<T> Px) const override {
     prec->Solve(x, Px);
-  }
-
-  void ConcurrentSolve(
-      ColumnVectorView<T const> x,
-      ColumnVectorView<T> Px,
-      ParallelWorkerInfo const& data) const override {
-    prec->ConcurrentSolve(x, Px, data);
   }
 
   /** @brief Update the preconditioner for the input pseudo-matrix.

@@ -22,6 +22,7 @@
 
 #include <mochi_core/utils/color.h>
 #include <mochi_core/utils/defer.h>
+#include <mochi_debugger/lib/debug_client.h>
 
 #include <imguios/imguios.h>
 
@@ -34,11 +35,31 @@ static void AddMeshColorProperty(Color& color) {
 
 static void AddRenderingProperties(UiState& state) {
   constexpr float kSliderWidth = 160.0f;
-
   auto& rendering = state.rendering;
+  bool enableDebugDraw = state.client->IsDebugDrawEnabled();
+
   UiCheckbox("Show Origin", &rendering.showOriginTriAxis, "Show a tri-axis at the scene origin");
-  UiCheckbox("Show Debug Draw", &rendering.showDebugDraw, "Show debug draw lines and spheres");
+  if (UiCheckbox(
+          "Show Debug Draw",
+          &enableDebugDraw,
+          "Render the selected debug draw features using data from the simulation")) {
+    state.client->EnableDebugDraw(enableDebugDraw);
+  }
+  rendering.showDebugDraw = enableDebugDraw; // Kept in sync
+
   UiCheckbox("Show Meshes", &rendering.showMeshes, "Show actor surface meshes");
+
+  if (ImGui::TreeNode("Debug Draw")) {
+    MOCHI_DEFER(ImGui::TreePop());
+
+    auto const features = state.client->GetDebugDrawFeatures();
+    for (int i = 0; i < isize(features); ++i) {
+      bool featureEnabled = features[i].enabled;
+      if (UiCheckbox(features[i].name.c_str(), &featureEnabled, features[i].description.c_str())) {
+        state.client->EnableDebugDrawFeature(features[i].name, featureEnabled);
+      }
+    }
+  }
 
   if (ImGui::TreeNode("Meshes")) {
     MOCHI_DEFER(ImGui::TreePop());

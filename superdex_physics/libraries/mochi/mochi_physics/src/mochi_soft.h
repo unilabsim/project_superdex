@@ -94,10 +94,6 @@ struct CSoftExportParams : NoCopy {
   Soft Actor Utils
 */
 
-// Set the displacements to zero. Note this is the local displacement thus does not zero out
-// recentering transform.
-void SetZeroDisplacements(entt::registry& reg, entt::entity e, Error& error);
-
 // Set the position of all nodes by replacing the contents of the solution vector.
 // Size of inPositionsLocal == numNodes * kSpaceDim.
 void SetNodePositionsLocal(
@@ -105,9 +101,6 @@ void SetNodePositionsLocal(
     entt::entity e,
     Span<real const> inPositionsLocal,
     Error& error);
-
-// Zero out the velocities.
-void SetZeroVelocities(entt::registry& reg, entt::entity e, Error& error);
 
 // Set the velocity of all nodes in the CGlobalKinematics component.
 // Size of inVelocitiesLocal == numNodes * kSpaceDim.

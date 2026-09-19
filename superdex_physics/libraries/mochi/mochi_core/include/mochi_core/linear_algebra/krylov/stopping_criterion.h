@@ -130,18 +130,45 @@ class StatusResidualL2 {
     }
   }
 
-  /// @brief Scaling for the relative tolerance and the divergence tolerance
-  /// @note The scaling is ||b||_{2}
-  template <typename VectorIn, typename Preconditioner, typename VectorOut>
-  void SetScaling(VectorIn const& b, Preconditioner&& /*M*/, VectorOut& /*z*/) {
-    auto bNormSqr = static_cast<Scalar>(_dot.NormSqr(b));
+  /// @brief Sets the tolerance scaling to \f$D(b,b)\f$, where \f$D\f$ is the criterion-owned
+  /// dot operation.
+  ///
+  /// @note The preconditioner and preconditioned right-hand side arguments are unused.
+  template <typename RhsType, typename PreconditionerType, typename PreconditionedRhsType>
+  void SetScaling(RhsType const& b, PreconditionerType&& /*M*/, PreconditionedRhsType& /*z*/) {
+    auto const bNormSqr = static_cast<Scalar>(_dot.NormSqr(b));
+    _check.SetScaling(bNormSqr);
+  }
+
+  /// @brief Collectively sets the tolerance scaling to \f$D(b,b)\f$, where \f$D\f$ is the
+  /// criterion-owned dot operation.
+  ///
+  /// @pre Each participating worker calls this method once in the same collective phase with a
+  /// unique worker index and an equivalently initialized criterion instance.
+  /// @pre Each worker passes its own @ref ParallelDot copy. All copies share the same collective
+  /// state.
+  /// @pre The row ranges form a disjoint partition of @p b.
+  /// @pre For a custom dot operation, summing its row-range products is mathematically equivalent
+  /// to its full-vector squared-norm operation. Floating-point reduction order may differ.
+  ///
+  /// @note Performs one @ref ParallelDot reduction and does not apply the preconditioner. The
+  /// @p z workspace is unused and need not be initialized.
+  template <typename RhsType, typename PreconditionedRhsType, typename Idx, typename DotScalar>
+  void SetConcurrentScaling(
+      RhsType const& b,
+      PreconditionedRhsType const& /*z*/,
+      Idx rowStart,
+      Idx rowEnd,
+      int workerIdx,
+      ParallelDot<DotScalar> const& parDot) {
+    auto const bNormSqr = static_cast<Scalar>(parDot.Dot(_dot, b, b, rowStart, rowEnd, workerIdx));
     _check.SetScaling(bNormSqr);
   }
 
   template <typename Vector>
   [[nodiscard]] IterationStatus
   CheckStatus(int iter, Vector const& r, Vector const& /*z*/, Vector const& p, Vector const& Ap) {
-    auto resNormSqr = static_cast<Scalar>(_dot.NormSqr(r));
+    auto const resNormSqr = static_cast<Scalar>(_dot.NormSqr(r));
     if ((iter > 0) && (_container.has_value())) {
       _container->Insert(p, Ap);
     }
@@ -160,7 +187,7 @@ class StatusResidualL2 {
       int workerIdx,
       ParallelDot<DotScalar> const& parDot) {
     MOCHI_ASSERT(!_container.has_value(), "Parallel status check does not support recycling.");
-    auto rNormSqr = static_cast<Scalar>(parDot.Dot(_dot, r, r, rowStart, rowEnd, workerIdx));
+    auto const rNormSqr = static_cast<Scalar>(parDot.Dot(_dot, r, r, rowStart, rowEnd, workerIdx));
     return _check.CheckStatus(iter, rNormSqr);
   }
 
@@ -218,7 +245,7 @@ class StatusPreconditionedResidualL2 {
   template <typename Vector>
   [[nodiscard]] IterationStatus
   CheckStatus(int iter, Vector const& /*r*/, Vector const& z, Vector const& p, Vector const& Ap) {
-    auto zNormSqr = static_cast<Scalar>(_dot.NormSqr(z));
+    auto const zNormSqr = static_cast<Scalar>(_dot.NormSqr(z));
     if ((iter > 0) && (_container.has_value())) {
       _container->Insert(p, Ap);
     }
@@ -236,8 +263,12 @@ class StatusPreconditionedResidualL2 {
       Idx rowEnd,
       int workerIdx,
       ParallelDot<DotScalar> const& parDot) {
+    auto const zNormSqr = static_cast<Scalar>(parDot.Dot(_dot, z, z, rowStart, rowEnd, workerIdx));
+    return ParallelCheckStatus(iter, zNormSqr);
+  }
+
+  [[nodiscard]] IterationStatus ParallelCheckStatus(int iter, Scalar zNormSqr) {
     MOCHI_ASSERT(!_container.has_value(), "Parallel status check does not support recycling.");
-    auto zNormSqr = static_cast<Scalar>(parDot.Dot(_dot, z, z, rowStart, rowEnd, workerIdx));
     return _check.CheckStatus(iter, zNormSqr);
   }
 
@@ -263,13 +294,40 @@ class StatusPreconditionedResidualL2 {
     return _container->GetRetainedMappedDirections();
   }
 
-  /// @brief Scaling for the relative tolerance and the divergence tolerance
-  /// @note The scaling is ||M^{-1} b||_{2}
-  /// @note z is a workspace to store M^{-1} b
-  template <typename VectorIn, typename Preconditioner, typename VectorOut>
-  void SetScaling(VectorIn const& b, Preconditioner&& M, VectorOut& z) {
+  /// @brief Computes \f$z=M^{-1}b\f$ using @p M and sets the tolerance scaling to
+  /// \f$D(z,z)\f$, where \f$D\f$ is the criterion-owned dot operation.
+  template <typename RhsType, typename PreconditionerType, typename PreconditionedRhsType>
+  void SetScaling(RhsType const& b, PreconditionerType&& M, PreconditionedRhsType& z) {
     Solve(M, b, z); // z = M^{-1} b
-    auto zNormSqr = static_cast<Scalar>(_dot.NormSqr(z));
+    auto const zNormSqr = static_cast<Scalar>(_dot.NormSqr(z));
+    _check.SetScaling(zNormSqr);
+  }
+
+  /// @brief Collectively sets the tolerance scaling to \f$D(z,z)\f$, where \f$D\f$ is the
+  /// criterion-owned dot operation.
+  ///
+  /// @pre On entry, the elements of @p z from @p rowStart through @p rowEnd (exclusive) equal the
+  /// corresponding elements of \f$M^{-1}b\f$, are visible to this worker, and remain unchanged
+  /// during the call.
+  /// @pre Each participating worker calls this method once in the same collective phase with a
+  /// unique worker index and an equivalently initialized criterion instance.
+  /// @pre Each worker passes its own @ref ParallelDot copy. All copies share the same collective
+  /// state.
+  /// @pre The row ranges form a disjoint partition of @p z.
+  /// @pre For a custom dot operation, summing its row-range products is mathematically equivalent
+  /// to its full-vector squared-norm operation. Floating-point reduction order may differ.
+  ///
+  /// @note Performs one @ref ParallelDot reduction and does not apply the preconditioner. The
+  /// caller supplies the precomputed @p z. The @p b argument is unused.
+  template <typename RhsType, typename PreconditionedRhsType, typename Idx, typename DotScalar>
+  void SetConcurrentScaling(
+      RhsType const& /*b*/,
+      PreconditionedRhsType const& z,
+      Idx rowStart,
+      Idx rowEnd,
+      int workerIdx,
+      ParallelDot<DotScalar> const& parDot) {
+    auto const zNormSqr = static_cast<Scalar>(parDot.Dot(_dot, z, z, rowStart, rowEnd, workerIdx));
     _check.SetScaling(zNormSqr);
   }
 };
@@ -299,7 +357,7 @@ class StatusResidualPreconditionerInduced {
       Vector const& z,
       Vector const& /*p*/,
       Vector const& /*Ap*/) {
-    auto rTz = static_cast<Scalar>(_dot(r, z));
+    auto const rTz = static_cast<Scalar>(_dot(r, z));
     return _check.CheckStatus(iter, rTz);
   }
 
@@ -314,7 +372,7 @@ class StatusResidualPreconditionerInduced {
       Idx rowEnd,
       int workerIdx,
       ParallelDot<DotScalar> const& parDot) {
-    auto rTz = static_cast<Scalar>(parDot.Dot(_dot, r, z, rowStart, rowEnd, workerIdx));
+    auto const rTz = static_cast<Scalar>(parDot.Dot(_dot, r, z, rowStart, rowEnd, workerIdx));
     return _check.CheckStatus(iter, rTz);
   }
 
@@ -330,13 +388,40 @@ class StatusResidualPreconditionerInduced {
     return _check.GetLatestResidualNormSqr();
   }
 
-  /// @brief Scaling for the relative tolerance and the divergence tolerance
-  /// @note The scaling is <b, M^{-1}b>
-  /// @note z is a workspace to store M^{-1} b
-  template <typename VectorIn, typename Preconditioner, typename VectorOut>
-  void SetScaling(VectorIn const& b, Preconditioner&& M, VectorOut& z) {
+  /// @brief Computes \f$z=M^{-1}b\f$ using @p M and sets the tolerance scaling to
+  /// \f$D(b,z)\f$, where \f$D\f$ is the criterion-owned dot operation.
+  template <typename RhsType, typename PreconditionerType, typename PreconditionedRhsType>
+  void SetScaling(RhsType const& b, PreconditionerType&& M, PreconditionedRhsType& z) {
     Solve(M, b, z); // z = M^{-1} b
-    auto bTz = static_cast<Scalar>(_dot(b, z)); // <b, M^{-1} b>
+    auto const bTz = static_cast<Scalar>(_dot(b, z)); // <b, M^{-1} b>
+    _check.SetScaling(bTz);
+  }
+
+  /// @brief Collectively sets the tolerance scaling to \f$D(b,z)\f$, where \f$D\f$ is the
+  /// criterion-owned dot operation.
+  ///
+  /// @pre On entry, the elements of @p z from @p rowStart through @p rowEnd (exclusive) equal the
+  /// corresponding elements of \f$M^{-1}b\f$, are visible to this worker, and remain unchanged
+  /// during the call.
+  /// @pre Each participating worker calls this method once in the same collective phase with a
+  /// unique worker index and an equivalently initialized criterion instance.
+  /// @pre Each worker passes its own @ref ParallelDot copy. All copies share the same collective
+  /// state.
+  /// @pre The row ranges form a disjoint partition of @p b and @p z.
+  /// @pre The criterion-owned dot operation is mathematically additive across the worker row
+  /// ranges. Floating-point reduction order may differ.
+  ///
+  /// @note Performs one @ref ParallelDot reduction and does not apply the preconditioner. The
+  /// caller supplies the precomputed @p z.
+  template <typename RhsType, typename PreconditionedRhsType, typename Idx, typename DotScalar>
+  void SetConcurrentScaling(
+      RhsType const& b,
+      PreconditionedRhsType const& z,
+      Idx rowStart,
+      Idx rowEnd,
+      int workerIdx,
+      ParallelDot<DotScalar> const& parDot) {
+    auto const bTz = static_cast<Scalar>(parDot.Dot(_dot, b, z, rowStart, rowEnd, workerIdx));
     _check.SetScaling(bTz);
   }
 };

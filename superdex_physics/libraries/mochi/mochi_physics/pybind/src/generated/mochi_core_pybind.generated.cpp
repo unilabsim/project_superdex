@@ -18,37 +18,41 @@
 
 // clang-format off
 
-#include <pybind11/pybind11.h>
+#include <limits>
+#include <nanobind/nanobind.h>
 #include "../pybind_include.h"
 
 using namespace mochi;
-namespace py = pybind11;
-using namespace pybind11::literals;
+namespace nb = nanobind;
 
 namespace mochi {
   // Forward declarations for the definitions below.
-  void DeclareMochiCore_MochiCore(py::module_& m, PybindRegistry& registry);
-  void DefineMochiCore_MochiCore(py::module_& m, PybindRegistry& registry);
+  void DeclareMochiCore_MochiCore(nb::module_& m, PybindRegistry& registry);
+  void DefineMochiCore_MochiCore(nb::module_& m, PybindRegistry& registry);
 } // namespace mochi
 
-void mochi::DeclareMochiCore_MochiCore([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
-  py::enum_<mochi::ArticulatedJointType>(m, "ArticulatedJointType", "Types of joints in an articulated body.")
-    .value("FREE", mochi::ArticulatedJointType::Free, "6-DoF joint with unconstrained relative motion between links.")
-    .value("PRISMATIC", mochi::ArticulatedJointType::Prismatic, "1-DoF translational joint along a single axis.")
-    .value("REVOLUTE", mochi::ArticulatedJointType::Revolute, "1-DoF rotational joint around a single axis.")
-    .value("SPHERICAL", mochi::ArticulatedJointType::Spherical, "3-DoF rotational ball-and-socket joint.")
-    .value("HARD", mochi::ArticulatedJointType::Hard, "0-DoF rigid weld joint with no relative motion between links.")
-    .value("CYCLE", mochi::ArticulatedJointType::Cycle, "Cycle-closing joint in a closed-loop articulated topology.")
-    .value("COUNT", mochi::ArticulatedJointType::Count)
-    .value("INVALID", mochi::ArticulatedJointType::Invalid)
-  ;
+void mochi::DeclareMochiCore_MochiCore([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+  {
+    auto boundEnum = nb::enum_<mochi::ArticulatedJointType>(m, "ArticulatedJointType", "Types of joints in an articulated body.");
+    boundEnum
+      .value("FREE", mochi::ArticulatedJointType::Free, "6-DoF joint with unconstrained relative motion between links.")
+      .value("PRISMATIC", mochi::ArticulatedJointType::Prismatic, "1-DoF translational joint along a single axis.")
+      .value("REVOLUTE", mochi::ArticulatedJointType::Revolute, "1-DoF rotational joint around a single axis.")
+      .value("SPHERICAL", mochi::ArticulatedJointType::Spherical, "3-DoF rotational ball-and-socket joint.")
+      .value("HARD", mochi::ArticulatedJointType::Hard, "0-DoF rigid weld joint with no relative motion between links.")
+      .value("CYCLE", mochi::ArticulatedJointType::Cycle, "Cycle-closing joint in a closed-loop articulated topology.")
+      .value("COUNT", mochi::ArticulatedJointType::Count)
+    ;
+    boundEnum.attr("INVALID") = boundEnum.attr("COUNT");
+    nb::cast<nb::dict>(boundEnum.attr("_member_map_")).attr("__setitem__")("INVALID", boundEnum.attr("COUNT"));
+  }
 
-  py::enum_<mochi::RoutingElementType>(m, "RoutingElementType", "Selects how a :class:`~superdex.physics.RoutingElement` is interpreted by a\nspatial tendon.")
+  nb::enum_<mochi::RoutingElementType>(m, "RoutingElementType", "Selects how a :class:`~superdex.physics.RoutingElement` is interpreted by a\nspatial tendon.")
     .value("WAYPOINT", mochi::RoutingElementType::Waypoint, "A point fixed in a link's local frame. Adjacent waypoints are joined by a\n    straight segment whose length contributes to the tendon length.")
     .value("LINEAR_JOINT", mochi::RoutingElementType::LinearJoint, "A constant moment arm contributing `coefficient * jointCoordinate`. Carries no\n    geometry and breaks the polyline between waypoints.")
   ;
 
-  py::enum_<mochi::VerbosityLevel>(m, "VerbosityLevel", "Verbosity levels for solvers and optimizers.")
+  nb::enum_<mochi::VerbosityLevel>(m, "VerbosityLevel", "Verbosity levels for solvers and optimizers.")
     .value("SILENT", mochi::VerbosityLevel::Silent, "No output.")
     .value("ERROR", mochi::VerbosityLevel::Error, "Only errors.")
     .value("WARNING", mochi::VerbosityLevel::Warning, "Errors and warnings.")
@@ -56,7 +60,7 @@ void mochi::DeclareMochiCore_MochiCore([[maybe_unused]] py::module_& m, [[maybe_
     .value("COUNT", mochi::VerbosityLevel::Count, "Number of verbosity level enum values.")
   ;
 
-  py::enum_<mochi::ConvergenceStatus>(m, "ConvergenceStatus", "Convergence status of the non-linear solver.\n\nNote:\n    Values are ordered by severity: ``None < Converged < Stopped < Diverged``.")
+  nb::enum_<mochi::ConvergenceStatus>(m, "ConvergenceStatus", "Convergence status of the non-linear solver.\n\nNote:\n    Values are ordered by severity: ``None < Converged < Stopped < Diverged``.")
     .value("NONE", mochi::ConvergenceStatus::None, "Convergence status has not been set.")
     .value("CONVERGED", mochi::ConvergenceStatus::Converged, "Solver converged to the requested tolerance.")
     .value("STOPPED", mochi::ConvergenceStatus::Stopped, "Solver met at least one stopping criterion without converging to the requested\n    tolerance.")
@@ -64,7 +68,7 @@ void mochi::DeclareMochiCore_MochiCore([[maybe_unused]] py::module_& m, [[maybe_
     .value("COUNT", mochi::ConvergenceStatus::Count, "Number of convergence status enum values.")
   ;
 
-  py::enum_<mochi::SoftMaterialType>(m, "SoftMaterialType", "Material constitutive models for soft bodies.\n\nDefines the constitutive response for deformable materials (strain energy and\nstress-strain relationship). Each material has different mechanical properties,\ncomputational cost, and stability characteristics.\n\nSee Also:\n    :class:`~superdex.physics.SoftMaterialParams`,\n    :class:`~superdex.physics.MaterialPsdStrategy`")
+  nb::enum_<mochi::SoftMaterialType>(m, "SoftMaterialType", "Material constitutive models for soft bodies.\n\nDefines the constitutive response for deformable materials (strain energy and\nstress-strain relationship). Each material has different mechanical properties,\ncomputational cost, and stability characteristics.\n\nSee Also:\n    :class:`~superdex.physics.SoftMaterialParams`,\n    :class:`~superdex.physics.MaterialPsdStrategy`")
     .value("NEO_HOOKEAN", mochi::SoftMaterialType::NeoHookean, "Neo-Hookean hyperelastic material.\n    \n    Non-linear hyperelastic material with log-barrier stabilization to handle\n    extreme deformations and element inversions robustly. Recommended for most soft\n    body simulations requiring large deformations.\n    \n    Reference: [Stable Neo-Hookean Flesh Simulation (Smith et al.,\n    2018)](https://www.tkim.graphics/NEO/StableNeoHookean2018.pdf)\n    \n    See Also:\n        :class:`~superdex.physics.NeoHookeanMaterialParams`")
     .value("ST_VENANT_KIRCHHOFF", mochi::SoftMaterialType::StVenantKirchhoff, "Saint Venant-Kirchhoff (StVK) hyperelastic material.\n    \n    Classical non-linear hyperelastic material. Simpler than neo-Hookean but may\n    exhibit instabilities under large deformations, particularly under large\n    compression.\n    \n    See Also:\n        :class:`~superdex.physics.StVenantKirchhoffMaterialParams`")
     .value("LINEAR_ELASTIC", mochi::SoftMaterialType::LinearElastic, "Linear elastic material (Hookean).\n    \n    Simplest material model with linear stress-strain relationship. Computationally\n    fast but only accurate for small deformations.\n    \n    Note:\n        Not suitable for large deformations.\n    \n    Note:\n        No PSD enforcement is needed. The Hessian matrix is positive definite\n        regardless of the PSD strategy.\n    \n    See Also:\n        :class:`~superdex.physics.LinearElasticMaterialParams`")
@@ -74,7 +78,7 @@ void mochi::DeclareMochiCore_MochiCore([[maybe_unused]] py::module_& m, [[maybe_
     .value("COUNT", mochi::SoftMaterialType::Count, "Number of unique material type enum values.")
   ;
 
-  py::enum_<mochi::MaterialPsdStrategy>(m, "MaterialPsdStrategy", "Strategy for ensuring positive semi-definite (PSD) Hessian matrices in material\nmodels.\n\nThe material Hessian (∂P/∂F, where P is the first Piola-Kirchhoff stress and F\nis the deformation gradient) should be PSD for stable simulation. This enum\ndefines strategies to enforce this property, balancing computational cost\nagainst stability and convergence quality.\n\nNote:\n    Different materials support different strategies. Check material-specific\n    documentation.\n\nSee Also:\n    :class:`~superdex.physics.SoftMaterialType`")
+  nb::enum_<mochi::MaterialPsdStrategy>(m, "MaterialPsdStrategy", "Strategy for ensuring positive semi-definite (PSD) Hessian matrices in material\nmodels.\n\nThe material Hessian (∂P/∂F, where P is the first Piola-Kirchhoff stress and F\nis the deformation gradient) should be PSD for stable simulation. This enum\ndefines strategies to enforce this property, balancing computational cost\nagainst stability and convergence quality.\n\nNote:\n    Different materials support different strategies. Check material-specific\n    documentation.\n\nSee Also:\n    :class:`~superdex.physics.SoftMaterialType`")
     .value("MATERIAL_DEFAULT", mochi::MaterialPsdStrategy::MaterialDefault, "Use the material's default PSD strategy.\n    \n    Note:\n        Supported for all material models.\n    \n    Note:\n        Each material model defines its own recommended default strategy.")
     .value("NONE", mochi::MaterialPsdStrategy::None, "No PSD enforcement. Negative eigenvalues may arise.\n    \n    Fastest strategy but may substantially degrade stability of most material\n    models.\n    \n    Note:\n        Supported for all material models.")
     .value("PROJECTION", mochi::MaterialPsdStrategy::Projection, "Eigenvalue clamping: U * Max(Λ, ε) * U^T.\n    \n    Performs eigendecomposition ∂P/∂F = U * Λ * U^T and clamps negative eigenvalues\n    to a small positive constant ε. Slower than most other methods, but typically\n    ensures best convergence.\n    \n    Note:\n        Supported for all material models.")
@@ -84,7 +88,7 @@ void mochi::DeclareMochiCore_MochiCore([[maybe_unused]] py::module_& m, [[maybe_
     .value("COUNT", mochi::MaterialPsdStrategy::Count, "Number of unique enum values.")
   ;
 
-  py::enum_<mochi::GridSdfResolutionMode>(m, "GridSdfResolutionMode", "The maximum voxel size for an SDF will be determined by one of these\nmeasurements scaled by :attr:`~superdex.physics.GridSdfParams.resolution_delta`.")
+  nb::enum_<mochi::GridSdfResolutionMode>(m, "GridSdfResolutionMode", "The maximum voxel size for an SDF will be determined by one of these\nmeasurements scaled by :attr:`~superdex.physics.GridSdfParams.resolution_delta`.")
     .value("LARGEST_AXIS", mochi::GridSdfResolutionMode::LargestAxis, "Use the largest dimension of the mesh's axis-aligned bounding box (AABB) as\n    reference.")
     .value("SMALLEST_AXIS", mochi::GridSdfResolutionMode::SmallestAxis, "Use the smallest dimension of the mesh's AABB as reference.")
     .value("MEAN_AXIS", mochi::GridSdfResolutionMode::MeanAxis, "Use the average of all three AABB dimensions as reference.")
@@ -95,13 +99,13 @@ void mochi::DeclareMochiCore_MochiCore([[maybe_unused]] py::module_& m, [[maybe_
     .value("COUNT", mochi::GridSdfResolutionMode::Count, "Total number of resolution modes.")
   ;
 
-  py::enum_<mochi::FileFormat>(m, "FileFormat", "File format options used when saving model data.")
+  nb::enum_<mochi::FileFormat>(m, "FileFormat", "File format options used when saving model data.")
     .value("JSON", mochi::FileFormat::JSON, "JSON format (text).")
     .value("H5", mochi::FileFormat::H5, "HDF5 format (binary). Requires MOCHI_USE_HDF5.")
     .value("COUNT", mochi::FileFormat::Count)
   ;
 
-  py::enum_<mochi::MeshFileType>(m, "MeshFileType", "Mesh file format hint for shape and model loading.")
+  nb::enum_<mochi::MeshFileType>(m, "MeshFileType", "Mesh file format hint for shape and model loading.")
     .value("LEGACY", mochi::MeshFileType::Legacy, "Auto-detect between HDF5 and JSON (default behavior).")
     .value("PLY", mochi::MeshFileType::PLY, "PLY format (Stanford Polygon).")
     .value("OFF", mochi::MeshFileType::OFF, "OFF format (Object File Format).")
@@ -110,7 +114,7 @@ void mochi::DeclareMochiCore_MochiCore([[maybe_unused]] py::module_& m, [[maybe_
     .value("COUNT", mochi::MeshFileType::Count)
   ;
 
-  py::enum_<mochi::ColliderType>(m, "ColliderType", "Collision detection geometry for an :class:`~superdex.physics.Actor`.\n\nNote:\n    This setting controls how OTHER actors detect contact with this actor. It\n    does not affect how this actor detects contact with other actors.")
+  nb::enum_<mochi::ColliderType>(m, "ColliderType", "Collision detection geometry for an :class:`~superdex.physics.Actor`.\n\nNote:\n    This setting controls how OTHER actors detect contact with this actor. It\n    does not affect how this actor detects contact with other actors.")
     .value("NONE", mochi::ColliderType::None, "No collision representation. Other actors cannot detect contact with this actor.\n    \n    Note:\n        It does NOT prevent this actor from detecting contact with other actors.")
     .value("AUTO", mochi::ColliderType::Auto, "Automatic collider type selection based on the actor's shape.\n    \n    Note:\n        Mochi will select the most appropriate collider type based on the actor's\n        shape and type: - Implicit sphere shapes: :class:`SPHERE\n        <superdex.physics.ColliderType>` - Implicit plane shapes: :class:`PLANE\n        <superdex.physics.ColliderType>` - Mesh shapes on volumetric actors (e.g.,\n        rigid, soft): :class:`SDF <superdex.physics.ColliderType>` - Shell and rod\n        actors: :class:`POINT_CLOUD <superdex.physics.ColliderType>`\n    \n    Note:\n        If Auto is set on an actor, a valid collider type will be assigned even if\n        the shape's default collider type is :class:`NONE\n        <superdex.physics.ColliderType>`. If you want :class:`NONE\n        <superdex.physics.ColliderType>`, set :class:`NONE\n        <superdex.physics.ColliderType>` explicitly as your collider type.\n    \n    Note:\n        After initialization, :meth:`~superdex.physics.Actor.get_collider_type` will\n        return the selected type, not :class:`AUTO <superdex.physics.ColliderType>`.")
     .value("SPHERE", mochi::ColliderType::Sphere, "Represent the actor by an approximating sphere derived from its bounding volume.\n    \n    Note:\n        For shapes with a sphere bounding volume, that sphere is used. For shapes\n        with an OBB/AABB bounding volume, the inscribed sphere is used. Otherwise, a\n        true bounding sphere is computed.\n    \n    Note:\n        Fast but only accurate for spherical geometries.\n    \n    Note:\n        Only supported for rigid actors and articulated links.")
@@ -122,7 +126,7 @@ void mochi::DeclareMochiCore_MochiCore([[maybe_unused]] py::module_& m, [[maybe_
     .value("COUNT", mochi::ColliderType::Count, "Number of collider type enum values.")
   ;
 
-  py::enum_<mochi::LogChannel>(m, "LogChannel", "Log message channel.")
+  nb::enum_<mochi::LogChannel>(m, "LogChannel", "Log message channel.")
     .value("VERBOSE", mochi::LogChannel::Verbose)
     .value("INFO", mochi::LogChannel::Info)
     .value("WARNING", mochi::LogChannel::Warning)
@@ -130,385 +134,429 @@ void mochi::DeclareMochiCore_MochiCore([[maybe_unused]] py::module_& m, [[maybe_
     .value("COUNT", mochi::LogChannel::Count)
   ;
 
-  py::enum_<mochi::CoulombFrictionModel>(m, "CoulombFrictionModel", "Coulomb friction regularization model.")
-    .value("C1_REGULARIZED", mochi::CoulombFrictionModel::C1Regularized, "C1-smoothed Coulomb friction with compact support: friction transitions linearly\n    from 0 to full strength over [0,\n    :attr:`~superdex.physics.ContactParams.friction_falloff_vel`].")
-    .value("CINF_REGULARIZED", mochi::CoulombFrictionModel::CinfRegularized, "C-infinity regularized Coulomb friction with no compact support: friction\n    asymptotically approaches full strength.\n    :attr:`~superdex.physics.ContactParams.friction_falloff_vel` controls the\n    regularization scale.")
-    .value("COUNT", mochi::CoulombFrictionModel::Count, "Number of friction model enum values.")
-    .value("DEFAULT", mochi::CoulombFrictionModel::Default, "Default Coulomb friction model.")
-  ;
+  {
+    auto boundEnum = nb::enum_<mochi::CoulombFrictionModel>(m, "CoulombFrictionModel", "Coulomb friction regularization model.");
+    boundEnum
+      .value("C1_REGULARIZED", mochi::CoulombFrictionModel::C1Regularized, "C1-smoothed Coulomb friction with compact support: friction transitions linearly\n    from 0 to full strength over [0,\n    :attr:`~superdex.physics.ContactParams.friction_falloff_vel`].")
+      .value("CINF_REGULARIZED", mochi::CoulombFrictionModel::CinfRegularized, "C-infinity regularized Coulomb friction with no compact support: friction\n    asymptotically approaches full strength.\n    :attr:`~superdex.physics.ContactParams.friction_falloff_vel` controls the\n    regularization scale.")
+      .value("COUNT", mochi::CoulombFrictionModel::Count, "Number of friction model enum values.")
+    ;
+    boundEnum.attr("DEFAULT") = boundEnum.attr("C1_REGULARIZED");
+    nb::cast<nb::dict>(boundEnum.attr("_member_map_")).attr("__setitem__")("DEFAULT", boundEnum.attr("C1_REGULARIZED"));
+  }
 
-  py::enum_<mochi::NonLinearSolverType>(m, "NonLinearSolverType", "Non-linear solver algorithm.")
-    .value("NEWTON", mochi::NonLinearSolverType::Newton, "Newton's method.")
-    .value("BFGS", mochi::NonLinearSolverType::BFGS, "Broyden-Fletcher-Goldfarb-Shanno (BFGS) method.\n    \n    Note:\n        The initial approximation of the dresidual is the actual dresidual (i.e.,\n        the first iteration matches Newton's method).\n    \n    Note:\n        The algorithm is restarted with the actual dresidual every\n        :attr:`~superdex.physics.NonLinearSolverParams.d_residual_assembly_period`\n        iterations, or immediately if the line search fails to improve the figure of\n        merit it monitors or the linear solver fails to converge.\n    \n    See Also:\n        :attr:`~superdex.physics.NonLinearSolverParams.d_residual_assembly_period`")
-    .value("SR1", mochi::NonLinearSolverType::SR1, "Symmetric Rank-One (SR1) method.\n    \n    Note:\n        The initial approximation of the dresidual is the actual dresidual (i.e.,\n        the first iteration matches Newton's method).\n    \n    Note:\n        The algorithm is restarted with the actual dresidual every\n        :attr:`~superdex.physics.NonLinearSolverParams.d_residual_assembly_period`\n        iterations, or immediately if the line search fails to improve the figure of\n        merit it monitors or the linear solver fails to converge.\n    \n    See Also:\n        :attr:`~superdex.physics.NonLinearSolverParams.d_residual_assembly_period`")
-    .value("COUNT", mochi::NonLinearSolverType::Count, "Number of non-linear solver type enum values.")
-    .value("DEFAULT", mochi::NonLinearSolverType::Default, "Default non-linear solver type.")
-  ;
+  {
+    auto boundEnum = nb::enum_<mochi::NonLinearSolverType>(m, "NonLinearSolverType", "Non-linear solver algorithm.");
+    boundEnum
+      .value("NEWTON", mochi::NonLinearSolverType::Newton, "Newton's method.")
+      .value("BFGS", mochi::NonLinearSolverType::BFGS, "Broyden-Fletcher-Goldfarb-Shanno (BFGS) method.\n    \n    Note:\n        The initial approximation of the dresidual is the actual dresidual (i.e.,\n        the first iteration matches Newton's method).\n    \n    Note:\n        The algorithm is restarted with the actual dresidual every\n        :attr:`~superdex.physics.NonLinearSolverParams.d_residual_assembly_period`\n        iterations, or immediately if the line search fails to improve the figure of\n        merit it monitors or the linear solver fails to converge.\n    \n    See Also:\n        :attr:`~superdex.physics.NonLinearSolverParams.d_residual_assembly_period`")
+      .value("SR1", mochi::NonLinearSolverType::SR1, "Symmetric Rank-One (SR1) method.\n    \n    Note:\n        The initial approximation of the dresidual is the actual dresidual (i.e.,\n        the first iteration matches Newton's method).\n    \n    Note:\n        The algorithm is restarted with the actual dresidual every\n        :attr:`~superdex.physics.NonLinearSolverParams.d_residual_assembly_period`\n        iterations, or immediately if the line search fails to improve the figure of\n        merit it monitors or the linear solver fails to converge.\n    \n    See Also:\n        :attr:`~superdex.physics.NonLinearSolverParams.d_residual_assembly_period`")
+      .value("COUNT", mochi::NonLinearSolverType::Count, "Number of non-linear solver type enum values.")
+    ;
+    boundEnum.attr("DEFAULT") = boundEnum.attr("NEWTON");
+    nb::cast<nb::dict>(boundEnum.attr("_member_map_")).attr("__setitem__")("DEFAULT", boundEnum.attr("NEWTON"));
+  }
 
-  py::enum_<mochi::NonLinearSolverConvergenceMode>(m, "NonLinearSolverConvergenceMode", "Convergence monitoring mode for the non-linear solver residual.\n\nNote:\n    Convergence is evaluated per simulation island, not scene-wide. Each island\n    is solved independently, and the selected mode determines how convergence is\n    assessed within that island.\n\nNote:\n    The norm used to monitor divergence via\n    :attr:`~superdex.physics.NonLinearSolverParams.abs_div_tol` and\n    :attr:`~superdex.physics.NonLinearSolverParams.rel_div_tol` is always the L2\n    norm, irrespective of this setting.\n\nNote:\n    The norm used to monitor stagnation via\n    :attr:`~superdex.physics.NonLinearSolverParams.rel_step_tol` is always the\n    L2 norm, irrespective of this setting.\n\nSee Also:\n    :attr:`~superdex.physics.NonLinearSolverParams.abs_tol`,\n    :attr:`~superdex.physics.NonLinearSolverParams.rel_tol`")
-    .value("GLOBAL", mochi::NonLinearSolverConvergenceMode::Global, "Use global, unweighted residual norm for convergence checks within each\n    simulation island.\n    \n    Convergence is determined by the global residual norm within each simulation\n    island: ``|r|`` <= absTol or ``|r|`` <= relTol * ``|r0|``")
-    .value("PER_ACTOR_WEIGHTED", mochi::NonLinearSolverConvergenceMode::PerActorWeighted, "Use per-actor weighted residual norms for convergence checks.\n    \n    Each actor uses a per-actor weighted L2 norm ``|r_a|_W`` = sqrt(Σᵢ wᵢ·rᵢ²),\n    where weights normalize force/torque residuals by characteristic force/torque.\n    All actors must satisfy their individual criteria: ``|r_a|_W`` <= absTol or\n    ``|r_a|_W`` <= relTol * ``|r0_a|_W``\n    \n    Note:\n        Weights are derived from inertia properties. Actors with zero inertia\n        receive uniform weights, which provide no physical normalization. For\n        quasi-static problems, :class:`GLOBAL\n        <superdex.physics.NonLinearSolverConvergenceMode>` mode is recommended.")
-    .value("COUNT", mochi::NonLinearSolverConvergenceMode::Count, "Number of convergence monitoring mode enum values.")
-    .value("DEFAULT", mochi::NonLinearSolverConvergenceMode::Default, "Default convergence monitoring mode.")
-  ;
+  {
+    auto boundEnum = nb::enum_<mochi::NonLinearSolverConvergenceMode>(m, "NonLinearSolverConvergenceMode", "Convergence monitoring mode for the non-linear solver residual.\n\nNote:\n    Convergence is evaluated per simulation island, not scene-wide. Each island\n    is solved independently, and the selected mode determines how convergence is\n    assessed within that island.\n\nNote:\n    The norm used to monitor divergence via\n    :attr:`~superdex.physics.NonLinearSolverParams.abs_div_tol` and\n    :attr:`~superdex.physics.NonLinearSolverParams.rel_div_tol` is always the L2\n    norm, irrespective of this setting.\n\nNote:\n    The norm used to monitor stagnation via\n    :attr:`~superdex.physics.NonLinearSolverParams.rel_step_tol` is always the\n    L2 norm, irrespective of this setting.\n\nSee Also:\n    :attr:`~superdex.physics.NonLinearSolverParams.abs_tol`,\n    :attr:`~superdex.physics.NonLinearSolverParams.rel_tol`");
+    boundEnum
+      .value("GLOBAL", mochi::NonLinearSolverConvergenceMode::Global, "Use global, unweighted residual norm for convergence checks within each\n    simulation island.\n    \n    Convergence is determined by the global residual norm within each simulation\n    island: ``|r|`` <= absTol or ``|r|`` <= relTol * ``|r0|``")
+      .value("PER_ACTOR_WEIGHTED", mochi::NonLinearSolverConvergenceMode::PerActorWeighted, "Use per-actor weighted residual norms for convergence checks.\n    \n    Each actor uses a per-actor weighted L2 norm ``|r_a|_W`` = sqrt(Σᵢ wᵢ·rᵢ²),\n    where weights normalize force/torque residuals by characteristic force/torque.\n    All actors must satisfy their individual criteria: ``|r_a|_W`` <= absTol or\n    ``|r_a|_W`` <= relTol * ``|r0_a|_W``\n    \n    Note:\n        Weights are derived from inertia properties. Actors with zero inertia\n        receive uniform weights, which provide no physical normalization. For\n        quasi-static problems, :class:`GLOBAL\n        <superdex.physics.NonLinearSolverConvergenceMode>` mode is recommended.")
+      .value("COUNT", mochi::NonLinearSolverConvergenceMode::Count, "Number of convergence monitoring mode enum values.")
+    ;
+    boundEnum.attr("DEFAULT") = boundEnum.attr("PER_ACTOR_WEIGHTED");
+    nb::cast<nb::dict>(boundEnum.attr("_member_map_")).attr("__setitem__")("DEFAULT", boundEnum.attr("PER_ACTOR_WEIGHTED"));
+  }
 
-  py::enum_<mochi::PsdProjectionMode>(m, "PsdProjectionMode", "Positive Semi-Definite (PSD) projection modes for the dresidual matrix.")
-    .value("NEVER", mochi::PsdProjectionMode::Never, "Never project to PSD.")
-    .value("ALWAYS", mochi::PsdProjectionMode::Always, "Always project to PSD.")
-    .value("IF_FAIL_RETRY", mochi::PsdProjectionMode::IfFailRetry, "If one non-linear iteration fails, retry the iteration projecting to PSD.")
-    .value("IF_FAIL_ALWAYS", mochi::PsdProjectionMode::IfFailAlways, "If one non-linear iteration fails, retry the iteration projecting to PSD and\n    continue projecting in all the remaining iterations of the solve.")
-    .value("COUNT", mochi::PsdProjectionMode::Count, "Number of PSD projection mode enum values.")
-    .value("DEFAULT", mochi::PsdProjectionMode::Default, "Default PSD projection mode.")
-  ;
+  {
+    auto boundEnum = nb::enum_<mochi::PsdProjectionMode>(m, "PsdProjectionMode", "Positive Semi-Definite (PSD) projection modes for the dresidual matrix.");
+    boundEnum
+      .value("NEVER", mochi::PsdProjectionMode::Never, "Never project to PSD.")
+      .value("ALWAYS", mochi::PsdProjectionMode::Always, "Always project to PSD.")
+      .value("IF_FAIL_RETRY", mochi::PsdProjectionMode::IfFailRetry, "If one non-linear iteration fails, retry the iteration projecting to PSD.")
+      .value("IF_FAIL_ALWAYS", mochi::PsdProjectionMode::IfFailAlways, "If one non-linear iteration fails, retry the iteration projecting to PSD and\n    continue projecting in all the remaining iterations of the solve.")
+      .value("COUNT", mochi::PsdProjectionMode::Count, "Number of PSD projection mode enum values.")
+    ;
+    boundEnum.attr("DEFAULT") = boundEnum.attr("ALWAYS");
+    nb::cast<nb::dict>(boundEnum.attr("_member_map_")).attr("__setitem__")("DEFAULT", boundEnum.attr("ALWAYS"));
+  }
 
-  py::enum_<mochi::LineSearchType>(m, "LineSearchType", "Line-search strategy used by the non-linear solver.")
-    .value("NONE", mochi::LineSearchType::None, "No line search. May substantially degrade stability.")
-    .value("SIMPLE", mochi::LineSearchType::Simple, "Simple line search. Accepts a step if the objective function does not increase\n    by more than a specified relative tolerance.\n    \n    See Also:\n        :attr:`~superdex.physics.NonLinearSolverParams.line_search_max_rel_increase`")
-    .value("ARMIJO", mochi::LineSearchType::Armijo, "Line search with Armijo condition.\n    \n    See Also:\n        :attr:`~superdex.physics.NonLinearSolverParams.line_search_wolfe1`")
-    .value("WOLFE_WEAK", mochi::LineSearchType::WolfeWeak, "Line search with weak Wolfe conditions.\n    \n    See Also:\n        :attr:`~superdex.physics.NonLinearSolverParams.line_search_wolfe1`,\n        :attr:`~superdex.physics.NonLinearSolverParams.line_search_wolfe2`")
-    .value("WOLFE_STRONG", mochi::LineSearchType::WolfeStrong, "Line search with strong Wolfe conditions.\n    \n    See Also:\n        :attr:`~superdex.physics.NonLinearSolverParams.line_search_wolfe1`,\n        :attr:`~superdex.physics.NonLinearSolverParams.line_search_wolfe2`")
-    .value("RESIDUAL_NORM", mochi::LineSearchType::ResidualNorm, "Line search with residual norm condition. Accepts a step if the residual norm\n    decreases.\n    \n    Note:\n        More robust than objective-based line searches (:class:`SIMPLE\n        <superdex.physics.LineSearchType>`, :class:`ARMIJO\n        <superdex.physics.LineSearchType>`, :class:`WOLFE_WEAK\n        <superdex.physics.LineSearchType>`, :class:`WOLFE_STRONG\n        <superdex.physics.LineSearchType>`) but may degrade non-linear solver\n        convergence in non-convex problems. In highly non-convex regions where the\n        residual norm cannot be reduced, it may cause objects to move at slower\n        velocity than they should due to the inability to take valid steps. Consider\n        using an objective-based line search in that case.")
-    .value("ARMIJO_OR_RESIDUAL_NORM", mochi::LineSearchType::ArmijoOrResidualNorm, "Line search that accepts either the Armijo or the residual norm condition.\n    \n    Note:\n        It combines the robustness of objective-based criteria when the iteration is\n        far from the solution, with residual-based criteria when it is near the\n        solution (particularly useful with single precision). It requires slightly\n        higher cost per line-search iteration.")
-    .value("COUNT", mochi::LineSearchType::Count, "Number of line search type enum values.")
-    .value("DEFAULT", mochi::LineSearchType::Default, "Default line search type.")
-  ;
+  {
+    auto boundEnum = nb::enum_<mochi::LineSearchType>(m, "LineSearchType", "Line-search strategy used by the non-linear solver.");
+    boundEnum
+      .value("NONE", mochi::LineSearchType::None, "No line search. May substantially degrade stability.")
+      .value("SIMPLE", mochi::LineSearchType::Simple, "Simple line search. Accepts a step if the objective function does not increase\n    by more than a specified relative tolerance.\n    \n    See Also:\n        :attr:`~superdex.physics.NonLinearSolverParams.line_search_max_rel_increase`")
+      .value("ARMIJO", mochi::LineSearchType::Armijo, "Line search with Armijo condition.\n    \n    See Also:\n        :attr:`~superdex.physics.NonLinearSolverParams.line_search_wolfe1`")
+      .value("WOLFE_WEAK", mochi::LineSearchType::WolfeWeak, "Line search with weak Wolfe conditions.\n    \n    See Also:\n        :attr:`~superdex.physics.NonLinearSolverParams.line_search_wolfe1`,\n        :attr:`~superdex.physics.NonLinearSolverParams.line_search_wolfe2`")
+      .value("WOLFE_STRONG", mochi::LineSearchType::WolfeStrong, "Line search with strong Wolfe conditions.\n    \n    See Also:\n        :attr:`~superdex.physics.NonLinearSolverParams.line_search_wolfe1`,\n        :attr:`~superdex.physics.NonLinearSolverParams.line_search_wolfe2`")
+      .value("RESIDUAL_NORM", mochi::LineSearchType::ResidualNorm, "Line search with residual norm condition. Accepts a step if the residual norm\n    decreases.\n    \n    Note:\n        More robust than objective-based line searches (:class:`SIMPLE\n        <superdex.physics.LineSearchType>`, :class:`ARMIJO\n        <superdex.physics.LineSearchType>`, :class:`WOLFE_WEAK\n        <superdex.physics.LineSearchType>`, :class:`WOLFE_STRONG\n        <superdex.physics.LineSearchType>`) but may degrade non-linear solver\n        convergence in non-convex problems. In highly non-convex regions where the\n        residual norm cannot be reduced, it may cause objects to move at slower\n        velocity than they should due to the inability to take valid steps. Consider\n        using an objective-based line search in that case.")
+      .value("ARMIJO_OR_RESIDUAL_NORM", mochi::LineSearchType::ArmijoOrResidualNorm, "Line search that accepts either the Armijo or the residual norm condition.\n    \n    Note:\n        It combines the robustness of objective-based criteria when the iteration is\n        far from the solution, with residual-based criteria when it is near the\n        solution (particularly useful with single precision). It requires slightly\n        higher cost per line-search iteration.")
+      .value("COUNT", mochi::LineSearchType::Count, "Number of line search type enum values.")
+    ;
+    boundEnum.attr("DEFAULT") = boundEnum.attr("RESIDUAL_NORM");
+    nb::cast<nb::dict>(boundEnum.attr("_member_map_")).attr("__setitem__")("DEFAULT", boundEnum.attr("RESIDUAL_NORM"));
+  }
 
-  py::enum_<mochi::LinearToleranceStrategy>(m, "LinearToleranceStrategy", "Strategy for adapting linear solver tolerance inside non-linear iterations.")
-    .value("CONSTANT", mochi::LinearToleranceStrategy::Constant, "Constant relative tolerance.")
-    .value("EISENSTAT_WALKER1", mochi::LinearToleranceStrategy::EisenstatWalker1, "Eisenstat-Walker strategy no. 1.\n    \n    Note:\n        Should be used with :class:`RESIDUAL_L2\n        <superdex.physics.LinearSolverConvergenceNorm>`. Other norms may yield\n        suboptimal forcing terms.\n    \n    Note:\n        Not recommended for use with quasi-Newton methods (e.g., :class:`BFGS\n        <superdex.physics.NonLinearSolverType>`, :class:`SR1\n        <superdex.physics.NonLinearSolverType>`).\n    \n        Reference: [Choosing the Forcing Terms in an Inexact Newton Method, Choice 1\n        (Eisenstat and Walker,\n        1994)](https://softlib.rice.edu/pub/CRPC-TRs/reports/CRPC-TR94463.pdf)")
-    .value("EISENSTAT_WALKER2", mochi::LinearToleranceStrategy::EisenstatWalker2, "Eisenstat-Walker strategy no. 2.\n    \n    Note:\n        Not recommended for use with quasi-Newton methods (e.g., :class:`BFGS\n        <superdex.physics.NonLinearSolverType>`, :class:`SR1\n        <superdex.physics.NonLinearSolverType>`).\n    \n        Reference: [Choosing the Forcing Terms in an Inexact Newton Method, Choice 2\n        (Eisenstat and Walker,\n        1994)](https://softlib.rice.edu/pub/CRPC-TRs/reports/CRPC-TR94463.pdf)")
-    .value("EISENSTAT_WALKER3", mochi::LinearToleranceStrategy::EisenstatWalker3, "Custom Eisenstat-Walker strategy: eta = max(min(1/(2+k), sqrt(``|r|``)), eta_0),\n    where `k` is the non-linear iteration number, ``|r|`` is the L2-norm of the\n    nonlinear residual, and `eta_0` is\n    :attr:`~superdex.physics.LinearSolverParams.rel_tol`.\n    \n    Note:\n        Should be used with :class:`RESIDUAL_L2\n        <superdex.physics.LinearSolverConvergenceNorm>`. Other norms may yield\n        suboptimal forcing terms.\n    \n    Note:\n        Not recommended for use with quasi-Newton methods (e.g., :class:`BFGS\n        <superdex.physics.NonLinearSolverType>`, :class:`SR1\n        <superdex.physics.NonLinearSolverType>`).")
-    .value("COUNT", mochi::LinearToleranceStrategy::Count, "Number of linear tolerance strategy enum values.")
-    .value("DEFAULT", mochi::LinearToleranceStrategy::Default, "Default linear tolerance strategy.")
-  ;
+  {
+    auto boundEnum = nb::enum_<mochi::LinearToleranceStrategy>(m, "LinearToleranceStrategy", "Strategy for adapting linear solver tolerance inside non-linear iterations.");
+    boundEnum
+      .value("CONSTANT", mochi::LinearToleranceStrategy::Constant, "Constant relative tolerance.")
+      .value("EISENSTAT_WALKER1", mochi::LinearToleranceStrategy::EisenstatWalker1, "Eisenstat-Walker strategy no. 1.\n    \n    Note:\n        Should be used with :class:`RESIDUAL_L2\n        <superdex.physics.LinearSolverConvergenceNorm>`. Other norms may yield\n        suboptimal forcing terms.\n    \n    Note:\n        Not recommended for use with quasi-Newton methods (e.g., :class:`BFGS\n        <superdex.physics.NonLinearSolverType>`, :class:`SR1\n        <superdex.physics.NonLinearSolverType>`).\n    \n        Reference: [Choosing the Forcing Terms in an Inexact Newton Method, Choice 1\n        (Eisenstat and Walker,\n        1994)](https://softlib.rice.edu/pub/CRPC-TRs/reports/CRPC-TR94463.pdf)")
+      .value("EISENSTAT_WALKER2", mochi::LinearToleranceStrategy::EisenstatWalker2, "Eisenstat-Walker strategy no. 2.\n    \n    Note:\n        Not recommended for use with quasi-Newton methods (e.g., :class:`BFGS\n        <superdex.physics.NonLinearSolverType>`, :class:`SR1\n        <superdex.physics.NonLinearSolverType>`).\n    \n        Reference: [Choosing the Forcing Terms in an Inexact Newton Method, Choice 2\n        (Eisenstat and Walker,\n        1994)](https://softlib.rice.edu/pub/CRPC-TRs/reports/CRPC-TR94463.pdf)")
+      .value("EISENSTAT_WALKER3", mochi::LinearToleranceStrategy::EisenstatWalker3, "Custom Eisenstat-Walker strategy: eta = max(min(1/(2+k), sqrt(``|r|``)), eta_0),\n    where `k` is the non-linear iteration number, ``|r|`` is the L2-norm of the\n    nonlinear residual, and `eta_0` is\n    :attr:`~superdex.physics.LinearSolverParams.rel_tol`.\n    \n    Note:\n        Should be used with :class:`RESIDUAL_L2\n        <superdex.physics.LinearSolverConvergenceNorm>`. Other norms may yield\n        suboptimal forcing terms.\n    \n    Note:\n        Not recommended for use with quasi-Newton methods (e.g., :class:`BFGS\n        <superdex.physics.NonLinearSolverType>`, :class:`SR1\n        <superdex.physics.NonLinearSolverType>`).")
+      .value("COUNT", mochi::LinearToleranceStrategy::Count, "Number of linear tolerance strategy enum values.")
+    ;
+    boundEnum.attr("DEFAULT") = boundEnum.attr("EISENSTAT_WALKER2");
+    nb::cast<nb::dict>(boundEnum.attr("_member_map_")).attr("__setitem__")("DEFAULT", boundEnum.attr("EISENSTAT_WALKER2"));
+  }
 
-  py::enum_<mochi::LinearSolverType>(m, "LinearSolverType", "Linear solver algorithm.")
-    .value("CG", mochi::LinearSolverType::CG, "Conjugate Gradient (CG) solver.\n    \n    Note:\n        Only valid for symmetric positive-definite systems.\n    \n    Note:\n        Unlike :class:`PARALLEL_CG <superdex.physics.LinearSolverType>`, only\n        matrix-vector products are parallelized. CG orthogonalization and\n        preconditioner solves are not.")
-    .value("GMRES", mochi::LinearSolverType::GMRES, "Generalized Minimal Residual (GMRES) solver.")
-    .value("CUDA_CG", mochi::LinearSolverType::CudaCG, "CUDA CG solver.\n    \n    Note:\n        Only valid for symmetric positive-definite systems.\n    \n    Note:\n        Requires building with CUDA and a preconditioner with CUDA support.\n    \n    See Also:\n        :class:`~superdex.physics.PreconditionerType`")
-    .value("CUDA_GMRES", mochi::LinearSolverType::CudaGMRES, "CUDA GMRES solver.\n    \n    Note:\n        Requires building with CUDA and a preconditioner with CUDA support.\n    \n    See Also:\n        :class:`~superdex.physics.PreconditionerType`")
-    .value("AUGMENTED_CG", mochi::LinearSolverType::AugmentedCG, "[Experimental] Augmented CG solver with Krylov subspace recycling.\n    \n    Note:\n        Only valid for symmetric positive-definite systems.\n    \n    Note:\n        Requires building with Eigen.\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
-    .value("LDLT", mochi::LinearSolverType::LDLT, "Direct solver based on the LDLt factorization without pivoting.\n    \n    Note:\n        Only valid for symmetric systems.\n    \n    Note:\n        May be unstable for indefinite or ill-conditioned systems.\n    \n    Note:\n        Uses a dense or a sparse factorization depending on the size and sparsity of\n        the system.")
-    .value("LU", mochi::LinearSolverType::LU, "Direct solver based on the dense LU factorization without pivoting.\n    \n    Note:\n        May be unstable for ill-conditioned systems.\n    \n    Note:\n        The cost of the factorization is O(n^3). Will be slow for large systems.\n    \n    Note:\n        Consider using :class:`LDLT <superdex.physics.LinearSolverType>` if the\n        system is symmetric.")
-    .value("ASYNC_CG", mochi::LinearSolverType::AsyncCG, "[Experimental] Asynchronous CG solver.\n    \n    Note:\n        Only valid for symmetric positive-definite systems.\n    \n    Note:\n        Async CG is a reformulation of the classical CG algorithm to compute the\n        matrix-vector products in parallel to the orthogonalization and convergence\n        check.\n    \n    Note:\n        Equivalent to the classical CG algorithm in exact-precision arithmetic, but\n        has inferior stability properties in finite-precision arithmetic.\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
-    .value("PARALLEL_CG", mochi::LinearSolverType::ParallelCG, "[Experimental] Parallel CG solver.\n    \n    Note:\n        Only valid for symmetric positive-definite systems.\n    \n    Note:\n        Unlike :class:`CG <superdex.physics.LinearSolverType>`, all operations\n        (matrix-vector products, preconditioner solves, CG orthogonalization) are\n        parallelized.\n    \n    Note:\n        Requires a preconditioner with a parallel solve.\n    \n    Warning:\n        Not deterministic.\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
-    .value("MINRES", mochi::LinearSolverType::MINRES, "Minimal Residual (MINRES) solver.\n    \n    Note:\n        Only valid for symmetric systems.")
-    .value("EXPERIMENTAL_CUDA_SPARSE_CHOLESKY", mochi::LinearSolverType::ExperimentalCudaSparseCholesky, "[Experimental] CUDA sparse Cholesky factorization.\n    \n    Note:\n        Only valid for sparse or block-sparse symmetric positive-definite systems.\n    \n    Note:\n        Requires building with CUDA.\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
-    .value("EXPERIMENTAL_CUDA_SPARSE_LDLT", mochi::LinearSolverType::ExperimentalCudaSparseLDLT, "[Experimental] CUDA sparse LDLt factorization.\n    \n    Note:\n        Only valid for sparse or block-sparse symmetric systems.\n    \n    Note:\n        Requires building with CUDA and cuDSS.\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
-    .value("EXPERIMENTAL_CUDA_SPARSE_LU", mochi::LinearSolverType::ExperimentalCudaSparseLU, "[Experimental] CUDA sparse LU factorization.\n    \n    Note:\n        Only valid for sparse or block-sparse systems.\n    \n    Note:\n        Requires building with CUDA.\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
-    .value("AUTO", mochi::LinearSolverType::Auto, "Let Mochi select the solver type based on the problem.")
-    .value("COUNT", mochi::LinearSolverType::Count, "Number of solver type enum values.")
-    .value("DEFAULT", mochi::LinearSolverType::Default, "Default solver type.")
-  ;
+  {
+    auto boundEnum = nb::enum_<mochi::LinearSolverType>(m, "LinearSolverType", "Linear solver algorithm.");
+    boundEnum
+      .value("CG", mochi::LinearSolverType::CG, "Conjugate Gradient (CG) solver.\n    \n    Note:\n        Only valid for symmetric positive-definite systems.\n    \n    Note:\n        Unlike :class:`PARALLEL_CG <superdex.physics.LinearSolverType>`, only\n        matrix-vector products are parallelized. CG orthogonalization and\n        preconditioner solves are not.")
+      .value("GMRES", mochi::LinearSolverType::GMRES, "Generalized Minimal Residual (GMRES) solver.")
+      .value("CUDA_CG", mochi::LinearSolverType::CudaCG, "CUDA CG solver.\n    \n    Note:\n        Only valid for symmetric positive-definite systems.\n    \n    Note:\n        Requires building with CUDA and a preconditioner with CUDA support.\n    \n    See Also:\n        :class:`~superdex.physics.PreconditionerType`")
+      .value("CUDA_GMRES", mochi::LinearSolverType::CudaGMRES, "CUDA GMRES solver.\n    \n    Note:\n        Requires building with CUDA and a preconditioner with CUDA support.\n    \n    See Also:\n        :class:`~superdex.physics.PreconditionerType`")
+      .value("AUGMENTED_CG", mochi::LinearSolverType::AugmentedCG, "[Experimental] Augmented CG solver with Krylov subspace recycling.\n    \n    Note:\n        Only valid for symmetric positive-definite systems.\n    \n    Note:\n        Requires building with Eigen.\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
+      .value("LDLT", mochi::LinearSolverType::LDLT, "Direct solver based on the LDLt factorization without pivoting.\n    \n    Note:\n        Only valid for symmetric systems.\n    \n    Note:\n        May be unstable for indefinite or ill-conditioned systems.\n    \n    Note:\n        Uses a dense or a sparse factorization depending on the size and sparsity of\n        the system.")
+      .value("LU", mochi::LinearSolverType::LU, "Direct solver based on the dense LU factorization without pivoting.\n    \n    Note:\n        May be unstable for ill-conditioned systems.\n    \n    Note:\n        The cost of the factorization is O(n^3). Will be slow for large systems.\n    \n    Note:\n        Consider using :class:`LDLT <superdex.physics.LinearSolverType>` if the\n        system is symmetric.")
+      .value("ASYNC_CG", mochi::LinearSolverType::AsyncCG, "[Experimental] Asynchronous CG solver.\n    \n    Note:\n        Only valid for symmetric positive-definite systems.\n    \n    Note:\n        Async CG is a reformulation of the classical CG algorithm to compute the\n        matrix-vector products in parallel to the orthogonalization and convergence\n        check.\n    \n    Note:\n        Equivalent to the classical CG algorithm in exact-precision arithmetic, but\n        has inferior stability properties in finite-precision arithmetic.\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
+      .value("PARALLEL_CG", mochi::LinearSolverType::ParallelCG, "[Experimental] Parallel CG solver.\n    \n    Note:\n        Only valid for symmetric positive-definite systems.\n    \n    Note:\n        Unlike :class:`CG <superdex.physics.LinearSolverType>`, all operations\n        (matrix-vector products, preconditioner solves, CG orthogonalization) are\n        parallelized.\n    \n    Note:\n        Requires a preconditioner with a parallel solve.\n    \n    Warning:\n        Not deterministic.\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
+      .value("MINRES", mochi::LinearSolverType::MINRES, "Minimal Residual (MINRES) solver.\n    \n    Note:\n        Only valid for symmetric systems.")
+      .value("EXPERIMENTAL_CUDA_SPARSE_CHOLESKY", mochi::LinearSolverType::ExperimentalCudaSparseCholesky, "[Experimental] CUDA sparse Cholesky factorization.\n    \n    Note:\n        Only valid for sparse or block-sparse symmetric positive-definite systems.\n    \n    Note:\n        Requires building with CUDA.\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
+      .value("EXPERIMENTAL_CUDA_SPARSE_LDLT", mochi::LinearSolverType::ExperimentalCudaSparseLDLT, "[Experimental] CUDA sparse LDLt factorization.\n    \n    Note:\n        Only valid for sparse or block-sparse symmetric systems.\n    \n    Note:\n        Requires building with CUDA and cuDSS.\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
+      .value("EXPERIMENTAL_CUDA_SPARSE_LU", mochi::LinearSolverType::ExperimentalCudaSparseLU, "[Experimental] CUDA sparse LU factorization.\n    \n    Note:\n        Only valid for sparse or block-sparse systems.\n    \n    Note:\n        Requires building with CUDA.\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
+      .value("AUTO", mochi::LinearSolverType::Auto, "Let Mochi select the solver type based on the problem.")
+      .value("COUNT", mochi::LinearSolverType::Count, "Number of solver type enum values.")
+    ;
+    boundEnum.attr("DEFAULT") = boundEnum.attr("AUTO");
+    nb::cast<nb::dict>(boundEnum.attr("_member_map_")).attr("__setitem__")("DEFAULT", boundEnum.attr("AUTO"));
+  }
 
-  py::enum_<mochi::PreconditionerType>(m, "PreconditionerType", "Preconditioner types for the linear solver.\n\nNote:\n    Only used for iterative solvers.\n\nNote:\n    CUDA iterative solvers only support :class:`NONE\n    <superdex.physics.PreconditionerType>`, :class:`JACOBI\n    <superdex.physics.PreconditionerType>` and :class:`BLOCK_JACOBI\n    <superdex.physics.PreconditionerType>` preconditioners.")
-    .value("NONE", mochi::PreconditionerType::None, "No preconditioner.")
-    .value("JACOBI", mochi::PreconditionerType::Jacobi, "Jacobi preconditioner.\n    \n    Note:\n        Only valid for matrices with non-zero diagonal entries.")
-    .value("BLOCK_JACOBI", mochi::PreconditionerType::BlockJacobi, "Block Jacobi preconditioner with block size of 3.\n    \n    Note:\n        Only valid for matrices whose size is a multiple of 3 and whose 3x3 diagonal\n        blocks are non-singular.")
-    .value("SSOR", mochi::PreconditionerType::SSOR, "Symmetric successive over-relaxation (SSOR) preconditioner.\n    \n    Note:\n        Only valid for symmetric positive-definite matrices.")
-    .value("BLOCK_SSOR", mochi::PreconditionerType::BlockSSOR, "Block symmetric successive over-relaxation (SSOR) preconditioner with block size\n    of 3.\n    \n    Note:\n        Only valid for symmetric positive-definite matrices whose size is a multiple\n        of 3 and whose 3x3 diagonal blocks are non-singular.")
-    .value("LU", mochi::PreconditionerType::LU, "Dense LU factorization without pivoting.\n    \n    Note:\n        May be unstable for ill-conditioned matrices.\n    \n    Note:\n        The iterative solver should converge in 1 iteration.")
-    .value("AMG", mochi::PreconditionerType::AMG, "Algebraic multigrid (AMG).\n    \n    Note:\n        Only valid for 3x3 block sparse symmetric positive-definite matrices with\n        non-singular 3x3 diagonal blocks.")
-    .value("SYM_INVERSE", mochi::PreconditionerType::SymInverse, "Symmetric inverse preconditioner based on the dense LDLt factorization without\n    pivoting.\n    \n    Note:\n        Only valid for symmetric matrices.\n    \n    Note:\n        May be unstable for indefinite or ill-conditioned matrices.\n    \n    Note:\n        The iterative solver should converge in 1 iteration.")
-    .value("LDLT", mochi::PreconditionerType::LDLT, "Dense LDLt factorization without pivoting.\n    \n    Note:\n        Only valid for symmetric matrices.\n    \n    Note:\n        May be unstable for indefinite or ill-conditioned matrices.\n    \n    Note:\n        The iterative solver should converge in 1 iteration.")
-    .value("ILU0", mochi::PreconditionerType::ILU0, "Incomplete LU factorization with zero fill-in.")
-    .value("IC0", mochi::PreconditionerType::IC0, "Incomplete Cholesky factorization with zero fill-in.\n    \n    Note:\n        Only valid for symmetric positive-definite matrices.")
-    .value("PER_ACTOR", mochi::PreconditionerType::PerActor, "Domain decomposition preconditioner, where each actor is a subdomain.\n    \n    Note:\n        The most appropriate preconditioner type is used for each actor.")
-    .value("COLORED_SSOR", mochi::PreconditionerType::ColoredSSOR, "[Experimental] Colored symmetric successive over-relaxation (SSOR)\n    preconditioner.\n    \n    Note:\n        Only valid for symmetric positive-definite matrices.\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
-    .value("COUNT", mochi::PreconditionerType::Count, "Number of preconditioner type enum values.")
-    .value("DEFAULT", mochi::PreconditionerType::Default, "Default preconditioner type.")
-  ;
+  {
+    auto boundEnum = nb::enum_<mochi::PreconditionerType>(m, "PreconditionerType", "Preconditioner types for the linear solver.\n\nNote:\n    Only used for iterative solvers.\n\nNote:\n    CUDA iterative solvers only support :class:`NONE\n    <superdex.physics.PreconditionerType>`, :class:`JACOBI\n    <superdex.physics.PreconditionerType>` and :class:`BLOCK_JACOBI\n    <superdex.physics.PreconditionerType>` preconditioners.");
+    boundEnum
+      .value("NONE", mochi::PreconditionerType::None, "No preconditioner.")
+      .value("JACOBI", mochi::PreconditionerType::Jacobi, "Jacobi preconditioner.\n    \n    Note:\n        Only valid for matrices with non-zero diagonal entries.")
+      .value("BLOCK_JACOBI", mochi::PreconditionerType::BlockJacobi, "Block Jacobi preconditioner with block size of 3.\n    \n    Note:\n        Only valid for matrices whose size is a multiple of 3 and whose 3x3 diagonal\n        blocks are non-singular.")
+      .value("SSOR", mochi::PreconditionerType::SSOR, "Symmetric successive over-relaxation (SSOR) preconditioner.\n    \n    Note:\n        Only valid for symmetric positive-definite matrices.")
+      .value("BLOCK_SSOR", mochi::PreconditionerType::BlockSSOR, "Block symmetric successive over-relaxation (SSOR) preconditioner with block size\n    of 3.\n    \n    Note:\n        Only valid for symmetric positive-definite matrices whose size is a multiple\n        of 3 and whose 3x3 diagonal blocks are non-singular.")
+      .value("LU", mochi::PreconditionerType::LU, "Dense LU factorization without pivoting.\n    \n    Note:\n        May be unstable for ill-conditioned matrices.\n    \n    Note:\n        The iterative solver should converge in 1 iteration.")
+      .value("AMG", mochi::PreconditionerType::AMG, "Algebraic multigrid (AMG).\n    \n    Note:\n        Only valid for 3x3 block sparse symmetric positive-definite matrices with\n        non-singular 3x3 diagonal blocks.")
+      .value("SYM_INVERSE", mochi::PreconditionerType::SymInverse, "Symmetric inverse preconditioner based on the dense LDLt factorization without\n    pivoting.\n    \n    Note:\n        Only valid for symmetric matrices.\n    \n    Note:\n        May be unstable for indefinite or ill-conditioned matrices.\n    \n    Note:\n        The iterative solver should converge in 1 iteration.")
+      .value("LDLT", mochi::PreconditionerType::LDLT, "Dense LDLt factorization without pivoting.\n    \n    Note:\n        Only valid for symmetric matrices.\n    \n    Note:\n        May be unstable for indefinite or ill-conditioned matrices.\n    \n    Note:\n        The iterative solver should converge in 1 iteration.")
+      .value("ILU0", mochi::PreconditionerType::ILU0, "Incomplete LU factorization with zero fill-in.")
+      .value("IC0", mochi::PreconditionerType::IC0, "Incomplete Cholesky factorization with zero fill-in.\n    \n    Note:\n        Only valid for symmetric positive-definite matrices.")
+      .value("PER_ACTOR", mochi::PreconditionerType::PerActor, "Domain decomposition preconditioner, where each actor is a subdomain.\n    \n    Note:\n        The most appropriate preconditioner type is used for each actor.")
+      .value("COLORED_SSOR", mochi::PreconditionerType::ColoredSSOR, "[Experimental] Colored symmetric successive over-relaxation (SSOR)\n    preconditioner.\n    \n    Note:\n        Only valid for symmetric positive-definite matrices.\n    \n    Warning:\n        This is an experimental feature. It may be changed or removed in the future.\n        Use at your own risk.")
+      .value("COUNT", mochi::PreconditionerType::Count, "Number of preconditioner type enum values.")
+    ;
+    boundEnum.attr("DEFAULT") = boundEnum.attr("PER_ACTOR");
+    nb::cast<nb::dict>(boundEnum.attr("_member_map_")).attr("__setitem__")("DEFAULT", boundEnum.attr("PER_ACTOR"));
+  }
 
-  py::enum_<mochi::LinearSolverConvergenceNorm>(m, "LinearSolverConvergenceNorm", "Norm types for the stopping criteria of the linear solver.\n\nNote:\n    This setting only applies to :class:`CG\n    <superdex.physics.LinearSolverType>`, :class:`CUDA_CG\n    <superdex.physics.LinearSolverType>`, :class:`PARALLEL_CG\n    <superdex.physics.LinearSolverType>` and :class:`ASYNC_CG\n    <superdex.physics.LinearSolverType>`. :class:`GMRES\n    <superdex.physics.LinearSolverType>`, :class:`CUDA_GMRES\n    <superdex.physics.LinearSolverType>`, :class:`MINRES\n    <superdex.physics.LinearSolverType>`, and :class:`AUGMENTED_CG\n    <superdex.physics.LinearSolverType>` always use the L2-norm of the residual\n    regardless of this setting. Direct solvers do not have stop criteria.")
-    .value("RESIDUAL_L2", mochi::LinearSolverConvergenceNorm::ResidualL2, "L2-norm of the residual: ``‖r‖₂``.")
-    .value("PRECONDITIONED_RESIDUAL_L2", mochi::LinearSolverConvergenceNorm::PreconditionedResidualL2, "L2-norm of the preconditioned residual: ``‖z‖₂`` where ``z = M⁻¹r``.")
-    .value("RESIDUAL_PRECONDITIONER_INDUCED", mochi::LinearSolverConvergenceNorm::ResidualPreconditionerInduced, "Preconditioner-induced norm of the residual: ``√⟨r, z⟩`` where ``z = M⁻¹r``.")
-    .value("COUNT", mochi::LinearSolverConvergenceNorm::Count, "Number of linear solver convergence norm enum values.")
-    .value("DEFAULT", mochi::LinearSolverConvergenceNorm::Default, "Default linear solver convergence norm.")
-  ;
+  {
+    auto boundEnum = nb::enum_<mochi::LinearSolverConvergenceNorm>(m, "LinearSolverConvergenceNorm", "Norm types for the stopping criteria of the linear solver.\n\nNote:\n    This setting only applies to :class:`CG\n    <superdex.physics.LinearSolverType>`, :class:`CUDA_CG\n    <superdex.physics.LinearSolverType>`, :class:`PARALLEL_CG\n    <superdex.physics.LinearSolverType>` and :class:`ASYNC_CG\n    <superdex.physics.LinearSolverType>`. :class:`GMRES\n    <superdex.physics.LinearSolverType>`, :class:`CUDA_GMRES\n    <superdex.physics.LinearSolverType>`, :class:`MINRES\n    <superdex.physics.LinearSolverType>`, and :class:`AUGMENTED_CG\n    <superdex.physics.LinearSolverType>` always use the L2-norm of the residual\n    regardless of this setting. Direct solvers do not have stop criteria.");
+    boundEnum
+      .value("RESIDUAL_L2", mochi::LinearSolverConvergenceNorm::ResidualL2, "L2-norm of the residual: ``‖r‖₂``.")
+      .value("PRECONDITIONED_RESIDUAL_L2", mochi::LinearSolverConvergenceNorm::PreconditionedResidualL2, "L2-norm of the preconditioned residual: ``‖z‖₂`` where ``z = M⁻¹r``.")
+      .value("RESIDUAL_PRECONDITIONER_INDUCED", mochi::LinearSolverConvergenceNorm::ResidualPreconditionerInduced, "Preconditioner-induced norm of the residual: ``√⟨r, z⟩`` where ``z = M⁻¹r``.")
+      .value("COUNT", mochi::LinearSolverConvergenceNorm::Count, "Number of linear solver convergence norm enum values.")
+    ;
+    boundEnum.attr("DEFAULT") = boundEnum.attr("PRECONDITIONED_RESIDUAL_L2");
+    nb::cast<nb::dict>(boundEnum.attr("_member_map_")).attr("__setitem__")("DEFAULT", boundEnum.attr("PRECONDITIONED_RESIDUAL_L2"));
+  }
 
-  py::enum_<mochi::IntegrationMethod>(m, "IntegrationMethod", "Time-integration method.")
-    .value("BACKWARD_EULER", mochi::IntegrationMethod::BackwardEuler, "Backward Euler: 1 step, 1 stage, 1st order, L-stable. Also known as BDF1 and\n    DIRK11.")
-    .value("BDF2", mochi::IntegrationMethod::BDF2, "BDF2: 2 steps, 1 stage, 2nd order, A-stable.")
-    .value("BDF3", mochi::IntegrationMethod::BDF3, "BDF3: 3 steps, 1 stage, 3rd order.")
-    .value("DIRK22", mochi::IntegrationMethod::DIRK22, "DIRK(2,2): 1 step, 2 stages, 2nd order, L-stable.")
-    .value("DIRK23", mochi::IntegrationMethod::DIRK23, "DIRK(2,3): 1 step, 2 stages, 3rd order.")
-    .value("DIRK33", mochi::IntegrationMethod::DIRK33, "DIRK(3,3): 1 step, 3 stages, 3rd order, L-stable.")
-    .value("SYMPLECTIC_DIRK12", mochi::IntegrationMethod::SymplecticDIRK12, "Symplectic DIRK(1,2): 1 step, 1 stage, 2nd order, A-stable. Also known as Gauss\n    and implicit midpoint.")
-    .value("SYMPLECTIC_DIRK22", mochi::IntegrationMethod::SymplecticDIRK22, "Symplectic DIRK(2,2): 1 step, 2 stages, 2nd order, A-stable.")
-    .value("COUNT", mochi::IntegrationMethod::Count, "Number of time integration method enum values.")
-    .value("DEFAULT", mochi::IntegrationMethod::Default, "Default time integration method.")
-  ;
+  {
+    auto boundEnum = nb::enum_<mochi::IntegrationMethod>(m, "IntegrationMethod", "Time-integration method.");
+    boundEnum
+      .value("BACKWARD_EULER", mochi::IntegrationMethod::BackwardEuler, "Backward Euler: 1 step, 1 stage, 1st order, L-stable. Also known as BDF1 and\n    DIRK11.")
+      .value("BDF2", mochi::IntegrationMethod::BDF2, "BDF2: 2 steps, 1 stage, 2nd order, A-stable.")
+      .value("BDF3", mochi::IntegrationMethod::BDF3, "BDF3: 3 steps, 1 stage, 3rd order.")
+      .value("DIRK22", mochi::IntegrationMethod::DIRK22, "DIRK(2,2): 1 step, 2 stages, 2nd order, L-stable.")
+      .value("DIRK23", mochi::IntegrationMethod::DIRK23, "DIRK(2,3): 1 step, 2 stages, 3rd order.")
+      .value("DIRK33", mochi::IntegrationMethod::DIRK33, "DIRK(3,3): 1 step, 3 stages, 3rd order, L-stable.")
+      .value("SYMPLECTIC_DIRK12", mochi::IntegrationMethod::SymplecticDIRK12, "Symplectic DIRK(1,2): 1 step, 1 stage, 2nd order, A-stable. Also known as Gauss\n    and implicit midpoint.")
+      .value("SYMPLECTIC_DIRK22", mochi::IntegrationMethod::SymplecticDIRK22, "Symplectic DIRK(2,2): 1 step, 2 stages, 2nd order, A-stable.")
+      .value("COUNT", mochi::IntegrationMethod::Count, "Number of time integration method enum values.")
+    ;
+    boundEnum.attr("DEFAULT") = boundEnum.attr("BACKWARD_EULER");
+    nb::cast<nb::dict>(boundEnum.attr("_member_map_")).attr("__setitem__")("DEFAULT", boundEnum.attr("BACKWARD_EULER"));
+  }
 
-  py::enum_<mochi::CoordinateSpaceAxes>(m, "CoordinateSpaceAxes", "Combination of axis directions for a coordinate space convention.\n\nEach three-letter name gives the semantic direction of positive X, positive Y,\nand positive Z, respectively. For example, :class:`FLU\n<superdex.physics.CoordinateSpaceAxes>` means X-forward, Y-left, Z-up.")
-    .value("RUF", mochi::CoordinateSpaceAxes::RUF, "X-right, Y-up, Z-forward (Unity).")
-    .value("RUB", mochi::CoordinateSpaceAxes::RUB, "X-right, Y-up, Z-backward (OpenGL, Filament).")
-    .value("RDF", mochi::CoordinateSpaceAxes::RDF, "X-right, Y-down, Z-forward.")
-    .value("RDB", mochi::CoordinateSpaceAxes::RDB, "X-right, Y-down, Z-backward.")
-    .value("LUF", mochi::CoordinateSpaceAxes::LUF, "X-left, Y-up, Z-forward.")
-    .value("LUB", mochi::CoordinateSpaceAxes::LUB, "X-left, Y-up, Z-backward.")
-    .value("LDF", mochi::CoordinateSpaceAxes::LDF, "X-left, Y-down, Z-forward.")
-    .value("LDB", mochi::CoordinateSpaceAxes::LDB, "X-left, Y-down, Z-backward.")
-    .value("RFU", mochi::CoordinateSpaceAxes::RFU, "X-right, Y-forward, Z-up.")
-    .value("RFD", mochi::CoordinateSpaceAxes::RFD, "X-right, Y-forward, Z-down.")
-    .value("RBU", mochi::CoordinateSpaceAxes::RBU, "X-right, Y-backward, Z-up.")
-    .value("RBD", mochi::CoordinateSpaceAxes::RBD, "X-right, Y-backward, Z-down.")
-    .value("LFU", mochi::CoordinateSpaceAxes::LFU, "X-left, Y-forward, Z-up.")
-    .value("LFD", mochi::CoordinateSpaceAxes::LFD, "X-left, Y-forward, Z-down.")
-    .value("LBU", mochi::CoordinateSpaceAxes::LBU, "X-left, Y-backward, Z-up.")
-    .value("LBD", mochi::CoordinateSpaceAxes::LBD, "X-left, Y-backward, Z-down.")
-    .value("URF", mochi::CoordinateSpaceAxes::URF, "X-up, Y-right, Z-forward.")
-    .value("URB", mochi::CoordinateSpaceAxes::URB, "X-up, Y-right, Z-backward.")
-    .value("ULF", mochi::CoordinateSpaceAxes::ULF, "X-up, Y-left, Z-forward.")
-    .value("ULB", mochi::CoordinateSpaceAxes::ULB, "X-up, Y-left, Z-backward.")
-    .value("DRF", mochi::CoordinateSpaceAxes::DRF, "X-down, Y-right, Z-forward.")
-    .value("DRB", mochi::CoordinateSpaceAxes::DRB, "X-down, Y-right, Z-backward.")
-    .value("DLF", mochi::CoordinateSpaceAxes::DLF, "X-down, Y-left, Z-forward.")
-    .value("DLB", mochi::CoordinateSpaceAxes::DLB, "X-down, Y-left, Z-backward.")
-    .value("UFR", mochi::CoordinateSpaceAxes::UFR, "X-up, Y-forward, Z-right.")
-    .value("UFL", mochi::CoordinateSpaceAxes::UFL, "X-up, Y-forward, Z-left.")
-    .value("UBR", mochi::CoordinateSpaceAxes::UBR, "X-up, Y-backward, Z-right.")
-    .value("UBL", mochi::CoordinateSpaceAxes::UBL, "X-up, Y-backward, Z-left.")
-    .value("DFR", mochi::CoordinateSpaceAxes::DFR, "X-down, Y-forward, Z-right.")
-    .value("DFL", mochi::CoordinateSpaceAxes::DFL, "X-down, Y-forward, Z-left.")
-    .value("DBR", mochi::CoordinateSpaceAxes::DBR, "X-down, Y-backward, Z-right.")
-    .value("DBL", mochi::CoordinateSpaceAxes::DBL, "X-down, Y-backward, Z-left.")
-    .value("FRU", mochi::CoordinateSpaceAxes::FRU, "X-forward, Y-right, Z-up (Unreal).")
-    .value("FRD", mochi::CoordinateSpaceAxes::FRD, "X-forward, Y-right, Z-down.")
-    .value("FLU", mochi::CoordinateSpaceAxes::FLU, "X-forward, Y-left, Z-up (Default).")
-    .value("FLD", mochi::CoordinateSpaceAxes::FLD, "X-forward, Y-left, Z-down.")
-    .value("BRU", mochi::CoordinateSpaceAxes::BRU, "X-backward, Y-right, Z-up.")
-    .value("BRD", mochi::CoordinateSpaceAxes::BRD, "X-backward, Y-right, Z-down.")
-    .value("BLU", mochi::CoordinateSpaceAxes::BLU, "X-backward, Y-left, Z-up.")
-    .value("BLD", mochi::CoordinateSpaceAxes::BLD, "X-backward, Y-left, Z-down.")
-    .value("FUR", mochi::CoordinateSpaceAxes::FUR, "X-forward, Y-up, Z-right.")
-    .value("FUL", mochi::CoordinateSpaceAxes::FUL, "X-forward, Y-up, Z-left.")
-    .value("FDR", mochi::CoordinateSpaceAxes::FDR, "X-forward, Y-down, Z-right.")
-    .value("FDL", mochi::CoordinateSpaceAxes::FDL, "X-forward, Y-down, Z-left.")
-    .value("BUR", mochi::CoordinateSpaceAxes::BUR, "X-backward, Y-up, Z-right.")
-    .value("BUL", mochi::CoordinateSpaceAxes::BUL, "X-backward, Y-up, Z-left.")
-    .value("BDR", mochi::CoordinateSpaceAxes::BDR, "X-backward, Y-down, Z-right.")
-    .value("BDL", mochi::CoordinateSpaceAxes::BDL, "X-backward, Y-down, Z-left.")
-    .value("DEFAULT", mochi::CoordinateSpaceAxes::Default, "Default convention for SuperDex Physics.")
-  ;
+  {
+    auto boundEnum = nb::enum_<mochi::CoordinateSpaceAxes>(m, "CoordinateSpaceAxes", "Combination of axis directions for a coordinate space convention.\n\nEach three-letter name gives the semantic direction of positive X, positive Y,\nand positive Z, respectively. For example, :class:`FLU\n<superdex.physics.CoordinateSpaceAxes>` means X-forward, Y-left, Z-up.");
+    boundEnum
+      .value("RUF", mochi::CoordinateSpaceAxes::RUF, "X-right, Y-up, Z-forward (Unity).")
+      .value("RUB", mochi::CoordinateSpaceAxes::RUB, "X-right, Y-up, Z-backward (OpenGL, Filament).")
+      .value("RDF", mochi::CoordinateSpaceAxes::RDF, "X-right, Y-down, Z-forward.")
+      .value("RDB", mochi::CoordinateSpaceAxes::RDB, "X-right, Y-down, Z-backward.")
+      .value("LUF", mochi::CoordinateSpaceAxes::LUF, "X-left, Y-up, Z-forward.")
+      .value("LUB", mochi::CoordinateSpaceAxes::LUB, "X-left, Y-up, Z-backward.")
+      .value("LDF", mochi::CoordinateSpaceAxes::LDF, "X-left, Y-down, Z-forward.")
+      .value("LDB", mochi::CoordinateSpaceAxes::LDB, "X-left, Y-down, Z-backward.")
+      .value("RFU", mochi::CoordinateSpaceAxes::RFU, "X-right, Y-forward, Z-up.")
+      .value("RFD", mochi::CoordinateSpaceAxes::RFD, "X-right, Y-forward, Z-down.")
+      .value("RBU", mochi::CoordinateSpaceAxes::RBU, "X-right, Y-backward, Z-up.")
+      .value("RBD", mochi::CoordinateSpaceAxes::RBD, "X-right, Y-backward, Z-down.")
+      .value("LFU", mochi::CoordinateSpaceAxes::LFU, "X-left, Y-forward, Z-up.")
+      .value("LFD", mochi::CoordinateSpaceAxes::LFD, "X-left, Y-forward, Z-down.")
+      .value("LBU", mochi::CoordinateSpaceAxes::LBU, "X-left, Y-backward, Z-up.")
+      .value("LBD", mochi::CoordinateSpaceAxes::LBD, "X-left, Y-backward, Z-down.")
+      .value("URF", mochi::CoordinateSpaceAxes::URF, "X-up, Y-right, Z-forward.")
+      .value("URB", mochi::CoordinateSpaceAxes::URB, "X-up, Y-right, Z-backward.")
+      .value("ULF", mochi::CoordinateSpaceAxes::ULF, "X-up, Y-left, Z-forward.")
+      .value("ULB", mochi::CoordinateSpaceAxes::ULB, "X-up, Y-left, Z-backward.")
+      .value("DRF", mochi::CoordinateSpaceAxes::DRF, "X-down, Y-right, Z-forward.")
+      .value("DRB", mochi::CoordinateSpaceAxes::DRB, "X-down, Y-right, Z-backward.")
+      .value("DLF", mochi::CoordinateSpaceAxes::DLF, "X-down, Y-left, Z-forward.")
+      .value("DLB", mochi::CoordinateSpaceAxes::DLB, "X-down, Y-left, Z-backward.")
+      .value("UFR", mochi::CoordinateSpaceAxes::UFR, "X-up, Y-forward, Z-right.")
+      .value("UFL", mochi::CoordinateSpaceAxes::UFL, "X-up, Y-forward, Z-left.")
+      .value("UBR", mochi::CoordinateSpaceAxes::UBR, "X-up, Y-backward, Z-right.")
+      .value("UBL", mochi::CoordinateSpaceAxes::UBL, "X-up, Y-backward, Z-left.")
+      .value("DFR", mochi::CoordinateSpaceAxes::DFR, "X-down, Y-forward, Z-right.")
+      .value("DFL", mochi::CoordinateSpaceAxes::DFL, "X-down, Y-forward, Z-left.")
+      .value("DBR", mochi::CoordinateSpaceAxes::DBR, "X-down, Y-backward, Z-right.")
+      .value("DBL", mochi::CoordinateSpaceAxes::DBL, "X-down, Y-backward, Z-left.")
+      .value("FRU", mochi::CoordinateSpaceAxes::FRU, "X-forward, Y-right, Z-up (Unreal).")
+      .value("FRD", mochi::CoordinateSpaceAxes::FRD, "X-forward, Y-right, Z-down.")
+      .value("FLU", mochi::CoordinateSpaceAxes::FLU, "X-forward, Y-left, Z-up (Default).")
+      .value("FLD", mochi::CoordinateSpaceAxes::FLD, "X-forward, Y-left, Z-down.")
+      .value("BRU", mochi::CoordinateSpaceAxes::BRU, "X-backward, Y-right, Z-up.")
+      .value("BRD", mochi::CoordinateSpaceAxes::BRD, "X-backward, Y-right, Z-down.")
+      .value("BLU", mochi::CoordinateSpaceAxes::BLU, "X-backward, Y-left, Z-up.")
+      .value("BLD", mochi::CoordinateSpaceAxes::BLD, "X-backward, Y-left, Z-down.")
+      .value("FUR", mochi::CoordinateSpaceAxes::FUR, "X-forward, Y-up, Z-right.")
+      .value("FUL", mochi::CoordinateSpaceAxes::FUL, "X-forward, Y-up, Z-left.")
+      .value("FDR", mochi::CoordinateSpaceAxes::FDR, "X-forward, Y-down, Z-right.")
+      .value("FDL", mochi::CoordinateSpaceAxes::FDL, "X-forward, Y-down, Z-left.")
+      .value("BUR", mochi::CoordinateSpaceAxes::BUR, "X-backward, Y-up, Z-right.")
+      .value("BUL", mochi::CoordinateSpaceAxes::BUL, "X-backward, Y-up, Z-left.")
+      .value("BDR", mochi::CoordinateSpaceAxes::BDR, "X-backward, Y-down, Z-right.")
+      .value("BDL", mochi::CoordinateSpaceAxes::BDL, "X-backward, Y-down, Z-left.")
+    ;
+    boundEnum.attr("DEFAULT") = boundEnum.attr("FLU");
+    nb::cast<nb::dict>(boundEnum.attr("_member_map_")).attr("__setitem__")("DEFAULT", boundEnum.attr("FLU"));
+  }
 
-  registry.StoreClass(py::class_<mochi::ArticulatedCycleJoint>(m, "ArticulatedCycleJoint", "Defines a cycle-closing joint in an articulated body.\n\nCycle joints create closed loops in the kinematic chain, allowing topologies\nbeyond simple trees."));
-  registry.StoreClass(py::class_<mochi::RoutingElement>(m, "RoutingElement", "One ordered element in a spatial tendon's heterogeneous routing list.\n\nA :class:`WAYPOINT <superdex.physics.RoutingElementType>` uses :attr:`index` (a\nlink index) and :attr:`local_position`; a :class:`LINEAR_JOINT\n<superdex.physics.RoutingElementType>` uses :attr:`index` (a joint index) and\n:attr:`coefficient`. Order matters: a segment forms only between adjacent\nwaypoints, so a linear-joint element between two waypoints leaves a gap."));
-  registry.StoreClass(py::class_<mochi::BlendingData>(m, "BlendingData", "Blending data for one source shape within a soft skinned mesh.\n\nSee Also:\n    :class:`~superdex.physics.BlendingDataView`"));
-  registry.StoreClass(py::class_<mochi::BlendingDataView>(m, "BlendingDataView", "Non-owning view of blending data for one source shape within a soft skinned\nmesh.\n\nSee Also:\n    :class:`~superdex.physics.BlendingData`"));
-  registry.StoreClass(py::class_<mochi::SkinningData>(m, "SkinningData", "Skinning data for a SuperDex mesh.\n\nSee Also:\n    :class:`~superdex.physics.SkinningDataView`"));
-  registry.StoreClass(py::class_<mochi::SkinningDataView>(m, "SkinningDataView", "Non-owning view of skinning data for a SuperDex mesh.\n\nSee Also:\n    :class:`~superdex.physics.SkinningData`"));
-  registry.StoreClass(py::class_<mochi::MeshData>(m, "MeshData", "Mesh data for a SuperDex actor or model file.\n\nSee Also:\n    :class:`~superdex.physics.MeshDataView`"));
-  registry.StoreClass(py::class_<mochi::MeshDataView>(m, "MeshDataView", "Non-owning view of mesh data for a SuperDex actor or model file.\n\nSee Also:\n    :class:`~superdex.physics.MeshData`"));
-  registry.StoreClass(py::class_<mochi::GridSdfData>(m, "GridSdfData", "Data for a precomputed signed-distance-field grid.\n\nSee Also:\n    :class:`~superdex.physics.GridSdfDataView`"));
-  registry.StoreClass(py::class_<mochi::GridSdfDataView>(m, "GridSdfDataView", "Non-owning view of data for a precomputed signed-distance-field grid.\n\nSee Also:\n    :class:`~superdex.physics.GridSdfData`"));
-  registry.StoreClass(py::class_<mochi::Box>(m, "Box", "Oriented box represented by center, half extents, and rotation."));
-  registry.StoreClass(py::class_<mochi::Plane>(m, "Plane", "Plane represented by a unit normal and signed distance from the origin."));
-  registry.StoreClass(py::class_<mochi::Sphere>(m, "Sphere", "Sphere represented by center and radius."));
-  registry.StoreClass(py::class_<mochi::ModelData>(m, "ModelData", "Contents of a SuperDex model file.\n\nSee Also:\n    :class:`~superdex.physics.ModelDataView`"));
-  registry.StoreClass(py::class_<mochi::ModelDataView>(m, "ModelDataView", "Non-owning view of the contents of a SuperDex model file.\n\nSee Also:\n    :class:`~superdex.physics.ModelData`"));
-  registry.StoreClass(py::class_<mochi::GridSdfParams>(m, "GridSdfParams", "Parameters controlling the resolution of grid-based Signed Distance Fields\n(SDF).\n\nA GridSdf represents the SDF to a closed surface mesh as a 3D grid where each\nvertex stores the signed distance to the surface mesh. The SDF grid resolution\nand bounds are controlled by these parameters."));
-  registry.StoreClass(py::class_<mochi::LinearElasticMaterialParams>(m, "LinearElasticMaterialParams", "Parameters for a linear elastic material model."));
-  registry.StoreClass(py::class_<mochi::StVenantKirchhoffMaterialParams>(m, "StVenantKirchhoffMaterialParams", "Parameters for the St. Venant-Kirchhoff material model."));
-  registry.StoreClass(py::class_<mochi::NeoHookeanMaterialParams>(m, "NeoHookeanMaterialParams", "Parameters for the Smith stable Neo-Hookean material model."));
-  registry.StoreClass(py::class_<mochi::ActiveAnisoArapMaterialParams>(m, "ActiveAnisoArapMaterialParams", "Parameters for the active anisotropic ARAP material component."));
-  registry.StoreClass(py::class_<mochi::ActiveNeoHookeanMaterialParams>(m, "ActiveNeoHookeanMaterialParams", "Parameters for a material combining passive Neo-Hookean and active anisotropic\nterms."));
-  registry.StoreClass(py::class_<mochi::ArapMaterialParams>(m, "ArapMaterialParams", "Parameters for an as-rigid-as-possible material model."));
-  registry.StoreClass(py::class_<mochi::ActiveShapeTargetingArapMaterialParams>(m, "ActiveShapeTargetingArapMaterialParams", "Parameters for an active ARAP material targeting a preferred shape tensor."));
-  registry.StoreClass(py::class_<mochi::SoftMaterialParams>(m, "SoftMaterialParams", "Parameters for a homogeneous soft material."));
-  registry.StoreClass(py::class_<mochi::PerElementSoftMaterialData>(m, "PerElementSoftMaterialData", "Per-element soft material data for heterogeneous materials.\n\nSee Also:\n    :class:`~superdex.physics.PerElementSoftMaterialDataView`"));
-  registry.StoreClass(py::class_<mochi::PerElementSoftMaterialDataView>(m, "PerElementSoftMaterialDataView", "Non-owning view of per-element soft material data.\n\nSee Also:\n    :class:`~superdex.physics.PerElementSoftMaterialData`"));
-  registry.StoreClass(py::class_<mochi::ContactParams>(m, "ContactParams", "Parameters for contact mechanics simulation.\n\nNote:\n    For each field without an actor-pair override, contact between a colliding\n    actor and a collider uses the collider's contact parameter (not the\n    colliding actor's). The exceptions are: - For friction and dissipation\n    coefficients (viscousFrictionCoefficient, coulombFrictionCoefficient,\n    normalViscousDampingCoefficient), the geometric mean of the colliding and\n    collider's coefficients is used. This disables friction/dissipation if\n    either of them does. - For penalty coefficient (penaltyCoefficient) and\n    friction velocity threshold (frictionFalloffVel), the geometric mean of the\n    colliding and collider's values is used, except if the collider is static in\n    which case the colliding's values are used.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.set_contact_pair_params_override`"));
-  registry.StoreClass(py::class_<mochi::ArticulatedJointFrictionParams>(m, "ArticulatedJointFrictionParams", "Per-joint friction parameters for articulated bodies.\n\nViscous and dry friction force/torque contributions are added together. -\nViscous friction force/torque is proportional to velocity with coefficient\n:attr:`viscous`. - The static-friction peak/breakaway force/torque is given by\n:attr:`coulomb` + :attr:`stiction_extra`. Static friction is regularized to\nallow slight slippage at speeds of up to :attr:`falloff_vel`. - Above the\nsmoothing threshold ``|v|`` > :attr:`falloff_vel`, dynamic dry friction\nforce/torque (excluding additional viscous friction) has magnitude\n:attr:`coulomb` + :attr:`stiction_extra` * exp(-pow((``|v|`` -\n:attr:`falloff_vel`) / :attr:`stribeck_vel`, 2)) when :attr:`stribeck_vel` is\npositive. If it is zero, the Stribeck term is omitted and the magnitude is\n:attr:`coulomb`. Here ``|v|`` is the magnitude of the relative (linear or\nangular) velocity. This causes friction to decrease smoothly from the peak\nstatic value to :attr:`coulomb` at high velocities."));
-  registry.StoreClass(py::class_<mochi::ArticulatedDofInfo>(m, "ArticulatedDofInfo", "Degree-of-freedom layout information for one articulated joint."));
-  registry.StoreClass(py::class_<mochi::SaturationHessianParams>(m, "SaturationHessianParams", "[Experimental] Controls whether force-saturation terms use a fitted quadratic\nHessian independently for each saturation pathway.\n\nFor each flag, `true` selects the fitted Hessian, which is more stable. `false`\nselects the exact analytical Hessian, which may converge faster but is less\nstable.\n\nNote:\n    When a flag is `false`, the solver will try first with the true Hessian for\n    that pathway. If the Newton iteration fails to improve, all flags are set to\n    `true` and the iteration is retried with fitted Hessians for all pathways.\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk."));
-  registry.StoreClass(py::class_<mochi::ExperimentalEvalParams>(m, "ExperimentalEvalParams", "[Experimental] Evaluation settings common to the full scene.\n\nThey tune the evaluation of internal models (contact, constraints, etc).\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk."));
-  registry.StoreClass(py::class_<mochi::NonLinearSolverParams>(m, "NonLinearSolverParams", "Parameters for non-linear implicit solves."));
-  registry.StoreClass(py::class_<mochi::LinearSolverParams>(m, "LinearSolverParams", "Parameters for linear solves."));
-  registry.StoreClass(py::class_<mochi::CoordinateSpace>(m, "CoordinateSpace", "Coordinate-axis convention and linear unit scale."));
+  registry.StoreClass(nb::class_<mochi::ArticulatedCycleJoint>(m, "ArticulatedCycleJoint", "Defines a cycle-closing joint in an articulated body.\n\nCycle joints create closed loops in the kinematic chain, allowing topologies\nbeyond simple trees."));
+  registry.StoreClass(nb::class_<mochi::RoutingElement>(m, "RoutingElement", "One ordered element in a spatial tendon's heterogeneous routing list.\n\nA :class:`WAYPOINT <superdex.physics.RoutingElementType>` uses :attr:`index` (a\nlink index) and :attr:`local_position`; a :class:`LINEAR_JOINT\n<superdex.physics.RoutingElementType>` uses :attr:`index` (a joint index) and\n:attr:`coefficient`. Order matters: a segment forms only between adjacent\nwaypoints, so a linear-joint element between two waypoints leaves a gap."));
+  registry.StoreClass(nb::class_<mochi::BlendingData>(m, "BlendingData", "Blending data for one source shape within a soft skinned mesh.\n\nSee Also:\n    :class:`~superdex.physics.BlendingDataView`"));
+  registry.StoreClass(nb::class_<mochi::BlendingDataView>(m, "BlendingDataView", "Non-owning view of blending data for one source shape within a soft skinned\nmesh.\n\nSee Also:\n    :class:`~superdex.physics.BlendingData`"));
+  registry.StoreClass(nb::class_<mochi::SkinningData>(m, "SkinningData", "Skinning data for a SuperDex mesh.\n\nSee Also:\n    :class:`~superdex.physics.SkinningDataView`"));
+  registry.StoreClass(nb::class_<mochi::SkinningDataView>(m, "SkinningDataView", "Non-owning view of skinning data for a SuperDex mesh.\n\nSee Also:\n    :class:`~superdex.physics.SkinningData`"));
+  registry.StoreClass(nb::class_<mochi::MeshData>(m, "MeshData", "Mesh data for a SuperDex actor or model file.\n\nSee Also:\n    :class:`~superdex.physics.MeshDataView`"));
+  registry.StoreClass(nb::class_<mochi::MeshDataView>(m, "MeshDataView", "Non-owning view of mesh data for a SuperDex actor or model file.\n\nSee Also:\n    :class:`~superdex.physics.MeshData`"));
+  registry.StoreClass(nb::class_<mochi::GridSdfData>(m, "GridSdfData", "Data for a precomputed signed-distance-field grid.\n\nSee Also:\n    :class:`~superdex.physics.GridSdfDataView`"));
+  registry.StoreClass(nb::class_<mochi::GridSdfDataView>(m, "GridSdfDataView", "Non-owning view of data for a precomputed signed-distance-field grid.\n\nSee Also:\n    :class:`~superdex.physics.GridSdfData`"));
+  registry.StoreClass(nb::class_<mochi::Box>(m, "Box", "Oriented box represented by center, half extents, and rotation."));
+  registry.StoreClass(nb::class_<mochi::Plane>(m, "Plane", "Plane represented by a unit normal and signed distance from the origin."));
+  registry.StoreClass(nb::class_<mochi::Sphere>(m, "Sphere", "Sphere represented by center and radius."));
+  registry.StoreClass(nb::class_<mochi::ModelData>(m, "ModelData", "Contents of a SuperDex model file.\n\nSee Also:\n    :class:`~superdex.physics.ModelDataView`"));
+  registry.StoreClass(nb::class_<mochi::ModelDataView>(m, "ModelDataView", "Non-owning view of the contents of a SuperDex model file.\n\nSee Also:\n    :class:`~superdex.physics.ModelData`"));
+  registry.StoreClass(nb::class_<mochi::GridSdfParams>(m, "GridSdfParams", "Parameters controlling the resolution of grid-based Signed Distance Fields\n(SDF).\n\nA GridSdf represents the SDF to a closed surface mesh as a 3D grid where each\nvertex stores the signed distance to the surface mesh. The SDF grid resolution\nand bounds are controlled by these parameters."));
+  registry.StoreClass(nb::class_<mochi::LinearElasticMaterialParams>(m, "LinearElasticMaterialParams", "Parameters for a linear elastic material model."));
+  registry.StoreClass(nb::class_<mochi::StVenantKirchhoffMaterialParams>(m, "StVenantKirchhoffMaterialParams", "Parameters for the St. Venant-Kirchhoff material model."));
+  registry.StoreClass(nb::class_<mochi::NeoHookeanMaterialParams>(m, "NeoHookeanMaterialParams", "Parameters for the Smith stable Neo-Hookean material model."));
+  registry.StoreClass(nb::class_<mochi::ActiveAnisoArapMaterialParams>(m, "ActiveAnisoArapMaterialParams", "Parameters for the active anisotropic ARAP material component."));
+  registry.StoreClass(nb::class_<mochi::ActiveNeoHookeanMaterialParams>(m, "ActiveNeoHookeanMaterialParams", "Parameters for a material combining passive Neo-Hookean and active anisotropic\nterms."));
+  registry.StoreClass(nb::class_<mochi::ArapMaterialParams>(m, "ArapMaterialParams", "Parameters for an as-rigid-as-possible material model."));
+  registry.StoreClass(nb::class_<mochi::ActiveShapeTargetingArapMaterialParams>(m, "ActiveShapeTargetingArapMaterialParams", "Parameters for an active ARAP material targeting a preferred shape tensor."));
+  registry.StoreClass(nb::class_<mochi::SoftMaterialParams>(m, "SoftMaterialParams", "Parameters for a homogeneous soft material."));
+  registry.StoreClass(nb::class_<mochi::PerElementSoftMaterialData>(m, "PerElementSoftMaterialData", "Per-element soft material data for heterogeneous materials.\n\nSee Also:\n    :class:`~superdex.physics.PerElementSoftMaterialDataView`"));
+  registry.StoreClass(nb::class_<mochi::PerElementSoftMaterialDataView>(m, "PerElementSoftMaterialDataView", "Non-owning view of per-element soft material data.\n\nSee Also:\n    :class:`~superdex.physics.PerElementSoftMaterialData`"));
+  registry.StoreClass(nb::class_<mochi::ContactParams>(m, "ContactParams", "Parameters for contact mechanics simulation.\n\nNote:\n    For each field without an actor-pair override, contact between a colliding\n    actor and a collider uses the collider's contact parameter (not the\n    colliding actor's). The exceptions are: - For friction and dissipation\n    coefficients (viscousFrictionCoefficient, coulombFrictionCoefficient,\n    normalViscousDampingCoefficient), the geometric mean of the colliding and\n    collider's coefficients is used. This disables friction/dissipation if\n    either of them does. - For penalty coefficient (penaltyCoefficient) and\n    friction velocity threshold (frictionFalloffVel), the geometric mean of the\n    colliding and collider's values is used, except if the collider is static in\n    which case the colliding's values are used.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.set_contact_pair_params_override`"));
+  registry.StoreClass(nb::class_<mochi::ArticulatedJointFrictionParams>(m, "ArticulatedJointFrictionParams", "Per-joint friction parameters for articulated bodies.\n\nViscous and dry friction force/torque contributions are added together. -\nViscous friction force/torque is proportional to velocity with coefficient\n:attr:`viscous`. - The static-friction peak/breakaway force/torque is given by\n:attr:`coulomb` + :attr:`stiction_extra`. Static friction is regularized to\nallow slight slippage at speeds of up to :attr:`falloff_vel`. - Above the\nsmoothing threshold ``|v|`` > :attr:`falloff_vel`, dynamic dry friction\nforce/torque (excluding additional viscous friction) has magnitude\n:attr:`coulomb` + :attr:`stiction_extra` * exp(-pow((``|v|`` -\n:attr:`falloff_vel`) / :attr:`stribeck_vel`, 2)) when :attr:`stribeck_vel` is\npositive. If it is zero, the Stribeck term is omitted and the magnitude is\n:attr:`coulomb`. Here ``|v|`` is the magnitude of the relative (linear or\nangular) velocity. This causes friction to decrease smoothly from the peak\nstatic value to :attr:`coulomb` at high velocities."));
+  registry.StoreClass(nb::class_<mochi::ArticulatedDofInfo>(m, "ArticulatedDofInfo", "Degree-of-freedom layout information for one articulated joint."));
+  registry.StoreClass(nb::class_<mochi::SaturationHessianParams>(m, "SaturationHessianParams", "[Experimental] Controls whether force-saturation terms use a fitted quadratic\nHessian independently for each saturation pathway.\n\nFor each flag, `true` selects the fitted Hessian, which is more stable. `false`\nselects the exact analytical Hessian, which may converge faster but is less\nstable.\n\nNote:\n    When a flag is `false`, the solver will try first with the true Hessian for\n    that pathway. If the Newton iteration fails to improve, all flags are set to\n    `true` and the iteration is retried with fitted Hessians for all pathways.\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk."));
+  registry.StoreClass(nb::class_<mochi::ExperimentalEvalParams>(m, "ExperimentalEvalParams", "[Experimental] Evaluation settings common to the full scene.\n\nThey tune the evaluation of internal models (contact, constraints, etc).\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk."));
+  registry.StoreClass(nb::class_<mochi::NonLinearSolverParams>(m, "NonLinearSolverParams", "Parameters for non-linear implicit solves."));
+  registry.StoreClass(nb::class_<mochi::LinearSolverParams>(m, "LinearSolverParams", "Parameters for linear solves."));
+  registry.StoreClass(nb::class_<mochi::CoordinateSpace>(m, "CoordinateSpace", "Coordinate-axis convention and linear unit scale."));
 }
 
-void mochi::DefineMochiCore_MochiCore([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+void mochi::DefineMochiCore_MochiCore([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
   registry.GetClass<mochi::ArticulatedCycleJoint>()
-    .def(py::init([](py::object child, py::object parent) {
-      mochi::ArticulatedCycleJoint result;
-      result.child = py::cast<int>(child);
-      result.parent = py::cast<int>(parent);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("child") = mochi::ArticulatedCycleJoint{}.child
-      , py::arg("parent") = mochi::ArticulatedCycleJoint{}.parent
+    .def("__init__", [](mochi::ArticulatedCycleJoint* self, nb::object child, nb::object parent) {
+      mochi::ArticulatedCycleJoint result{};
+      result.child = nb::cast<int>(child);
+      result.parent = nb::cast<int>(parent);
+      new (self) mochi::ArticulatedCycleJoint(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("child") = mochi::ArticulatedCycleJoint{}.child
+      , nb::arg("parent") = mochi::ArticulatedCycleJoint{}.parent
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::ArticulatedCycleJoint const& self) { return mochi::ArticulatedCycleJoint(self); })
-    .def("__deepcopy__", [](mochi::ArticulatedCycleJoint const& self, py::dict) { return mochi::ArticulatedCycleJoint(self); })
-    .def_readwrite("child", &mochi::ArticulatedCycleJoint::child, "Child link index.")
-    .def_readwrite("parent", &mochi::ArticulatedCycleJoint::parent, "Parent link index.")
+    .def("__deepcopy__", [](mochi::ArticulatedCycleJoint const& self, nb::dict) { return mochi::ArticulatedCycleJoint(self); })
+    .def_rw("child", &mochi::ArticulatedCycleJoint::child, "Child link index.")
+    .def_rw("parent", &mochi::ArticulatedCycleJoint::parent, "Parent link index.")
   ;
 
   registry.GetClass<mochi::RoutingElement>()
-    .def(py::init([](py::object type, py::object index, py::object local_position, py::object coefficient) {
-      mochi::RoutingElement result;
-      result.type = py::cast<mochi::RoutingElementType>(type);
-      result.index = py::cast<int>(index);
-      result.localPosition = py::cast<mochi::Real3>(local_position);
-      result.coefficient = py::cast<mochi::real>(coefficient);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("type") = mochi::RoutingElement{}.type
-      , py::arg("index") = mochi::RoutingElement{}.index
-      , py::arg("local_position") = mochi::RoutingElement{}.localPosition
-      , py::arg("coefficient") = mochi::RoutingElement{}.coefficient
+    .def("__init__", [](mochi::RoutingElement* self, nb::object type, nb::object index, nb::object local_position, nb::object coefficient) {
+      mochi::RoutingElement result{};
+      result.type = nb::cast<mochi::RoutingElementType>(type);
+      result.index = nb::cast<int>(index);
+      result.localPosition = nb::cast<mochi::Real3>(local_position);
+      result.coefficient = nb::cast<mochi::real>(coefficient);
+      new (self) mochi::RoutingElement(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("type") = mochi::RoutingElement{}.type
+      , nb::arg("index") = mochi::RoutingElement{}.index
+      , nb::arg("local_position").sig("...") = mochi::RoutingElement{}.localPosition
+      , nb::arg("coefficient") = mochi::RoutingElement{}.coefficient
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::RoutingElement const& self) { return mochi::RoutingElement(self); })
-    .def("__deepcopy__", [](mochi::RoutingElement const& self, py::dict) { return mochi::RoutingElement(self); })
-    .def_readwrite("type", &mochi::RoutingElement::type, "Selects the interpretation of the remaining fields.")
-    .def_readwrite("index", &mochi::RoutingElement::index, "Link index for a waypoint, or joint index for a linear-joint element.")
-    .def_property("local_position", [](mochi::RoutingElement& self) -> mochi::Real3& { return self.localPosition; }, [](mochi::RoutingElement& self, py::object val) { self.localPosition = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Waypoint position in the link's local frame, the same frame in which the link's\nmesh and geometry are authored (the link's root-transform frame) [m]. Only used\nfor waypoint elements.")
-    .def_readwrite("coefficient", &mochi::RoutingElement::coefficient, "Signed constant moment arm d(displacement)/d(joint DoF) [m / joint DoF]. Only\nused for linear-joint elements. Its sign sets whether the tendon lengthens or\nshortens with the joint DoF.")
+    .def("__deepcopy__", [](mochi::RoutingElement const& self, nb::dict) { return mochi::RoutingElement(self); })
+    .def_rw("type", &mochi::RoutingElement::type, "Selects the interpretation of the remaining fields.")
+    .def_rw("index", &mochi::RoutingElement::index, "Link index for a waypoint, or joint index for a linear-joint element.")
+    .def_prop_rw("local_position", [](mochi::RoutingElement& self) -> mochi::Real3& { return self.localPosition; }, [](mochi::RoutingElement& self, nb::object val) { self.localPosition = nb::cast<mochi::Real3>(val); }, "Waypoint position in the link's local frame, the same frame in which the link's\nmesh and geometry are authored (the link's root-transform frame) [m]. Only used\nfor waypoint elements.")
+    .def_rw("coefficient", &mochi::RoutingElement::coefficient, "Signed constant moment arm d(displacement)/d(joint DoF) [m / joint DoF]. Only\nused for linear-joint elements. Its sign sets whether the tendon lengthens or\nshortens with the joint DoF.")
   ;
 
   registry.GetClass<mochi::BlendingData>()
-    .def(py::init([](py::object source_shape, py::object indices, py::object weights) {
-      mochi::BlendingData result;
-      result.sourceShape = py::cast<mochi::DynamicString>(source_shape);
-      result.indices = py::cast<mochi::DynamicArray<int>>(indices);
-      result.weights = py::cast<mochi::DynamicArray<mochi::real>>(weights);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("source_shape") = mochi::BlendingData{}.sourceShape
-      , py::arg("indices") = mochi::BlendingData{}.indices
-      , py::arg("weights") = mochi::BlendingData{}.weights
+    .def("__init__", [](mochi::BlendingData* self, nb::object source_shape, nb::object indices, nb::object weights) {
+      mochi::BlendingData result{};
+      result.sourceShape = nb::cast<mochi::DynamicString>(source_shape);
+      result.indices = nb::cast<mochi::DynamicArray<int>>(indices);
+      result.weights = nb::cast<mochi::DynamicArray<mochi::real>>(weights);
+      new (self) mochi::BlendingData(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("source_shape") = mochi::BlendingData{}.sourceShape
+      , nb::arg("indices").sig("...") = mochi::BlendingData{}.indices
+      , nb::arg("weights").sig("...") = mochi::BlendingData{}.weights
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::BlendingData const& self) { return mochi::BlendingData(self); })
-    .def("__deepcopy__", [](mochi::BlendingData const& self, py::dict) { return mochi::BlendingData(self); })
-    .def_readwrite("source_shape", &mochi::BlendingData::sourceShape, "Name of the soft source shape.")
-    .def_property("indices", [](mochi::BlendingData& self) -> mochi::DynamicArray<int>& { return self.indices; }, [](mochi::BlendingData& self, py::object val) { self.indices = py::cast<mochi::DynamicArray<int>>(val); }, py::return_value_policy::reference_internal, "Indices for blending. Size is numNodes * 2.")
-    .def_property("weights", [](mochi::BlendingData& self) -> mochi::DynamicArray<mochi::real>& { return self.weights; }, [](mochi::BlendingData& self, py::object val) { self.weights = py::cast<mochi::DynamicArray<mochi::real>>(val); }, py::return_value_policy::reference_internal, "Weights for blending. Size is numNodes * 2.")
-    .def(py::init<mochi::BlendingDataView const&>()
-      , py::arg("src")
+    .def("__deepcopy__", [](mochi::BlendingData const& self, nb::dict) { return mochi::BlendingData(self); })
+    .def_rw("source_shape", &mochi::BlendingData::sourceShape, "Name of the soft source shape.")
+    .def_prop_rw("indices", [](mochi::BlendingData& self) -> mochi::DynamicArray<int>& { return self.indices; }, [](mochi::BlendingData& self, nb::object val) { self.indices = nb::cast<mochi::DynamicArray<int>>(val); }, "Indices for blending. Size is numNodes * 2.")
+    .def_prop_rw("weights", [](mochi::BlendingData& self) -> mochi::DynamicArray<mochi::real>& { return self.weights; }, [](mochi::BlendingData& self, nb::object val) { self.weights = nb::cast<mochi::DynamicArray<mochi::real>>(val); }, "Weights for blending. Size is numNodes * 2.")
+    .def(nb::init<mochi::BlendingDataView const&>()
+      , nb::arg("src")
       , "Copy from :class:`~superdex.physics.BlendingDataView`.\n\nArgs:\n    src (BlendingDataView): Source data."
     )
   ;
 
   registry.GetClass<mochi::BlendingDataView>()
-    .def(py::init([](py::object source_shape, py::object indices, py::object weights) {
-      mochi::BlendingDataView result;
-      result.sourceShape = py::cast<std::string_view>(source_shape);
-      result.indices = py::cast<mochi::Span<int const>>(indices);
-      result.weights = py::cast<mochi::Span<mochi::real const>>(weights);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("source_shape") = mochi::BlendingDataView{}.sourceShape
-      , py::arg("indices") = mochi::BlendingDataView{}.indices
-      , py::arg("weights") = mochi::BlendingDataView{}.weights
+    .def("__init__", [](mochi::BlendingDataView* self, nb::object source_shape, nb::object indices, nb::object weights) {
+      mochi::BlendingDataView result{};
+      result.sourceShape = nb::cast<std::string_view>(source_shape);
+      result.indices = nb::cast<mochi::Span<int const>>(indices);
+      result.weights = nb::cast<mochi::Span<mochi::real const>>(weights);
+      new (self) mochi::BlendingDataView(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("source_shape") = mochi::BlendingDataView{}.sourceShape
+      , nb::arg("indices").sig("...") = mochi::BlendingDataView{}.indices
+      , nb::arg("weights").sig("...") = mochi::BlendingDataView{}.weights
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
-    .def("__copy__", [](mochi::BlendingDataView const&) { throw py::type_error("BlendingDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer)."); })
-    .def("__deepcopy__", [](mochi::BlendingDataView const&, py::dict) { throw py::type_error("BlendingDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer). Shallow copy is not currently allowed either, to prevent mistakes."); })
-    .def_readwrite("source_shape", &mochi::BlendingDataView::sourceShape, "Name of the soft source shape.")
-    .def_property("indices", [](mochi::BlendingDataView& self) -> mochi::Span<int const>& { return self.indices; }, [](mochi::BlendingDataView& self, py::object val) { self.indices = py::cast<mochi::Span<int const>>(val); }, py::return_value_policy::reference_internal, "Indices for blending. Size is numNodes * 2.")
-    .def_property("weights", [](mochi::BlendingDataView& self) -> mochi::Span<mochi::real const>& { return self.weights; }, [](mochi::BlendingDataView& self, py::object val) { self.weights = py::cast<mochi::Span<mochi::real const>>(val); }, py::return_value_policy::reference_internal, "Weights for blending. Size is numNodes * 2.")
-    .def(py::init<mochi::BlendingData const&>()
-      , py::arg("src"), py::keep_alive<1, 2>()
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
+    .def("__copy__", [](mochi::BlendingDataView const&) { throw nb::type_error("BlendingDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer)."); })
+    .def("__deepcopy__", [](mochi::BlendingDataView const&, nb::dict) { throw nb::type_error("BlendingDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer). Shallow copy is not currently allowed either, to prevent mistakes."); })
+    .def_rw("source_shape", &mochi::BlendingDataView::sourceShape, "Name of the soft source shape.")
+    .def_prop_rw("indices", [](mochi::BlendingDataView& self) -> mochi::Span<int const>& { return self.indices; }, [](mochi::BlendingDataView& self, nb::object val) { self.indices = nb::cast<mochi::Span<int const>>(val); }, "Indices for blending. Size is numNodes * 2.")
+    .def_prop_rw("weights", [](mochi::BlendingDataView& self) -> mochi::Span<mochi::real const>& { return self.weights; }, [](mochi::BlendingDataView& self, nb::object val) { self.weights = nb::cast<mochi::Span<mochi::real const>>(val); }, "Weights for blending. Size is numNodes * 2.")
+    .def(nb::init<mochi::BlendingData const&>()
+      , nb::arg("src"), nb::keep_alive<1, 2>()
       , "Implicit conversion from :class:`~superdex.physics.BlendingData`.\n\nArgs:\n    src (BlendingData): Source data."
     )
   ;
 
   registry.GetClass<mochi::SkinningData>()
-    .def(py::init([](py::object weights_per_node, py::object indices, py::object weights) {
-      mochi::SkinningData result;
-      result.weightsPerNode = py::cast<int>(weights_per_node);
-      result.indices = py::cast<mochi::DynamicArray<int>>(indices);
-      result.weights = py::cast<mochi::DynamicArray<mochi::real>>(weights);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("weights_per_node") = mochi::SkinningData{}.weightsPerNode
-      , py::arg("indices") = mochi::SkinningData{}.indices
-      , py::arg("weights") = mochi::SkinningData{}.weights
+    .def("__init__", [](mochi::SkinningData* self, nb::object weights_per_node, nb::object indices, nb::object weights) {
+      mochi::SkinningData result{};
+      result.weightsPerNode = nb::cast<int>(weights_per_node);
+      result.indices = nb::cast<mochi::DynamicArray<int>>(indices);
+      result.weights = nb::cast<mochi::DynamicArray<mochi::real>>(weights);
+      new (self) mochi::SkinningData(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("weights_per_node") = mochi::SkinningData{}.weightsPerNode
+      , nb::arg("indices").sig("...") = mochi::SkinningData{}.indices
+      , nb::arg("weights").sig("...") = mochi::SkinningData{}.weights
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::SkinningData const& self) { return mochi::SkinningData(self); })
-    .def("__deepcopy__", [](mochi::SkinningData const& self, py::dict) { return mochi::SkinningData(self); })
-    .def_readwrite("weights_per_node", &mochi::SkinningData::weightsPerNode, "Number of weights and indices per skinned node.")
-    .def_property("indices", [](mochi::SkinningData& self) -> mochi::DynamicArray<int>& { return self.indices; }, [](mochi::SkinningData& self, py::object val) { self.indices = py::cast<mochi::DynamicArray<int>>(val); }, py::return_value_policy::reference_internal, "Indices for each node. Size is numNodes * weightsPerNode.")
-    .def_property("weights", [](mochi::SkinningData& self) -> mochi::DynamicArray<mochi::real>& { return self.weights; }, [](mochi::SkinningData& self, py::object val) { self.weights = py::cast<mochi::DynamicArray<mochi::real>>(val); }, py::return_value_policy::reference_internal, "Weights for each node. Size is numNodes * weightsPerNode.")
-    .def(py::init<mochi::SkinningDataView const&>()
-      , py::arg("src")
+    .def("__deepcopy__", [](mochi::SkinningData const& self, nb::dict) { return mochi::SkinningData(self); })
+    .def_rw("weights_per_node", &mochi::SkinningData::weightsPerNode, "Number of weights and indices per skinned node.")
+    .def_prop_rw("indices", [](mochi::SkinningData& self) -> mochi::DynamicArray<int>& { return self.indices; }, [](mochi::SkinningData& self, nb::object val) { self.indices = nb::cast<mochi::DynamicArray<int>>(val); }, "Indices for each node. Size is numNodes * weightsPerNode.")
+    .def_prop_rw("weights", [](mochi::SkinningData& self) -> mochi::DynamicArray<mochi::real>& { return self.weights; }, [](mochi::SkinningData& self, nb::object val) { self.weights = nb::cast<mochi::DynamicArray<mochi::real>>(val); }, "Weights for each node. Size is numNodes * weightsPerNode.")
+    .def(nb::init<mochi::SkinningDataView const&>()
+      , nb::arg("src")
       , "Copy from :class:`~superdex.physics.SkinningDataView`.\n\nArgs:\n    src (SkinningDataView): Source data."
     )
   ;
 
   registry.GetClass<mochi::SkinningDataView>()
-    .def(py::init([](py::object weights_per_node, py::object indices, py::object weights) {
-      mochi::SkinningDataView result;
-      result.weightsPerNode = py::cast<int>(weights_per_node);
-      result.indices = py::cast<mochi::Span<int const>>(indices);
-      result.weights = py::cast<mochi::Span<mochi::real const>>(weights);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("weights_per_node") = mochi::SkinningDataView{}.weightsPerNode
-      , py::arg("indices") = mochi::SkinningDataView{}.indices
-      , py::arg("weights") = mochi::SkinningDataView{}.weights
+    .def("__init__", [](mochi::SkinningDataView* self, nb::object weights_per_node, nb::object indices, nb::object weights) {
+      mochi::SkinningDataView result{};
+      result.weightsPerNode = nb::cast<int>(weights_per_node);
+      result.indices = nb::cast<mochi::Span<int const>>(indices);
+      result.weights = nb::cast<mochi::Span<mochi::real const>>(weights);
+      new (self) mochi::SkinningDataView(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("weights_per_node") = mochi::SkinningDataView{}.weightsPerNode
+      , nb::arg("indices").sig("...") = mochi::SkinningDataView{}.indices
+      , nb::arg("weights").sig("...") = mochi::SkinningDataView{}.weights
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
-    .def("__copy__", [](mochi::SkinningDataView const&) { throw py::type_error("SkinningDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer)."); })
-    .def("__deepcopy__", [](mochi::SkinningDataView const&, py::dict) { throw py::type_error("SkinningDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer). Shallow copy is not currently allowed either, to prevent mistakes."); })
-    .def_readwrite("weights_per_node", &mochi::SkinningDataView::weightsPerNode, "Number of weights and indices per skinned node.")
-    .def_property("indices", [](mochi::SkinningDataView& self) -> mochi::Span<int const>& { return self.indices; }, [](mochi::SkinningDataView& self, py::object val) { self.indices = py::cast<mochi::Span<int const>>(val); }, py::return_value_policy::reference_internal, "Indices for each node. Size is numNodes * weightsPerNode.")
-    .def_property("weights", [](mochi::SkinningDataView& self) -> mochi::Span<mochi::real const>& { return self.weights; }, [](mochi::SkinningDataView& self, py::object val) { self.weights = py::cast<mochi::Span<mochi::real const>>(val); }, py::return_value_policy::reference_internal, "Weights for each node. Size is numNodes * weightsPerNode.")
-    .def(py::init<mochi::SkinningData const&>()
-      , py::arg("src"), py::keep_alive<1, 2>()
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
+    .def("__copy__", [](mochi::SkinningDataView const&) { throw nb::type_error("SkinningDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer)."); })
+    .def("__deepcopy__", [](mochi::SkinningDataView const&, nb::dict) { throw nb::type_error("SkinningDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer). Shallow copy is not currently allowed either, to prevent mistakes."); })
+    .def_rw("weights_per_node", &mochi::SkinningDataView::weightsPerNode, "Number of weights and indices per skinned node.")
+    .def_prop_rw("indices", [](mochi::SkinningDataView& self) -> mochi::Span<int const>& { return self.indices; }, [](mochi::SkinningDataView& self, nb::object val) { self.indices = nb::cast<mochi::Span<int const>>(val); }, "Indices for each node. Size is numNodes * weightsPerNode.")
+    .def_prop_rw("weights", [](mochi::SkinningDataView& self) -> mochi::Span<mochi::real const>& { return self.weights; }, [](mochi::SkinningDataView& self, nb::object val) { self.weights = nb::cast<mochi::Span<mochi::real const>>(val); }, "Weights for each node. Size is numNodes * weightsPerNode.")
+    .def(nb::init<mochi::SkinningData const&>()
+      , nb::arg("src"), nb::keep_alive<1, 2>()
       , "Implicit conversion from :class:`~superdex.physics.SkinningData`.\n\nArgs:\n    src (SkinningData): Source data."
     )
   ;
 
   registry.GetClass<mochi::MeshData>()
-    .def(py::init([](py::object nodes_per_element, py::object coordinates, py::object connectivity, py::object skinning) {
-      mochi::MeshData result;
-      result.nodesPerElement = py::cast<int>(nodes_per_element);
-      result.coordinates = py::cast<mochi::DynamicArray<mochi::real>>(coordinates);
-      result.connectivity = py::cast<mochi::DynamicArray<int>>(connectivity);
-      result.skinning = py::cast<std::optional<mochi::SkinningData>>(skinning);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("nodes_per_element") = mochi::MeshData{}.nodesPerElement
-      , py::arg("coordinates") = mochi::MeshData{}.coordinates
-      , py::arg("connectivity") = mochi::MeshData{}.connectivity
-      , py::arg("skinning") = mochi::MeshData{}.skinning
+    .def("__init__", [](mochi::MeshData* self, nb::object nodes_per_element, nb::object coordinates, nb::object connectivity, nb::object skinning) {
+      mochi::MeshData result{};
+      result.nodesPerElement = nb::cast<int>(nodes_per_element);
+      result.coordinates = nb::cast<mochi::DynamicArray<mochi::real>>(coordinates);
+      result.connectivity = nb::cast<mochi::DynamicArray<int>>(connectivity);
+      result.skinning = nb::cast<std::optional<mochi::SkinningData>>(skinning);
+      new (self) mochi::MeshData(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("nodes_per_element") = mochi::MeshData{}.nodesPerElement
+      , nb::arg("coordinates").sig("...") = mochi::MeshData{}.coordinates
+      , nb::arg("connectivity").sig("...") = mochi::MeshData{}.connectivity
+      , nb::arg("skinning").sig("...") = mochi::MeshData{}.skinning
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::MeshData const& self) { return mochi::MeshData(self); })
-    .def("__deepcopy__", [](mochi::MeshData const& self, py::dict) { return mochi::MeshData(self); })
-    .def_readwrite("nodes_per_element", &mochi::MeshData::nodesPerElement, "Number of nodes (vertices) per element.\n\nNote:\n    2 for polyline meshes, 3 for triangle meshes, 4 for tetrahedral meshes.")
-    .def_property("coordinates", [](mochi::MeshData& self) -> mochi::DynamicArray<mochi::real>& { return self.coordinates; }, [](mochi::MeshData& self, py::object val) { self.coordinates = py::cast<mochi::DynamicArray<mochi::real>>(val); }, py::return_value_policy::reference_internal, "Flat array of node coordinate values [m].\n\nNote:\n    Size must be a multiple of 3.")
-    .def_property("connectivity", [](mochi::MeshData& self) -> mochi::DynamicArray<int>& { return self.connectivity; }, [](mochi::MeshData& self, py::object val) { self.connectivity = py::cast<mochi::DynamicArray<int>>(val); }, py::return_value_policy::reference_internal, "Flat array of node indices forming the elements.\n\nNote:\n    Size must be a multiple of\n    :attr:`~superdex.physics.MeshData.nodes_per_element`.")
-    .def_readwrite("skinning", &mochi::MeshData::skinning, "Optional skinning data.")
-    .def(py::init<mochi::MeshDataView const&>()
-      , py::arg("src")
+    .def("__deepcopy__", [](mochi::MeshData const& self, nb::dict) { return mochi::MeshData(self); })
+    .def_rw("nodes_per_element", &mochi::MeshData::nodesPerElement, "Number of nodes (vertices) per element.\n\nNote:\n    2 for polyline meshes, 3 for triangle meshes, 4 for tetrahedral meshes.")
+    .def_prop_rw("coordinates", [](mochi::MeshData& self) -> mochi::DynamicArray<mochi::real>& { return self.coordinates; }, [](mochi::MeshData& self, nb::object val) { self.coordinates = nb::cast<mochi::DynamicArray<mochi::real>>(val); }, "Flat array of node coordinate values [m].\n\nNote:\n    Size must be a multiple of 3.")
+    .def_prop_rw("connectivity", [](mochi::MeshData& self) -> mochi::DynamicArray<int>& { return self.connectivity; }, [](mochi::MeshData& self, nb::object val) { self.connectivity = nb::cast<mochi::DynamicArray<int>>(val); }, "Flat array of node indices forming the elements.\n\nNote:\n    Size must be a multiple of\n    :attr:`~superdex.physics.MeshData.nodes_per_element`.")
+    .def_prop_rw("skinning", [](mochi::MeshData& self) -> std::optional<mochi::SkinningData>& { return self.skinning; }, [](mochi::MeshData& self, nb::handle val) { self.skinning = val.is_none() ? std::optional<mochi::SkinningData>{} : nb::cast<std::optional<mochi::SkinningData>>(val); }, "Optional skinning data.", nb::for_setter(nb::arg("value").none()))
+    .def(nb::init<mochi::MeshDataView const&>()
+      , nb::arg("src")
       , "Copy from :class:`~superdex.physics.MeshDataView`.\n\nArgs:\n    src (MeshDataView): Source data."
     )
     .def("get_num_nodes", &mochi::MeshData::GetNumNodes
@@ -523,31 +571,31 @@ void mochi::DefineMochiCore_MochiCore([[maybe_unused]] py::module_& m, [[maybe_u
   ;
 
   registry.GetClass<mochi::MeshDataView>()
-    .def(py::init([](py::object nodes_per_element, py::object coordinates, py::object connectivity, py::object skinning) {
-      mochi::MeshDataView result;
-      result.nodesPerElement = py::cast<int>(nodes_per_element);
-      result.coordinates = py::cast<mochi::Span<mochi::real const>>(coordinates);
-      result.connectivity = py::cast<mochi::Span<int const>>(connectivity);
-      result.skinning = py::cast<std::optional<mochi::SkinningDataView>>(skinning);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("nodes_per_element") = mochi::MeshDataView{}.nodesPerElement
-      , py::arg("coordinates") = mochi::MeshDataView{}.coordinates
-      , py::arg("connectivity") = mochi::MeshDataView{}.connectivity
-      , py::arg("skinning") = mochi::MeshDataView{}.skinning
+    .def("__init__", [](mochi::MeshDataView* self, nb::object nodes_per_element, nb::object coordinates, nb::object connectivity, nb::object skinning) {
+      mochi::MeshDataView result{};
+      result.nodesPerElement = nb::cast<int>(nodes_per_element);
+      result.coordinates = nb::cast<mochi::Span<mochi::real const>>(coordinates);
+      result.connectivity = nb::cast<mochi::Span<int const>>(connectivity);
+      result.skinning = nb::cast<std::optional<mochi::SkinningDataView>>(skinning);
+      new (self) mochi::MeshDataView(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("nodes_per_element") = mochi::MeshDataView{}.nodesPerElement
+      , nb::arg("coordinates").sig("...") = mochi::MeshDataView{}.coordinates
+      , nb::arg("connectivity").sig("...") = mochi::MeshDataView{}.connectivity
+      , nb::arg("skinning").sig("...") = mochi::MeshDataView{}.skinning
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
-    .def("__copy__", [](mochi::MeshDataView const&) { throw py::type_error("MeshDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer)."); })
-    .def("__deepcopy__", [](mochi::MeshDataView const&, py::dict) { throw py::type_error("MeshDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer). Shallow copy is not currently allowed either, to prevent mistakes."); })
-    .def_readwrite("nodes_per_element", &mochi::MeshDataView::nodesPerElement, "Number of nodes (vertices) per element.\n\nNote:\n    2 for polyline meshes, 3 for triangle meshes, 4 for tetrahedral meshes.")
-    .def_property("coordinates", [](mochi::MeshDataView& self) -> mochi::Span<mochi::real const>& { return self.coordinates; }, [](mochi::MeshDataView& self, py::object val) { self.coordinates = py::cast<mochi::Span<mochi::real const>>(val); }, py::return_value_policy::reference_internal, "Flat array of node coordinate values [m].\n\nNote:\n    Size must be a multiple of 3.")
-    .def_property("connectivity", [](mochi::MeshDataView& self) -> mochi::Span<int const>& { return self.connectivity; }, [](mochi::MeshDataView& self, py::object val) { self.connectivity = py::cast<mochi::Span<int const>>(val); }, py::return_value_policy::reference_internal, "Flat array of node indices forming the elements.\n\nNote:\n    Size must be a multiple of\n    :attr:`~superdex.physics.MeshDataView.nodes_per_element`.")
-    .def_readwrite("skinning", &mochi::MeshDataView::skinning, "Optional skinning data.\n\nReturns:\n    Optional skinning data.")
-    .def(py::init<mochi::MeshData const&>()
-      , py::arg("src"), py::keep_alive<1, 2>()
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
+    .def("__copy__", [](mochi::MeshDataView const&) { throw nb::type_error("MeshDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer)."); })
+    .def("__deepcopy__", [](mochi::MeshDataView const&, nb::dict) { throw nb::type_error("MeshDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer). Shallow copy is not currently allowed either, to prevent mistakes."); })
+    .def_rw("nodes_per_element", &mochi::MeshDataView::nodesPerElement, "Number of nodes (vertices) per element.\n\nNote:\n    2 for polyline meshes, 3 for triangle meshes, 4 for tetrahedral meshes.")
+    .def_prop_rw("coordinates", [](mochi::MeshDataView& self) -> mochi::Span<mochi::real const>& { return self.coordinates; }, [](mochi::MeshDataView& self, nb::object val) { self.coordinates = nb::cast<mochi::Span<mochi::real const>>(val); }, "Flat array of node coordinate values [m].\n\nNote:\n    Size must be a multiple of 3.")
+    .def_prop_rw("connectivity", [](mochi::MeshDataView& self) -> mochi::Span<int const>& { return self.connectivity; }, [](mochi::MeshDataView& self, nb::object val) { self.connectivity = nb::cast<mochi::Span<int const>>(val); }, "Flat array of node indices forming the elements.\n\nNote:\n    Size must be a multiple of\n    :attr:`~superdex.physics.MeshDataView.nodes_per_element`.")
+    .def_prop_rw("skinning", [](mochi::MeshDataView& self) -> std::optional<mochi::SkinningDataView>& { return self.skinning; }, [](mochi::MeshDataView& self, nb::handle val) { self.skinning = val.is_none() ? std::optional<mochi::SkinningDataView>{} : nb::cast<std::optional<mochi::SkinningDataView>>(val); }, "Optional skinning data.\n\nReturns:\n    Optional skinning data.", nb::for_setter(nb::arg("value").none()))
+    .def(nb::init<mochi::MeshData const&>()
+      , nb::arg("src"), nb::keep_alive<1, 2>()
       , "Implicit conversion from :class:`~superdex.physics.MeshData`.\n\nArgs:\n    src (MeshData): Source data."
     )
     .def("get_num_nodes", &mochi::MeshDataView::GetNumNodes
@@ -562,348 +610,354 @@ void mochi::DefineMochiCore_MochiCore([[maybe_unused]] py::module_& m, [[maybe_u
   ;
 
   registry.GetClass<mochi::GridSdfData>()
-    .def(py::init([](py::object dims, py::object values, py::object bounds, py::object negative_value_bounds, py::object scale, py::object rotation, py::object translation) {
-      mochi::GridSdfData result;
-      result.dims = py::cast<mochi::Int3>(dims);
-      result.values = py::cast<mochi::DynamicArray<mochi::real>>(values);
-      result.bounds = py::cast<mochi::Aabb>(bounds);
-      result.negativeValueBounds = py::cast<mochi::Aabb>(negative_value_bounds);
-      result.scale = py::cast<std::optional<mochi::Real3>>(scale);
-      result.rotation = py::cast<std::optional<mochi::Quaternion>>(rotation);
-      result.translation = py::cast<std::optional<mochi::Real3>>(translation);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("dims") = mochi::GridSdfData{}.dims
-      , py::arg("values") = mochi::GridSdfData{}.values
-      , py::arg("bounds") = mochi::GridSdfData{}.bounds
-      , py::arg("negative_value_bounds") = mochi::GridSdfData{}.negativeValueBounds
-      , py::arg("scale") = mochi::GridSdfData{}.scale
-      , py::arg("rotation") = mochi::GridSdfData{}.rotation
-      , py::arg("translation") = mochi::GridSdfData{}.translation
+    .def("__init__", [](mochi::GridSdfData* self, nb::object dims, nb::object values, nb::object bounds, nb::object negative_value_bounds, nb::object scale, nb::object rotation, nb::object translation) {
+      mochi::GridSdfData result{};
+      result.dims = nb::cast<mochi::Int3>(dims);
+      result.values = nb::cast<mochi::DynamicArray<mochi::real>>(values);
+      result.bounds = nb::cast<mochi::Aabb>(bounds);
+      result.negativeValueBounds = nb::cast<mochi::Aabb>(negative_value_bounds);
+      result.scale = nb::cast<std::optional<mochi::Real3>>(scale);
+      result.rotation = nb::cast<std::optional<mochi::Quaternion>>(rotation);
+      result.translation = nb::cast<std::optional<mochi::Real3>>(translation);
+      new (self) mochi::GridSdfData(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("dims").sig("...") = mochi::GridSdfData{}.dims
+      , nb::arg("values").sig("...") = mochi::GridSdfData{}.values
+      , nb::arg("bounds").sig("...") = mochi::GridSdfData{}.bounds
+      , nb::arg("negative_value_bounds").sig("...") = mochi::GridSdfData{}.negativeValueBounds
+      , nb::arg("scale").sig("...") = mochi::GridSdfData{}.scale
+      , nb::arg("rotation").sig("...") = mochi::GridSdfData{}.rotation
+      , nb::arg("translation").sig("...") = mochi::GridSdfData{}.translation
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::GridSdfData const& self) { return mochi::GridSdfData(self); })
-    .def("__deepcopy__", [](mochi::GridSdfData const& self, py::dict) { return mochi::GridSdfData(self); })
-    .def_property("dims", [](mochi::GridSdfData& self) -> mochi::Int3& { return self.dims; }, [](mochi::GridSdfData& self, py::object val) { self.dims = py::cast<mochi::Int3>(val); }, py::return_value_policy::reference_internal, "Dimensions of the SDF grid in X, Y, and Z.")
-    .def_property("values", [](mochi::GridSdfData& self) -> mochi::DynamicArray<mochi::real>& { return self.values; }, [](mochi::GridSdfData& self, py::object val) { self.values = py::cast<mochi::DynamicArray<mochi::real>>(val); }, py::return_value_policy::reference_internal, "Signed distance values [m]. Size must be dims[0] * dims[1] * dims[2].")
-    .def_readwrite("bounds", &mochi::GridSdfData::bounds, "Spatial bounds of the SDF grid. Values are distributed uniformly within this\nvolume.")
-    .def_readwrite("negative_value_bounds", &mochi::GridSdfData::negativeValueBounds, "Spatial bounds of the portion of the SDF grid with negative values.\n\nNote:\n    This is generally the bounds of the mesh for which the SDF grid was\n    computed, while the overall grid bounds may be larger due to padding for\n    penalty fall-off distance.")
-    .def_property("scale", [](mochi::GridSdfData& self) -> std::optional<mochi::Real3>& { return self.scale; }, [](mochi::GridSdfData& self, py::object val) { self.scale = py::cast<std::optional<mochi::Real3>>(val); }, py::return_value_policy::reference_internal, "Optional parent-from-grid per-axis scale to apply at runtime.\n\nNote:\n    Applied order is scale, then rotation, then translation.\n\nNote:\n    Typically set when a transform is baked into the containing model.")
-    .def_property("rotation", [](mochi::GridSdfData& self) -> std::optional<mochi::Quaternion>& { return self.rotation; }, [](mochi::GridSdfData& self, py::object val) { self.rotation = py::cast<std::optional<mochi::Quaternion>>(val); }, py::return_value_policy::reference_internal, "Optional parent-from-grid rotation to apply at runtime.\n\nNote:\n    Applied order is scale, then rotation, then translation.\n\nNote:\n    Typically set when a transform is baked into the containing model.")
-    .def_property("translation", [](mochi::GridSdfData& self) -> std::optional<mochi::Real3>& { return self.translation; }, [](mochi::GridSdfData& self, py::object val) { self.translation = py::cast<std::optional<mochi::Real3>>(val); }, py::return_value_policy::reference_internal, "Optional parent-from-grid translation [m] to apply at runtime.\n\nNote:\n    Applied order is scale, then rotation, then translation.\n\nNote:\n    Typically set when a transform is baked into the containing model.")
-    .def(py::init<mochi::GridSdfDataView const&>()
-      , py::arg("src")
+    .def("__deepcopy__", [](mochi::GridSdfData const& self, nb::dict) { return mochi::GridSdfData(self); })
+    .def_prop_rw("dims", [](mochi::GridSdfData& self) -> mochi::Int3& { return self.dims; }, [](mochi::GridSdfData& self, nb::object val) { self.dims = nb::cast<mochi::Int3>(val); }, "Dimensions of the SDF grid in X, Y, and Z.")
+    .def_prop_rw("values", [](mochi::GridSdfData& self) -> mochi::DynamicArray<mochi::real>& { return self.values; }, [](mochi::GridSdfData& self, nb::object val) { self.values = nb::cast<mochi::DynamicArray<mochi::real>>(val); }, "Signed distance values [m]. Size must be dims[0] * dims[1] * dims[2].")
+    .def_rw("bounds", &mochi::GridSdfData::bounds, "Spatial bounds of the SDF grid. Values are distributed uniformly within this\nvolume.")
+    .def_rw("negative_value_bounds", &mochi::GridSdfData::negativeValueBounds, "Spatial bounds of the portion of the SDF grid with negative values.\n\nNote:\n    This is generally the bounds of the mesh for which the SDF grid was\n    computed, while the overall grid bounds may be larger due to padding for\n    penalty fall-off distance.")
+    .def_prop_rw("scale", [](mochi::GridSdfData& self) -> std::optional<mochi::Real3>& { return self.scale; }, [](mochi::GridSdfData& self, nb::handle val) { self.scale = val.is_none() ? std::optional<mochi::Real3>{} : nb::cast<std::optional<mochi::Real3>>(val); }, "Optional parent-from-grid per-axis scale to apply at runtime.\n\nNote:\n    Applied order is scale, then rotation, then translation.\n\nNote:\n    Typically set when a transform is baked into the containing model.", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("rotation", [](mochi::GridSdfData& self) -> std::optional<mochi::Quaternion>& { return self.rotation; }, [](mochi::GridSdfData& self, nb::handle val) { self.rotation = val.is_none() ? std::optional<mochi::Quaternion>{} : nb::cast<std::optional<mochi::Quaternion>>(val); }, "Optional parent-from-grid rotation to apply at runtime.\n\nNote:\n    Applied order is scale, then rotation, then translation.\n\nNote:\n    Typically set when a transform is baked into the containing model.", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("translation", [](mochi::GridSdfData& self) -> std::optional<mochi::Real3>& { return self.translation; }, [](mochi::GridSdfData& self, nb::handle val) { self.translation = val.is_none() ? std::optional<mochi::Real3>{} : nb::cast<std::optional<mochi::Real3>>(val); }, "Optional parent-from-grid translation [m] to apply at runtime.\n\nNote:\n    Applied order is scale, then rotation, then translation.\n\nNote:\n    Typically set when a transform is baked into the containing model.", nb::for_setter(nb::arg("value").none()))
+    .def(nb::init<mochi::GridSdfDataView const&>()
+      , nb::arg("src")
       , "Copy from :class:`~superdex.physics.GridSdfDataView`.\n\nArgs:\n    src (GridSdfDataView): Source data."
     )
   ;
 
   registry.GetClass<mochi::GridSdfDataView>()
-    .def(py::init([](py::object dims, py::object values, py::object bounds, py::object negative_value_bounds, py::object scale, py::object rotation, py::object translation) {
-      mochi::GridSdfDataView result;
-      result.dims = py::cast<mochi::Int3>(dims);
-      result.values = py::cast<mochi::Span<mochi::real const>>(values);
-      result.bounds = py::cast<mochi::Aabb>(bounds);
-      result.negativeValueBounds = py::cast<mochi::Aabb>(negative_value_bounds);
-      result.scale = py::cast<std::optional<mochi::Real3>>(scale);
-      result.rotation = py::cast<std::optional<mochi::Quaternion>>(rotation);
-      result.translation = py::cast<std::optional<mochi::Real3>>(translation);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("dims") = mochi::GridSdfDataView{}.dims
-      , py::arg("values") = mochi::GridSdfDataView{}.values
-      , py::arg("bounds") = mochi::GridSdfDataView{}.bounds
-      , py::arg("negative_value_bounds") = mochi::GridSdfDataView{}.negativeValueBounds
-      , py::arg("scale") = mochi::GridSdfDataView{}.scale
-      , py::arg("rotation") = mochi::GridSdfDataView{}.rotation
-      , py::arg("translation") = mochi::GridSdfDataView{}.translation
+    .def("__init__", [](mochi::GridSdfDataView* self, nb::object dims, nb::object values, nb::object bounds, nb::object negative_value_bounds, nb::object scale, nb::object rotation, nb::object translation) {
+      mochi::GridSdfDataView result{};
+      result.dims = nb::cast<mochi::Int3>(dims);
+      result.values = nb::cast<mochi::Span<mochi::real const>>(values);
+      result.bounds = nb::cast<mochi::Aabb>(bounds);
+      result.negativeValueBounds = nb::cast<mochi::Aabb>(negative_value_bounds);
+      result.scale = nb::cast<std::optional<mochi::Real3>>(scale);
+      result.rotation = nb::cast<std::optional<mochi::Quaternion>>(rotation);
+      result.translation = nb::cast<std::optional<mochi::Real3>>(translation);
+      new (self) mochi::GridSdfDataView(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("dims").sig("...") = mochi::GridSdfDataView{}.dims
+      , nb::arg("values").sig("...") = mochi::GridSdfDataView{}.values
+      , nb::arg("bounds").sig("...") = mochi::GridSdfDataView{}.bounds
+      , nb::arg("negative_value_bounds").sig("...") = mochi::GridSdfDataView{}.negativeValueBounds
+      , nb::arg("scale").sig("...") = mochi::GridSdfDataView{}.scale
+      , nb::arg("rotation").sig("...") = mochi::GridSdfDataView{}.rotation
+      , nb::arg("translation").sig("...") = mochi::GridSdfDataView{}.translation
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
-    .def("__copy__", [](mochi::GridSdfDataView const&) { throw py::type_error("GridSdfDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer)."); })
-    .def("__deepcopy__", [](mochi::GridSdfDataView const&, py::dict) { throw py::type_error("GridSdfDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer). Shallow copy is not currently allowed either, to prevent mistakes."); })
-    .def_property("dims", [](mochi::GridSdfDataView& self) -> mochi::Int3& { return self.dims; }, [](mochi::GridSdfDataView& self, py::object val) { self.dims = py::cast<mochi::Int3>(val); }, py::return_value_policy::reference_internal, "Dimensions of the SDF grid in X, Y, and Z.")
-    .def_property("values", [](mochi::GridSdfDataView& self) -> mochi::Span<mochi::real const>& { return self.values; }, [](mochi::GridSdfDataView& self, py::object val) { self.values = py::cast<mochi::Span<mochi::real const>>(val); }, py::return_value_policy::reference_internal, "Signed distance values [m]. Size must be dims[0] * dims[1] * dims[2].")
-    .def_readwrite("bounds", &mochi::GridSdfDataView::bounds, "Spatial bounds of the SDF grid. Values are distributed uniformly within this\nvolume.")
-    .def_readwrite("negative_value_bounds", &mochi::GridSdfDataView::negativeValueBounds, "Spatial bounds of the portion of the SDF grid with negative values.\n\nNote:\n    This is generally the bounds of the mesh for which the SDF grid was\n    computed, while the overall grid bounds may be larger due to padding for\n    penalty fall-off distance.")
-    .def_property("scale", [](mochi::GridSdfDataView& self) -> std::optional<mochi::Real3>& { return self.scale; }, [](mochi::GridSdfDataView& self, py::object val) { self.scale = py::cast<std::optional<mochi::Real3>>(val); }, py::return_value_policy::reference_internal, "Optional parent-from-grid per-axis scale to apply at runtime.\n\nNote:\n    Applied order is scale, then rotation, then translation.\n\nNote:\n    Typically set when a transform is baked into the containing model.")
-    .def_property("rotation", [](mochi::GridSdfDataView& self) -> std::optional<mochi::Quaternion>& { return self.rotation; }, [](mochi::GridSdfDataView& self, py::object val) { self.rotation = py::cast<std::optional<mochi::Quaternion>>(val); }, py::return_value_policy::reference_internal, "Optional parent-from-grid rotation to apply at runtime.\n\nNote:\n    Applied order is scale, then rotation, then translation.\n\nNote:\n    Typically set when a transform is baked into the containing model.")
-    .def_property("translation", [](mochi::GridSdfDataView& self) -> std::optional<mochi::Real3>& { return self.translation; }, [](mochi::GridSdfDataView& self, py::object val) { self.translation = py::cast<std::optional<mochi::Real3>>(val); }, py::return_value_policy::reference_internal, "Optional parent-from-grid translation [m] to apply at runtime.\n\nNote:\n    Applied order is scale, then rotation, then translation.\n\nNote:\n    Typically set when a transform is baked into the containing model.")
-    .def(py::init<mochi::GridSdfData const&>()
-      , py::arg("src"), py::keep_alive<1, 2>()
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
+    .def("__copy__", [](mochi::GridSdfDataView const&) { throw nb::type_error("GridSdfDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer)."); })
+    .def("__deepcopy__", [](mochi::GridSdfDataView const&, nb::dict) { throw nb::type_error("GridSdfDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer). Shallow copy is not currently allowed either, to prevent mistakes."); })
+    .def_prop_rw("dims", [](mochi::GridSdfDataView& self) -> mochi::Int3& { return self.dims; }, [](mochi::GridSdfDataView& self, nb::object val) { self.dims = nb::cast<mochi::Int3>(val); }, "Dimensions of the SDF grid in X, Y, and Z.")
+    .def_prop_rw("values", [](mochi::GridSdfDataView& self) -> mochi::Span<mochi::real const>& { return self.values; }, [](mochi::GridSdfDataView& self, nb::object val) { self.values = nb::cast<mochi::Span<mochi::real const>>(val); }, "Signed distance values [m]. Size must be dims[0] * dims[1] * dims[2].")
+    .def_rw("bounds", &mochi::GridSdfDataView::bounds, "Spatial bounds of the SDF grid. Values are distributed uniformly within this\nvolume.")
+    .def_rw("negative_value_bounds", &mochi::GridSdfDataView::negativeValueBounds, "Spatial bounds of the portion of the SDF grid with negative values.\n\nNote:\n    This is generally the bounds of the mesh for which the SDF grid was\n    computed, while the overall grid bounds may be larger due to padding for\n    penalty fall-off distance.")
+    .def_prop_rw("scale", [](mochi::GridSdfDataView& self) -> std::optional<mochi::Real3>& { return self.scale; }, [](mochi::GridSdfDataView& self, nb::handle val) { self.scale = val.is_none() ? std::optional<mochi::Real3>{} : nb::cast<std::optional<mochi::Real3>>(val); }, "Optional parent-from-grid per-axis scale to apply at runtime.\n\nNote:\n    Applied order is scale, then rotation, then translation.\n\nNote:\n    Typically set when a transform is baked into the containing model.", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("rotation", [](mochi::GridSdfDataView& self) -> std::optional<mochi::Quaternion>& { return self.rotation; }, [](mochi::GridSdfDataView& self, nb::handle val) { self.rotation = val.is_none() ? std::optional<mochi::Quaternion>{} : nb::cast<std::optional<mochi::Quaternion>>(val); }, "Optional parent-from-grid rotation to apply at runtime.\n\nNote:\n    Applied order is scale, then rotation, then translation.\n\nNote:\n    Typically set when a transform is baked into the containing model.", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("translation", [](mochi::GridSdfDataView& self) -> std::optional<mochi::Real3>& { return self.translation; }, [](mochi::GridSdfDataView& self, nb::handle val) { self.translation = val.is_none() ? std::optional<mochi::Real3>{} : nb::cast<std::optional<mochi::Real3>>(val); }, "Optional parent-from-grid translation [m] to apply at runtime.\n\nNote:\n    Applied order is scale, then rotation, then translation.\n\nNote:\n    Typically set when a transform is baked into the containing model.", nb::for_setter(nb::arg("value").none()))
+    .def(nb::init<mochi::GridSdfData const&>()
+      , nb::arg("src"), nb::keep_alive<1, 2>()
       , "Implicit conversion from :class:`~superdex.physics.GridSdfData`.\n\nArgs:\n    src (GridSdfData): Source data."
     )
   ;
 
   registry.GetClass<mochi::Box>()
-    .def(py::init([](py::object center, py::object half_extents, py::object rotation) {
-      mochi::Box result;
-      result.center = py::cast<mochi::Real3>(center);
-      result.halfExtents = py::cast<mochi::Real3>(half_extents);
-      result.rotation = py::cast<mochi::Quaternion>(rotation);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("center") = mochi::Box{}.center
-      , py::arg("half_extents") = mochi::Box{}.halfExtents
-      , py::arg("rotation") = mochi::Box{}.rotation
+    .def("__init__", [](mochi::Box* self, nb::object center, nb::object half_extents, nb::object rotation) {
+      mochi::Box result{};
+      result.center = nb::cast<mochi::Real3>(center);
+      result.halfExtents = nb::cast<mochi::Real3>(half_extents);
+      result.rotation = nb::cast<mochi::Quaternion>(rotation);
+      new (self) mochi::Box(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("center").sig("...") = mochi::Box{}.center
+      , nb::arg("half_extents").sig("...") = mochi::Box{}.halfExtents
+      , nb::arg("rotation").sig("...") = mochi::Box{}.rotation
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::Box const& self) { return mochi::Box(self); })
-    .def("__deepcopy__", [](mochi::Box const& self, py::dict) { return mochi::Box(self); })
-    .def_property("center", [](mochi::Box& self) -> mochi::Real3& { return self.center; }, [](mochi::Box& self, py::object val) { self.center = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Center position [m].")
-    .def_property("half_extents", [](mochi::Box& self) -> mochi::Real3& { return self.halfExtents; }, [](mochi::Box& self, py::object val) { self.halfExtents = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Half-size along each local axis [m].")
-    .def_property("rotation", [](mochi::Box& self) -> mochi::Quaternion& { return self.rotation; }, [](mochi::Box& self, py::object val) { self.rotation = py::cast<mochi::Quaternion>(val); }, py::return_value_policy::reference_internal, "Orientation of the box local frame.")
+    .def("__deepcopy__", [](mochi::Box const& self, nb::dict) { return mochi::Box(self); })
+    .def_prop_rw("center", [](mochi::Box& self) -> mochi::Real3& { return self.center; }, [](mochi::Box& self, nb::object val) { self.center = nb::cast<mochi::Real3>(val); }, "Center position [m].")
+    .def_prop_rw("half_extents", [](mochi::Box& self) -> mochi::Real3& { return self.halfExtents; }, [](mochi::Box& self, nb::object val) { self.halfExtents = nb::cast<mochi::Real3>(val); }, "Half-size along each local axis [m].")
+    .def_prop_rw("rotation", [](mochi::Box& self) -> mochi::Quaternion& { return self.rotation; }, [](mochi::Box& self, nb::object val) { self.rotation = nb::cast<mochi::Quaternion>(val); }, "Orientation of the box local frame.")
   ;
 
   registry.GetClass<mochi::Plane>()
-    .def(py::init([](py::object normal, py::object distance) {
-      mochi::Plane result;
-      result.normal = py::cast<mochi::Real3>(normal);
-      result.distance = py::cast<mochi::real>(distance);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("normal") = mochi::Plane{}.normal
-      , py::arg("distance") = mochi::Plane{}.distance
+    .def("__init__", [](mochi::Plane* self, nb::object normal, nb::object distance) {
+      mochi::Plane result{};
+      result.normal = nb::cast<mochi::Real3>(normal);
+      result.distance = nb::cast<mochi::real>(distance);
+      new (self) mochi::Plane(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("normal").sig("...") = mochi::Plane{}.normal
+      , nb::arg("distance") = mochi::Plane{}.distance
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::Plane const& self) { return mochi::Plane(self); })
-    .def("__deepcopy__", [](mochi::Plane const& self, py::dict) { return mochi::Plane(self); })
-    .def_property("normal", [](mochi::Plane& self) -> mochi::Real3& { return self.normal; }, [](mochi::Plane& self, py::object val) { self.normal = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Unit normal vector.")
-    .def_readwrite("distance", &mochi::Plane::distance, "Signed distance from the origin [m].")
+    .def("__deepcopy__", [](mochi::Plane const& self, nb::dict) { return mochi::Plane(self); })
+    .def_prop_rw("normal", [](mochi::Plane& self) -> mochi::Real3& { return self.normal; }, [](mochi::Plane& self, nb::object val) { self.normal = nb::cast<mochi::Real3>(val); }, "Unit normal vector.")
+    .def_rw("distance", &mochi::Plane::distance, "Signed distance from the origin [m].")
   ;
 
   registry.GetClass<mochi::Sphere>()
-    .def(py::init([](py::object center, py::object radius) {
-      mochi::Sphere result;
-      result.center = py::cast<mochi::Real3>(center);
-      result.radius = py::cast<mochi::real>(radius);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("center") = mochi::Sphere{}.center
-      , py::arg("radius") = mochi::Sphere{}.radius
+    .def("__init__", [](mochi::Sphere* self, nb::object center, nb::object radius) {
+      mochi::Sphere result{};
+      result.center = nb::cast<mochi::Real3>(center);
+      result.radius = nb::cast<mochi::real>(radius);
+      new (self) mochi::Sphere(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("center").sig("...") = mochi::Sphere{}.center
+      , nb::arg("radius") = mochi::Sphere{}.radius
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::Sphere const& self) { return mochi::Sphere(self); })
-    .def("__deepcopy__", [](mochi::Sphere const& self, py::dict) { return mochi::Sphere(self); })
-    .def_property("center", [](mochi::Sphere& self) -> mochi::Real3& { return self.center; }, [](mochi::Sphere& self, py::object val) { self.center = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Center position [m].")
-    .def_readwrite("radius", &mochi::Sphere::radius, "Radius [m].")
+    .def("__deepcopy__", [](mochi::Sphere const& self, nb::dict) { return mochi::Sphere(self); })
+    .def_prop_rw("center", [](mochi::Sphere& self) -> mochi::Real3& { return self.center; }, [](mochi::Sphere& self, nb::object val) { self.center = nb::cast<mochi::Real3>(val); }, "Center position [m].")
+    .def_rw("radius", &mochi::Sphere::radius, "Radius [m].")
   ;
 
   registry.GetClass<mochi::ModelData>()
-    .def(py::init([](py::object mesh, py::object visual_mesh, py::object blending, py::object constrained_nodes, py::object element_frame_axes, py::object box, py::object plane, py::object sphere, py::object sdf, py::object material) {
-      mochi::ModelData result;
-      result.mesh = py::cast<std::optional<mochi::MeshData>>(mesh);
-      result.visualMesh = py::cast<std::optional<mochi::MeshData>>(visual_mesh);
-      result.blending = py::cast<std::optional<mochi::DynamicArray<mochi::BlendingData>>>(blending);
-      result.constrainedNodes = py::cast<std::optional<mochi::DynamicArray<int>>>(constrained_nodes);
-      result.elementFrameAxes = py::cast<std::optional<mochi::DynamicArray<mochi::real>>>(element_frame_axes);
-      result.box = py::cast<std::optional<mochi::Box>>(box);
-      result.plane = py::cast<std::optional<mochi::Plane>>(plane);
-      result.sphere = py::cast<std::optional<mochi::Sphere>>(sphere);
-      result.sdf = py::cast<std::optional<mochi::GridSdfData>>(sdf);
-      result.material = py::cast<std::optional<mochi::PerElementSoftMaterialData>>(material);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("mesh") = mochi::ModelData{}.mesh
-      , py::arg("visual_mesh") = mochi::ModelData{}.visualMesh
-      , py::arg("blending") = mochi::ModelData{}.blending
-      , py::arg("constrained_nodes") = mochi::ModelData{}.constrainedNodes
-      , py::arg("element_frame_axes") = mochi::ModelData{}.elementFrameAxes
-      , py::arg("box") = mochi::ModelData{}.box
-      , py::arg("plane") = mochi::ModelData{}.plane
-      , py::arg("sphere") = mochi::ModelData{}.sphere
-      , py::arg("sdf") = mochi::ModelData{}.sdf
-      , py::arg("material") = mochi::ModelData{}.material
+    .def("__init__", [](mochi::ModelData* self, nb::object mesh, nb::object visual_mesh, nb::object contact_skin_mesh, nb::object blending, nb::object constrained_nodes, nb::object element_frame_axes, nb::object box, nb::object plane, nb::object sphere, nb::object sdf, nb::object material) {
+      mochi::ModelData result{};
+      result.mesh = nb::cast<std::optional<mochi::MeshData>>(mesh);
+      result.visualMesh = nb::cast<std::optional<mochi::MeshData>>(visual_mesh);
+      result.contactSkinMesh = nb::cast<std::optional<mochi::MeshData>>(contact_skin_mesh);
+      result.blending = nb::cast<std::optional<mochi::DynamicArray<mochi::BlendingData>>>(blending);
+      result.constrainedNodes = nb::cast<std::optional<mochi::DynamicArray<int>>>(constrained_nodes);
+      result.elementFrameAxes = nb::cast<std::optional<mochi::DynamicArray<mochi::real>>>(element_frame_axes);
+      result.box = nb::cast<std::optional<mochi::Box>>(box);
+      result.plane = nb::cast<std::optional<mochi::Plane>>(plane);
+      result.sphere = nb::cast<std::optional<mochi::Sphere>>(sphere);
+      result.sdf = nb::cast<std::optional<mochi::GridSdfData>>(sdf);
+      result.material = nb::cast<std::optional<mochi::PerElementSoftMaterialData>>(material);
+      new (self) mochi::ModelData(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("mesh").sig("...") = mochi::ModelData{}.mesh
+      , nb::arg("visual_mesh").sig("...") = mochi::ModelData{}.visualMesh
+      , nb::arg("contact_skin_mesh").sig("...") = mochi::ModelData{}.contactSkinMesh
+      , nb::arg("blending").sig("...") = mochi::ModelData{}.blending
+      , nb::arg("constrained_nodes").sig("...") = mochi::ModelData{}.constrainedNodes
+      , nb::arg("element_frame_axes").sig("...") = mochi::ModelData{}.elementFrameAxes
+      , nb::arg("box").sig("...") = mochi::ModelData{}.box
+      , nb::arg("plane").sig("...") = mochi::ModelData{}.plane
+      , nb::arg("sphere").sig("...") = mochi::ModelData{}.sphere
+      , nb::arg("sdf").sig("...") = mochi::ModelData{}.sdf
+      , nb::arg("material").sig("...") = mochi::ModelData{}.material
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::ModelData const& self) { return mochi::ModelData(self); })
-    .def("__deepcopy__", [](mochi::ModelData const& self, py::dict) { return mochi::ModelData(self); })
-    .def_readwrite("mesh", &mochi::ModelData::mesh)
-    .def_readwrite("visual_mesh", &mochi::ModelData::visualMesh)
-    .def_property("blending", [](mochi::ModelData& self) -> std::optional<mochi::DynamicArray<mochi::BlendingData>>& { return self.blending; }, [](mochi::ModelData& self, py::object val) { self.blending = py::cast<std::optional<mochi::DynamicArray<mochi::BlendingData>>>(val); }, py::return_value_policy::reference_internal)
-    .def_property("constrained_nodes", [](mochi::ModelData& self) -> std::optional<mochi::DynamicArray<int>>& { return self.constrainedNodes; }, [](mochi::ModelData& self, py::object val) { self.constrainedNodes = py::cast<std::optional<mochi::DynamicArray<int>>>(val); }, py::return_value_policy::reference_internal, "Indices of mesh nodes that are constrained.")
-    .def_property("element_frame_axes", [](mochi::ModelData& self) -> std::optional<mochi::DynamicArray<mochi::real>>& { return self.elementFrameAxes; }, [](mochi::ModelData& self, py::object val) { self.elementFrameAxes = py::cast<std::optional<mochi::DynamicArray<mochi::real>>>(val); }, py::return_value_policy::reference_internal, "Per-element reference frame axes for polyline meshes.\n\nFlat array of unit vectors (3 reals per element), each orthogonal to its\nelement's tangent. Only valid when the mesh is a polyline with\n:attr:`~superdex.physics.MeshData.nodes_per_element` equal to 2.")
-    .def_readwrite("box", &mochi::ModelData::box)
-    .def_readwrite("plane", &mochi::ModelData::plane)
-    .def_readwrite("sphere", &mochi::ModelData::sphere)
-    .def_readwrite("sdf", &mochi::ModelData::sdf)
-    .def_readwrite("material", &mochi::ModelData::material)
-    .def(py::init<mochi::ModelDataView const&>()
-      , py::arg("src")
+    .def("__deepcopy__", [](mochi::ModelData const& self, nb::dict) { return mochi::ModelData(self); })
+    .def_prop_rw("mesh", [](mochi::ModelData& self) -> std::optional<mochi::MeshData>& { return self.mesh; }, [](mochi::ModelData& self, nb::handle val) { self.mesh = val.is_none() ? std::optional<mochi::MeshData>{} : nb::cast<std::optional<mochi::MeshData>>(val); }, nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("visual_mesh", [](mochi::ModelData& self) -> std::optional<mochi::MeshData>& { return self.visualMesh; }, [](mochi::ModelData& self, nb::handle val) { self.visualMesh = val.is_none() ? std::optional<mochi::MeshData>{} : nb::cast<std::optional<mochi::MeshData>>(val); }, nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("contact_skin_mesh", [](mochi::ModelData& self) -> std::optional<mochi::MeshData>& { return self.contactSkinMesh; }, [](mochi::ModelData& self, nb::handle val) { self.contactSkinMesh = val.is_none() ? std::optional<mochi::MeshData>{} : nb::cast<std::optional<mochi::MeshData>>(val); }, "Optional triangular mesh used for surface queries and, when selected as the\nrod's contact geometry, for contact quadrature.\n\nThe skinning indices reference primary-mesh nodes for triangular and tetrahedral\nmeshes, and primary-mesh elements for polylines. Currently consumed only by rod\nactors.", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("blending", [](mochi::ModelData& self) -> std::optional<mochi::DynamicArray<mochi::BlendingData>>& { return self.blending; }, [](mochi::ModelData& self, nb::handle val) { self.blending = val.is_none() ? std::optional<mochi::DynamicArray<mochi::BlendingData>>{} : nb::cast<std::optional<mochi::DynamicArray<mochi::BlendingData>>>(val); }, nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("constrained_nodes", [](mochi::ModelData& self) -> std::optional<mochi::DynamicArray<int>>& { return self.constrainedNodes; }, [](mochi::ModelData& self, nb::handle val) { self.constrainedNodes = val.is_none() ? std::optional<mochi::DynamicArray<int>>{} : nb::cast<std::optional<mochi::DynamicArray<int>>>(val); }, "Indices of mesh nodes that are constrained.", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("element_frame_axes", [](mochi::ModelData& self) -> std::optional<mochi::DynamicArray<mochi::real>>& { return self.elementFrameAxes; }, [](mochi::ModelData& self, nb::handle val) { self.elementFrameAxes = val.is_none() ? std::optional<mochi::DynamicArray<mochi::real>>{} : nb::cast<std::optional<mochi::DynamicArray<mochi::real>>>(val); }, "Per-element reference frame axes for polyline meshes.\n\nFlat array of unit vectors (3 reals per element), each orthogonal to its\nelement's tangent. Only valid when the mesh is a polyline with\n:attr:`~superdex.physics.MeshData.nodes_per_element` equal to 2.", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("box", [](mochi::ModelData& self) -> std::optional<mochi::Box>& { return self.box; }, [](mochi::ModelData& self, nb::handle val) { self.box = val.is_none() ? std::optional<mochi::Box>{} : nb::cast<std::optional<mochi::Box>>(val); }, nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("plane", [](mochi::ModelData& self) -> std::optional<mochi::Plane>& { return self.plane; }, [](mochi::ModelData& self, nb::handle val) { self.plane = val.is_none() ? std::optional<mochi::Plane>{} : nb::cast<std::optional<mochi::Plane>>(val); }, nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("sphere", [](mochi::ModelData& self) -> std::optional<mochi::Sphere>& { return self.sphere; }, [](mochi::ModelData& self, nb::handle val) { self.sphere = val.is_none() ? std::optional<mochi::Sphere>{} : nb::cast<std::optional<mochi::Sphere>>(val); }, nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("sdf", [](mochi::ModelData& self) -> std::optional<mochi::GridSdfData>& { return self.sdf; }, [](mochi::ModelData& self, nb::handle val) { self.sdf = val.is_none() ? std::optional<mochi::GridSdfData>{} : nb::cast<std::optional<mochi::GridSdfData>>(val); }, nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("material", [](mochi::ModelData& self) -> std::optional<mochi::PerElementSoftMaterialData>& { return self.material; }, [](mochi::ModelData& self, nb::handle val) { self.material = val.is_none() ? std::optional<mochi::PerElementSoftMaterialData>{} : nb::cast<std::optional<mochi::PerElementSoftMaterialData>>(val); }, nb::for_setter(nb::arg("value").none()))
+    .def(nb::init<mochi::ModelDataView const&>()
+      , nb::arg("src")
       , "Copy from :class:`~superdex.physics.ModelDataView`.\n\nArgs:\n    src (ModelDataView): Source data."
     )
   ;
 
   registry.GetClass<mochi::ModelDataView>()
-    .def(py::init([](py::object mesh, py::object visual_mesh, py::object blending, py::object constrained_nodes, py::object element_frame_axes, py::object box, py::object plane, py::object sphere, py::object sdf, py::object material) {
-      mochi::ModelDataView result;
-      result.mesh = py::cast<std::optional<mochi::MeshDataView>>(mesh);
-      result.visualMesh = py::cast<std::optional<mochi::MeshDataView>>(visual_mesh);
-      result.blending = py::cast<std::optional<mochi::DynamicArray<mochi::BlendingDataView>>>(blending);
-      result.constrainedNodes = py::cast<std::optional<mochi::Span<int const>>>(constrained_nodes);
-      result.elementFrameAxes = py::cast<std::optional<mochi::Span<mochi::real const>>>(element_frame_axes);
-      result.box = py::cast<std::optional<mochi::Box>>(box);
-      result.plane = py::cast<std::optional<mochi::Plane>>(plane);
-      result.sphere = py::cast<std::optional<mochi::Sphere>>(sphere);
-      result.sdf = py::cast<std::optional<mochi::GridSdfDataView>>(sdf);
-      result.material = py::cast<std::optional<mochi::PerElementSoftMaterialDataView>>(material);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("mesh") = mochi::ModelDataView{}.mesh
-      , py::arg("visual_mesh") = mochi::ModelDataView{}.visualMesh
-      , py::arg("blending") = mochi::ModelDataView{}.blending
-      , py::arg("constrained_nodes") = mochi::ModelDataView{}.constrainedNodes
-      , py::arg("element_frame_axes") = mochi::ModelDataView{}.elementFrameAxes
-      , py::arg("box") = mochi::ModelDataView{}.box
-      , py::arg("plane") = mochi::ModelDataView{}.plane
-      , py::arg("sphere") = mochi::ModelDataView{}.sphere
-      , py::arg("sdf") = mochi::ModelDataView{}.sdf
-      , py::arg("material") = mochi::ModelDataView{}.material
+    .def("__init__", [](mochi::ModelDataView* self, nb::object mesh, nb::object visual_mesh, nb::object contact_skin_mesh, nb::object blending, nb::object constrained_nodes, nb::object element_frame_axes, nb::object box, nb::object plane, nb::object sphere, nb::object sdf, nb::object material) {
+      mochi::ModelDataView result{};
+      result.mesh = nb::cast<std::optional<mochi::MeshDataView>>(mesh);
+      result.visualMesh = nb::cast<std::optional<mochi::MeshDataView>>(visual_mesh);
+      result.contactSkinMesh = nb::cast<std::optional<mochi::MeshDataView>>(contact_skin_mesh);
+      result.blending = nb::cast<std::optional<mochi::DynamicArray<mochi::BlendingDataView>>>(blending);
+      result.constrainedNodes = nb::cast<std::optional<mochi::Span<int const>>>(constrained_nodes);
+      result.elementFrameAxes = nb::cast<std::optional<mochi::Span<mochi::real const>>>(element_frame_axes);
+      result.box = nb::cast<std::optional<mochi::Box>>(box);
+      result.plane = nb::cast<std::optional<mochi::Plane>>(plane);
+      result.sphere = nb::cast<std::optional<mochi::Sphere>>(sphere);
+      result.sdf = nb::cast<std::optional<mochi::GridSdfDataView>>(sdf);
+      result.material = nb::cast<std::optional<mochi::PerElementSoftMaterialDataView>>(material);
+      new (self) mochi::ModelDataView(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("mesh").sig("...") = mochi::ModelDataView{}.mesh
+      , nb::arg("visual_mesh").sig("...") = mochi::ModelDataView{}.visualMesh
+      , nb::arg("contact_skin_mesh").sig("...") = mochi::ModelDataView{}.contactSkinMesh
+      , nb::arg("blending").sig("...") = mochi::ModelDataView{}.blending
+      , nb::arg("constrained_nodes").sig("...") = mochi::ModelDataView{}.constrainedNodes
+      , nb::arg("element_frame_axes").sig("...") = mochi::ModelDataView{}.elementFrameAxes
+      , nb::arg("box").sig("...") = mochi::ModelDataView{}.box
+      , nb::arg("plane").sig("...") = mochi::ModelDataView{}.plane
+      , nb::arg("sphere").sig("...") = mochi::ModelDataView{}.sphere
+      , nb::arg("sdf").sig("...") = mochi::ModelDataView{}.sdf
+      , nb::arg("material").sig("...") = mochi::ModelDataView{}.material
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
-    .def("__copy__", [](mochi::ModelDataView const&) { throw py::type_error("ModelDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer)."); })
-    .def("__deepcopy__", [](mochi::ModelDataView const&, py::dict) { throw py::type_error("ModelDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer). Shallow copy is not currently allowed either, to prevent mistakes."); })
-    .def_readwrite("mesh", &mochi::ModelDataView::mesh)
-    .def_readwrite("visual_mesh", &mochi::ModelDataView::visualMesh)
-    .def_property("blending", [](mochi::ModelDataView& self) -> std::optional<mochi::DynamicArray<mochi::BlendingDataView>>& { return self.blending; }, [](mochi::ModelDataView& self, py::object val) { self.blending = py::cast<std::optional<mochi::DynamicArray<mochi::BlendingDataView>>>(val); }, py::return_value_policy::reference_internal)
-    .def_property("constrained_nodes", [](mochi::ModelDataView& self) -> std::optional<mochi::Span<int const>>& { return self.constrainedNodes; }, [](mochi::ModelDataView& self, py::object val) { self.constrainedNodes = py::cast<std::optional<mochi::Span<int const>>>(val); }, py::return_value_policy::reference_internal, "Indices of mesh nodes that are constrained.")
-    .def_property("element_frame_axes", [](mochi::ModelDataView& self) -> std::optional<mochi::Span<mochi::real const>>& { return self.elementFrameAxes; }, [](mochi::ModelDataView& self, py::object val) { self.elementFrameAxes = py::cast<std::optional<mochi::Span<mochi::real const>>>(val); }, py::return_value_policy::reference_internal, "Per-element reference frame axes for polyline meshes.\n\nFlat array of unit vectors (3 reals per element), each orthogonal to its\nelement's tangent. Only valid when the mesh is a polyline with\n:attr:`~superdex.physics.MeshDataView.nodes_per_element` equal to 2.")
-    .def_readwrite("box", &mochi::ModelDataView::box)
-    .def_readwrite("plane", &mochi::ModelDataView::plane)
-    .def_readwrite("sphere", &mochi::ModelDataView::sphere)
-    .def_readwrite("sdf", &mochi::ModelDataView::sdf)
-    .def_readwrite("material", &mochi::ModelDataView::material)
-    .def(py::init<mochi::ModelData const&>()
-      , py::arg("src"), py::keep_alive<1, 2>()
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
+    .def("__copy__", [](mochi::ModelDataView const&) { throw nb::type_error("ModelDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer)."); })
+    .def("__deepcopy__", [](mochi::ModelDataView const&, nb::dict) { throw nb::type_error("ModelDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer). Shallow copy is not currently allowed either, to prevent mistakes."); })
+    .def_prop_rw("mesh", [](mochi::ModelDataView& self) -> std::optional<mochi::MeshDataView>& { return self.mesh; }, [](mochi::ModelDataView& self, nb::handle val) { self.mesh = val.is_none() ? std::optional<mochi::MeshDataView>{} : nb::cast<std::optional<mochi::MeshDataView>>(val); }, nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("visual_mesh", [](mochi::ModelDataView& self) -> std::optional<mochi::MeshDataView>& { return self.visualMesh; }, [](mochi::ModelDataView& self, nb::handle val) { self.visualMesh = val.is_none() ? std::optional<mochi::MeshDataView>{} : nb::cast<std::optional<mochi::MeshDataView>>(val); }, nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("contact_skin_mesh", [](mochi::ModelDataView& self) -> std::optional<mochi::MeshDataView>& { return self.contactSkinMesh; }, [](mochi::ModelDataView& self, nb::handle val) { self.contactSkinMesh = val.is_none() ? std::optional<mochi::MeshDataView>{} : nb::cast<std::optional<mochi::MeshDataView>>(val); }, "Optional triangular mesh used for surface queries and, when selected as the\nrod's contact geometry, for contact quadrature.\n\nThe skinning indices reference primary-mesh nodes for triangular and tetrahedral\nmeshes, and primary-mesh elements for polylines. Currently consumed only by rod\nactors.", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("blending", [](mochi::ModelDataView& self) -> std::optional<mochi::DynamicArray<mochi::BlendingDataView>>& { return self.blending; }, [](mochi::ModelDataView& self, nb::handle val) { self.blending = val.is_none() ? std::optional<mochi::DynamicArray<mochi::BlendingDataView>>{} : nb::cast<std::optional<mochi::DynamicArray<mochi::BlendingDataView>>>(val); }, nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("constrained_nodes", [](mochi::ModelDataView& self) -> std::optional<mochi::Span<int const>>& { return self.constrainedNodes; }, [](mochi::ModelDataView& self, nb::handle val) { self.constrainedNodes = val.is_none() ? std::optional<mochi::Span<int const>>{} : nb::cast<std::optional<mochi::Span<int const>>>(val); }, "Indices of mesh nodes that are constrained.", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("element_frame_axes", [](mochi::ModelDataView& self) -> std::optional<mochi::Span<mochi::real const>>& { return self.elementFrameAxes; }, [](mochi::ModelDataView& self, nb::handle val) { self.elementFrameAxes = val.is_none() ? std::optional<mochi::Span<mochi::real const>>{} : nb::cast<std::optional<mochi::Span<mochi::real const>>>(val); }, "Per-element reference frame axes for polyline meshes.\n\nFlat array of unit vectors (3 reals per element), each orthogonal to its\nelement's tangent. Only valid when the mesh is a polyline with\n:attr:`~superdex.physics.MeshDataView.nodes_per_element` equal to 2.", nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("box", [](mochi::ModelDataView& self) -> std::optional<mochi::Box>& { return self.box; }, [](mochi::ModelDataView& self, nb::handle val) { self.box = val.is_none() ? std::optional<mochi::Box>{} : nb::cast<std::optional<mochi::Box>>(val); }, nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("plane", [](mochi::ModelDataView& self) -> std::optional<mochi::Plane>& { return self.plane; }, [](mochi::ModelDataView& self, nb::handle val) { self.plane = val.is_none() ? std::optional<mochi::Plane>{} : nb::cast<std::optional<mochi::Plane>>(val); }, nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("sphere", [](mochi::ModelDataView& self) -> std::optional<mochi::Sphere>& { return self.sphere; }, [](mochi::ModelDataView& self, nb::handle val) { self.sphere = val.is_none() ? std::optional<mochi::Sphere>{} : nb::cast<std::optional<mochi::Sphere>>(val); }, nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("sdf", [](mochi::ModelDataView& self) -> std::optional<mochi::GridSdfDataView>& { return self.sdf; }, [](mochi::ModelDataView& self, nb::handle val) { self.sdf = val.is_none() ? std::optional<mochi::GridSdfDataView>{} : nb::cast<std::optional<mochi::GridSdfDataView>>(val); }, nb::for_setter(nb::arg("value").none()))
+    .def_prop_rw("material", [](mochi::ModelDataView& self) -> std::optional<mochi::PerElementSoftMaterialDataView>& { return self.material; }, [](mochi::ModelDataView& self, nb::handle val) { self.material = val.is_none() ? std::optional<mochi::PerElementSoftMaterialDataView>{} : nb::cast<std::optional<mochi::PerElementSoftMaterialDataView>>(val); }, nb::for_setter(nb::arg("value").none()))
+    .def(nb::init<mochi::ModelData const&>()
+      , nb::arg("src"), nb::keep_alive<1, 2>()
       , "Implicit conversion from :class:`~superdex.physics.ModelData`.\n\nArgs:\n    src (ModelData): Source data."
     )
   ;
 
   registry.GetClass<mochi::GridSdfParams>()
-    .def(py::init([](py::object resolution_mode, py::object resolution_delta, py::object boundary_padding_dist, py::object min_grid_resolution) {
-      mochi::GridSdfParams result;
-      result.resolutionMode = py::cast<mochi::GridSdfResolutionMode>(resolution_mode);
-      result.resolutionDelta = py::cast<mochi::Real3>(resolution_delta);
-      result.boundaryPaddingDist = py::cast<mochi::real>(boundary_padding_dist);
-      result.minGridResolution = py::cast<mochi::Int3>(min_grid_resolution);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("resolution_mode") = mochi::GridSdfParams{}.resolutionMode
-      , py::arg("resolution_delta") = mochi::GridSdfParams{}.resolutionDelta
-      , py::arg("boundary_padding_dist") = mochi::GridSdfParams{}.boundaryPaddingDist
-      , py::arg("min_grid_resolution") = mochi::GridSdfParams{}.minGridResolution
+    .def("__init__", [](mochi::GridSdfParams* self, nb::object resolution_mode, nb::object resolution_delta, nb::object boundary_padding_dist, nb::object min_grid_resolution) {
+      mochi::GridSdfParams result{};
+      result.resolutionMode = nb::cast<mochi::GridSdfResolutionMode>(resolution_mode);
+      result.resolutionDelta = nb::cast<mochi::Real3>(resolution_delta);
+      result.boundaryPaddingDist = nb::cast<mochi::real>(boundary_padding_dist);
+      result.minGridResolution = nb::cast<mochi::Int3>(min_grid_resolution);
+      new (self) mochi::GridSdfParams(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("resolution_mode") = mochi::GridSdfParams{}.resolutionMode
+      , nb::arg("resolution_delta").sig("...") = mochi::GridSdfParams{}.resolutionDelta
+      , nb::arg("boundary_padding_dist") = mochi::GridSdfParams{}.boundaryPaddingDist
+      , nb::arg("min_grid_resolution").sig("...") = mochi::GridSdfParams{}.minGridResolution
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::GridSdfParams const& self) { return mochi::GridSdfParams(self); })
-    .def("__deepcopy__", [](mochi::GridSdfParams const& self, py::dict) { return mochi::GridSdfParams(self); })
-    .def_readwrite("resolution_mode", &mochi::GridSdfParams::resolutionMode, "Defines the mesh feature used as reference measurement for computing the voxel\nsize.\n\nSee Also:\n    :attr:`~superdex.physics.GridSdfParams.resolution_delta`")
-    .def_property("resolution_delta", [](mochi::GridSdfParams& self) -> mochi::Real3& { return self.resolutionDelta; }, [](mochi::GridSdfParams& self, py::object val) { self.resolutionDelta = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "The maximum voxel size will be\n:attr:`~superdex.physics.GridSdfParams.resolution_delta` times the reference\nmeasurement computed using\n:attr:`~superdex.physics.GridSdfParams.resolution_mode`.\n\nNote:\n    The actual voxel size may be smaller because the number of grid cells will\n    be rounded up to an integer value and clamped to a minimum of\n    :attr:`~superdex.physics.GridSdfParams.min_grid_resolution`.\n\nNote:\n    Increasing :attr:`~superdex.physics.GridSdfParams.resolution_delta` will\n    result in larger voxels. Doing so will make it harder for the SDF to resolve\n    fine details of the mesh, but it will save memory and improve SDF generation\n    speed.\n\nNote:\n    Decreasing :attr:`~superdex.physics.GridSdfParams.resolution_delta` will\n    improve the SDF's ability to resolve fine details, but it will take more\n    memory and more time to generate. This cost scales proportional to N^3. Use\n    with care.\n\nSee Also:\n    :attr:`~superdex.physics.GridSdfParams.resolution_mode`")
-    .def_readwrite("boundary_padding_dist", &mochi::GridSdfParams::boundaryPaddingDist, "Additional distance (in meters) to expand the mesh's axis-aligned bounding box\n(AABB) when determining the SDF grid bounds.\n\nThe SDF grid will cover the mesh's AABB expanded by this distance in all\ndirections. This ensures the SDF has valid distance values even slightly outside\nthe mesh's AABB.\n\nNote:\n    In practice, this value should be greater than the value returned by\n    :meth:`~superdex.physics.ContactParams.get_penalty_threshold_dist`. If the\n    SDF did not have enough padding, then Mochi would have to use a less\n    efficient algorithm for collision detection, but it would still work.\n\nNote:\n    When you load a model and bake a uniform scale value less than 1.0, the\n    model's pre-computed SDF will also be scaled, resulting in less absolute\n    padding. The default padding value is larger than the default contact\n    penalty threshold distance for this reason.\n\nSee Also:\n    :const:`~superdex.physics.GRID_SDF_DEFAULT_BOUNDARY_PADDING`")
-    .def_property("min_grid_resolution", [](mochi::GridSdfParams& self) -> mochi::Int3& { return self.minGridResolution; }, [](mochi::GridSdfParams& self, py::object val) { self.minGridResolution = py::cast<mochi::Int3>(val); }, py::return_value_policy::reference_internal, "The minimum grid resolution measured in number of voxels per axis.\n\nNote:\n    This may override the voxel count (and voxel size) computed using\n    :attr:`~superdex.physics.GridSdfParams.resolution_mode` and\n    :attr:`~superdex.physics.GridSdfParams.resolution_delta`.")
+    .def("__deepcopy__", [](mochi::GridSdfParams const& self, nb::dict) { return mochi::GridSdfParams(self); })
+    .def_rw("resolution_mode", &mochi::GridSdfParams::resolutionMode, "Defines the mesh feature used as reference measurement for computing the voxel\nsize.\n\nSee Also:\n    :attr:`~superdex.physics.GridSdfParams.resolution_delta`")
+    .def_prop_rw("resolution_delta", [](mochi::GridSdfParams& self) -> mochi::Real3& { return self.resolutionDelta; }, [](mochi::GridSdfParams& self, nb::object val) { self.resolutionDelta = nb::cast<mochi::Real3>(val); }, "The maximum voxel size will be\n:attr:`~superdex.physics.GridSdfParams.resolution_delta` times the reference\nmeasurement computed using\n:attr:`~superdex.physics.GridSdfParams.resolution_mode`.\n\nNote:\n    The actual voxel size may be smaller because the number of grid cells will\n    be rounded up to an integer value and clamped to a minimum of\n    :attr:`~superdex.physics.GridSdfParams.min_grid_resolution`.\n\nNote:\n    Increasing :attr:`~superdex.physics.GridSdfParams.resolution_delta` will\n    result in larger voxels. Doing so will make it harder for the SDF to resolve\n    fine details of the mesh, but it will save memory and improve SDF generation\n    speed.\n\nNote:\n    Decreasing :attr:`~superdex.physics.GridSdfParams.resolution_delta` will\n    improve the SDF's ability to resolve fine details, but it will take more\n    memory and more time to generate. This cost scales proportional to N^3. Use\n    with care.\n\nSee Also:\n    :attr:`~superdex.physics.GridSdfParams.resolution_mode`")
+    .def_rw("boundary_padding_dist", &mochi::GridSdfParams::boundaryPaddingDist, "Additional distance (in meters) to expand the mesh's axis-aligned bounding box\n(AABB) when determining the SDF grid bounds.\n\nThe SDF grid will cover the mesh's AABB expanded by this distance in all\ndirections. This ensures the SDF has valid distance values even slightly outside\nthe mesh's AABB.\n\nNote:\n    In practice, this value should be greater than the value returned by\n    :meth:`~superdex.physics.ContactParams.get_penalty_threshold_dist`. If the\n    SDF did not have enough padding, then Mochi would have to use a less\n    efficient algorithm for collision detection, but it would still work.\n\nNote:\n    When you load a model and bake a uniform scale value less than 1.0, the\n    model's pre-computed SDF will also be scaled, resulting in less absolute\n    padding. The default padding value is larger than the default contact\n    penalty threshold distance for this reason.\n\nSee Also:\n    :const:`~superdex.physics.GRID_SDF_DEFAULT_BOUNDARY_PADDING`")
+    .def_prop_rw("min_grid_resolution", [](mochi::GridSdfParams& self) -> mochi::Int3& { return self.minGridResolution; }, [](mochi::GridSdfParams& self, nb::object val) { self.minGridResolution = nb::cast<mochi::Int3>(val); }, "The minimum grid resolution measured in number of voxels per axis.\n\nNote:\n    This may override the voxel count (and voxel size) computed using\n    :attr:`~superdex.physics.GridSdfParams.resolution_mode` and\n    :attr:`~superdex.physics.GridSdfParams.resolution_delta`.")
   ;
 
   registry.GetClass<mochi::LinearElasticMaterialParams>()
-    .def(py::init([](py::object youngs_modulus, py::object poisson_ratio) {
-      mochi::LinearElasticMaterialParams result;
-      result.youngsModulus = py::cast<mochi::real>(youngs_modulus);
-      result.poissonRatio = py::cast<mochi::real>(poisson_ratio);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("youngs_modulus") = mochi::LinearElasticMaterialParams{}.youngsModulus
-      , py::arg("poisson_ratio") = mochi::LinearElasticMaterialParams{}.poissonRatio
+    .def("__init__", [](mochi::LinearElasticMaterialParams* self, nb::object youngs_modulus, nb::object poisson_ratio) {
+      mochi::LinearElasticMaterialParams result{};
+      result.youngsModulus = nb::cast<mochi::real>(youngs_modulus);
+      result.poissonRatio = nb::cast<mochi::real>(poisson_ratio);
+      new (self) mochi::LinearElasticMaterialParams(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("youngs_modulus") = mochi::LinearElasticMaterialParams{}.youngsModulus
+      , nb::arg("poisson_ratio") = mochi::LinearElasticMaterialParams{}.poissonRatio
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::LinearElasticMaterialParams const& self) { return mochi::LinearElasticMaterialParams(self); })
-    .def("__deepcopy__", [](mochi::LinearElasticMaterialParams const& self, py::dict) { return mochi::LinearElasticMaterialParams(self); })
-    .def_readwrite("youngs_modulus", &mochi::LinearElasticMaterialParams::youngsModulus, "Young's modulus [Pa]. Must be positive.")
-    .def_readwrite("poisson_ratio", &mochi::LinearElasticMaterialParams::poissonRatio, "Poisson's ratio (dimensionless).\n\nNote:\n    Must be in (-1, 0.5). Near 0.5 = nearly incompressible.")
+    .def("__deepcopy__", [](mochi::LinearElasticMaterialParams const& self, nb::dict) { return mochi::LinearElasticMaterialParams(self); })
+    .def_rw("youngs_modulus", &mochi::LinearElasticMaterialParams::youngsModulus, "Young's modulus [Pa]. Must be positive.")
+    .def_rw("poisson_ratio", &mochi::LinearElasticMaterialParams::poissonRatio, "Poisson's ratio (dimensionless).\n\nNote:\n    Must be in (-1, 0.5). Near 0.5 = nearly incompressible.")
   ;
 
   registry.GetClass<mochi::StVenantKirchhoffMaterialParams>()
-    .def(py::init([](py::object youngs_modulus, py::object poisson_ratio, py::object psd_strategy) {
-      mochi::StVenantKirchhoffMaterialParams result;
-      result.youngsModulus = py::cast<mochi::real>(youngs_modulus);
-      result.poissonRatio = py::cast<mochi::real>(poisson_ratio);
-      result.psdStrategy = py::cast<mochi::MaterialPsdStrategy>(psd_strategy);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("youngs_modulus") = mochi::StVenantKirchhoffMaterialParams{}.youngsModulus
-      , py::arg("poisson_ratio") = mochi::StVenantKirchhoffMaterialParams{}.poissonRatio
-      , py::arg("psd_strategy") = mochi::StVenantKirchhoffMaterialParams{}.psdStrategy
+    .def("__init__", [](mochi::StVenantKirchhoffMaterialParams* self, nb::object youngs_modulus, nb::object poisson_ratio, nb::object psd_strategy) {
+      mochi::StVenantKirchhoffMaterialParams result{};
+      result.youngsModulus = nb::cast<mochi::real>(youngs_modulus);
+      result.poissonRatio = nb::cast<mochi::real>(poisson_ratio);
+      result.psdStrategy = nb::cast<mochi::MaterialPsdStrategy>(psd_strategy);
+      new (self) mochi::StVenantKirchhoffMaterialParams(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("youngs_modulus") = mochi::StVenantKirchhoffMaterialParams{}.youngsModulus
+      , nb::arg("poisson_ratio") = mochi::StVenantKirchhoffMaterialParams{}.poissonRatio
+      , nb::arg("psd_strategy") = mochi::StVenantKirchhoffMaterialParams{}.psdStrategy
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::StVenantKirchhoffMaterialParams const& self) { return mochi::StVenantKirchhoffMaterialParams(self); })
-    .def("__deepcopy__", [](mochi::StVenantKirchhoffMaterialParams const& self, py::dict) { return mochi::StVenantKirchhoffMaterialParams(self); })
-    .def_readwrite("youngs_modulus", &mochi::StVenantKirchhoffMaterialParams::youngsModulus, "Young's modulus [Pa]. Must be positive.")
-    .def_readwrite("poisson_ratio", &mochi::StVenantKirchhoffMaterialParams::poissonRatio, "Poisson's ratio (dimensionless).\n\nNote:\n    Must be in (-1, 0.5). Near 0.5 = nearly incompressible.")
-    .def_readwrite("psd_strategy", &mochi::StVenantKirchhoffMaterialParams::psdStrategy, "Strategy for ensuring positive semi-definite Hessian matrices.\n\nSee Also:\n    :class:`~superdex.physics.MaterialPsdStrategy`")
+    .def("__deepcopy__", [](mochi::StVenantKirchhoffMaterialParams const& self, nb::dict) { return mochi::StVenantKirchhoffMaterialParams(self); })
+    .def_rw("youngs_modulus", &mochi::StVenantKirchhoffMaterialParams::youngsModulus, "Young's modulus [Pa]. Must be positive.")
+    .def_rw("poisson_ratio", &mochi::StVenantKirchhoffMaterialParams::poissonRatio, "Poisson's ratio (dimensionless).\n\nNote:\n    Must be in (-1, 0.5). Near 0.5 = nearly incompressible.")
+    .def_rw("psd_strategy", &mochi::StVenantKirchhoffMaterialParams::psdStrategy, "Strategy for ensuring positive semi-definite Hessian matrices.\n\nSee Also:\n    :class:`~superdex.physics.MaterialPsdStrategy`")
   ;
 
   registry.GetClass<mochi::NeoHookeanMaterialParams>()
-    .def(py::init([](py::object youngs_modulus, py::object poisson_ratio, py::object psd_strategy) {
-      mochi::NeoHookeanMaterialParams result;
-      result.youngsModulus = py::cast<mochi::real>(youngs_modulus);
-      result.poissonRatio = py::cast<mochi::real>(poisson_ratio);
-      result.psdStrategy = py::cast<mochi::MaterialPsdStrategy>(psd_strategy);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("youngs_modulus") = mochi::NeoHookeanMaterialParams{}.youngsModulus
-      , py::arg("poisson_ratio") = mochi::NeoHookeanMaterialParams{}.poissonRatio
-      , py::arg("psd_strategy") = mochi::NeoHookeanMaterialParams{}.psdStrategy
+    .def("__init__", [](mochi::NeoHookeanMaterialParams* self, nb::object youngs_modulus, nb::object poisson_ratio, nb::object psd_strategy) {
+      mochi::NeoHookeanMaterialParams result{};
+      result.youngsModulus = nb::cast<mochi::real>(youngs_modulus);
+      result.poissonRatio = nb::cast<mochi::real>(poisson_ratio);
+      result.psdStrategy = nb::cast<mochi::MaterialPsdStrategy>(psd_strategy);
+      new (self) mochi::NeoHookeanMaterialParams(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("youngs_modulus") = mochi::NeoHookeanMaterialParams{}.youngsModulus
+      , nb::arg("poisson_ratio") = mochi::NeoHookeanMaterialParams{}.poissonRatio
+      , nb::arg("psd_strategy") = mochi::NeoHookeanMaterialParams{}.psdStrategy
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::NeoHookeanMaterialParams const& self) { return mochi::NeoHookeanMaterialParams(self); })
-    .def("__deepcopy__", [](mochi::NeoHookeanMaterialParams const& self, py::dict) { return mochi::NeoHookeanMaterialParams(self); })
-    .def_readwrite("youngs_modulus", &mochi::NeoHookeanMaterialParams::youngsModulus, "Young's modulus [Pa]. Must be positive.")
-    .def_readwrite("poisson_ratio", &mochi::NeoHookeanMaterialParams::poissonRatio, "Poisson's ratio (dimensionless).\n\nNote:\n    Must be in (-1, 0.5). Near 0.5 = nearly incompressible.")
-    .def_readwrite("psd_strategy", &mochi::NeoHookeanMaterialParams::psdStrategy, "Strategy for ensuring positive semi-definite Hessian matrices.\n\nSee Also:\n    :class:`~superdex.physics.MaterialPsdStrategy`")
+    .def("__deepcopy__", [](mochi::NeoHookeanMaterialParams const& self, nb::dict) { return mochi::NeoHookeanMaterialParams(self); })
+    .def_rw("youngs_modulus", &mochi::NeoHookeanMaterialParams::youngsModulus, "Young's modulus [Pa]. Must be positive.")
+    .def_rw("poisson_ratio", &mochi::NeoHookeanMaterialParams::poissonRatio, "Poisson's ratio (dimensionless).\n\nNote:\n    Must be in (-1, 0.5). Near 0.5 = nearly incompressible.")
+    .def_rw("psd_strategy", &mochi::NeoHookeanMaterialParams::psdStrategy, "Strategy for ensuring positive semi-definite Hessian matrices.\n\nSee Also:\n    :class:`~superdex.physics.MaterialPsdStrategy`")
   ;
 
   registry.GetClass<mochi::ActiveAnisoArapMaterialParams>()
-    .def(py::init([](py::object alpha, py::object length, py::object aniso_dir, py::object psd_strategy) {
-      mochi::ActiveAnisoArapMaterialParams result;
-      result.alpha = py::cast<mochi::real>(alpha);
-      result.length = py::cast<mochi::real>(length);
-      result.anisoDir = py::cast<mochi::Real3>(aniso_dir);
-      result.psdStrategy = py::cast<mochi::MaterialPsdStrategy>(psd_strategy);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("alpha") = mochi::ActiveAnisoArapMaterialParams{}.alpha
-      , py::arg("length") = mochi::ActiveAnisoArapMaterialParams{}.length
-      , py::arg("aniso_dir") = mochi::ActiveAnisoArapMaterialParams{}.anisoDir
-      , py::arg("psd_strategy") = mochi::ActiveAnisoArapMaterialParams{}.psdStrategy
+    .def("__init__", [](mochi::ActiveAnisoArapMaterialParams* self, nb::object alpha, nb::object length, nb::object aniso_dir, nb::object psd_strategy) {
+      mochi::ActiveAnisoArapMaterialParams result{};
+      result.alpha = nb::cast<mochi::real>(alpha);
+      result.length = nb::cast<mochi::real>(length);
+      result.anisoDir = nb::cast<mochi::Real3>(aniso_dir);
+      result.psdStrategy = nb::cast<mochi::MaterialPsdStrategy>(psd_strategy);
+      new (self) mochi::ActiveAnisoArapMaterialParams(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("alpha") = mochi::ActiveAnisoArapMaterialParams{}.alpha
+      , nb::arg("length") = mochi::ActiveAnisoArapMaterialParams{}.length
+      , nb::arg("aniso_dir").sig("...") = mochi::ActiveAnisoArapMaterialParams{}.anisoDir
+      , nb::arg("psd_strategy") = mochi::ActiveAnisoArapMaterialParams{}.psdStrategy
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::ActiveAnisoArapMaterialParams const& self) { return mochi::ActiveAnisoArapMaterialParams(self); })
-    .def("__deepcopy__", [](mochi::ActiveAnisoArapMaterialParams const& self, py::dict) { return mochi::ActiveAnisoArapMaterialParams(self); })
-    .def_readwrite("alpha", &mochi::ActiveAnisoArapMaterialParams::alpha, "Anisotropic stiffness (α) along fiber direction [Pa].\n\nNote:\n    Must not be negative.")
-    .def_readwrite("length", &mochi::ActiveAnisoArapMaterialParams::length, "Anisotropic reference length (dimensionless).\n\nNote:\n    Must not be negative.")
-    .def_property("aniso_dir", [](mochi::ActiveAnisoArapMaterialParams& self) -> mochi::Real3& { return self.anisoDir; }, [](mochi::ActiveAnisoArapMaterialParams& self, py::object val) { self.anisoDir = py::cast<mochi::Real3>(val); }, py::return_value_policy::reference_internal, "Fiber direction unit vector with components (cos(φ)cos(θ), sin(φ),\ncos(φ)sin(θ)).\n\nSee Also:\n    :meth:`~superdex.physics.ActiveAnisoArapMaterialParams.compute_fiber_direction`,\n    :meth:`~superdex.physics.ActiveAnisoArapMaterialParams.get_theta`,\n    :meth:`~superdex.physics.ActiveAnisoArapMaterialParams.get_phi`")
-    .def_readwrite("psd_strategy", &mochi::ActiveAnisoArapMaterialParams::psdStrategy, "Strategy for ensuring positive semi-definite Hessian matrices.\n\nSee Also:\n    :class:`~superdex.physics.MaterialPsdStrategy`")
+    .def("__deepcopy__", [](mochi::ActiveAnisoArapMaterialParams const& self, nb::dict) { return mochi::ActiveAnisoArapMaterialParams(self); })
+    .def_rw("alpha", &mochi::ActiveAnisoArapMaterialParams::alpha, "Anisotropic stiffness (α) along fiber direction [Pa].\n\nNote:\n    Must not be negative.")
+    .def_rw("length", &mochi::ActiveAnisoArapMaterialParams::length, "Anisotropic reference length (dimensionless).\n\nNote:\n    Must not be negative.")
+    .def_prop_rw("aniso_dir", [](mochi::ActiveAnisoArapMaterialParams& self) -> mochi::Real3& { return self.anisoDir; }, [](mochi::ActiveAnisoArapMaterialParams& self, nb::object val) { self.anisoDir = nb::cast<mochi::Real3>(val); }, "Fiber direction unit vector with components (cos(φ)cos(θ), sin(φ),\ncos(φ)sin(θ)).\n\nSee Also:\n    :meth:`~superdex.physics.ActiveAnisoArapMaterialParams.compute_fiber_direction`,\n    :meth:`~superdex.physics.ActiveAnisoArapMaterialParams.get_theta`,\n    :meth:`~superdex.physics.ActiveAnisoArapMaterialParams.get_phi`")
+    .def_rw("psd_strategy", &mochi::ActiveAnisoArapMaterialParams::psdStrategy, "Strategy for ensuring positive semi-definite Hessian matrices.\n\nSee Also:\n    :class:`~superdex.physics.MaterialPsdStrategy`")
     .def("get_theta", &mochi::ActiveAnisoArapMaterialParams::GetTheta
       , "Returns the azimuthal angle (θ) [rad] from the stored fiber direction.\n\nReturns:\n    The azimuthal angle.\n\nSee Also:\n    :meth:`~superdex.physics.ActiveAnisoArapMaterialParams.compute_fiber_direction`,\n    :meth:`~superdex.physics.ActiveAnisoArapMaterialParams.get_phi`"
     )
@@ -911,158 +965,158 @@ void mochi::DefineMochiCore_MochiCore([[maybe_unused]] py::module_& m, [[maybe_u
       , "Returns the elevation angle (φ) [rad] from the stored fiber direction.\n\nReturns:\n    The elevation angle.\n\nSee Also:\n    :meth:`~superdex.physics.ActiveAnisoArapMaterialParams.compute_fiber_direction`,\n    :meth:`~superdex.physics.ActiveAnisoArapMaterialParams.get_theta`"
     )
     .def_static("compute_fiber_direction", &mochi::ActiveAnisoArapMaterialParams::ComputeFiberDirection
-      , py::arg("theta")
-      , py::arg("phi")
+      , nb::arg("theta")
+      , nb::arg("phi")
       , "Computes the fiber direction unit vector from spherical angles.\n\nArgs:\n    theta (float): Azimuthal angle (θ) [rad].\n    phi (float): Elevation angle (φ) [rad].\n\nReturns:\n    Unit vector: (cos(φ)cos(θ), sin(φ), cos(φ)sin(θ))."
     )
   ;
 
   registry.GetClass<mochi::ActiveNeoHookeanMaterialParams>()
-    .def(py::init([](py::object passive_isotropic, py::object active_anisotropic) {
-      mochi::ActiveNeoHookeanMaterialParams result;
-      result.passiveIsotropic = py::cast<mochi::NeoHookeanMaterialParams>(passive_isotropic);
-      result.activeAnisotropic = py::cast<mochi::ActiveAnisoArapMaterialParams>(active_anisotropic);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("passive_isotropic") = mochi::ActiveNeoHookeanMaterialParams{}.passiveIsotropic
-      , py::arg("active_anisotropic") = mochi::ActiveNeoHookeanMaterialParams{}.activeAnisotropic
+    .def("__init__", [](mochi::ActiveNeoHookeanMaterialParams* self, nb::object passive_isotropic, nb::object active_anisotropic) {
+      mochi::ActiveNeoHookeanMaterialParams result{};
+      result.passiveIsotropic = nb::cast<mochi::NeoHookeanMaterialParams>(passive_isotropic);
+      result.activeAnisotropic = nb::cast<mochi::ActiveAnisoArapMaterialParams>(active_anisotropic);
+      new (self) mochi::ActiveNeoHookeanMaterialParams(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("passive_isotropic").sig("...") = mochi::ActiveNeoHookeanMaterialParams{}.passiveIsotropic
+      , nb::arg("active_anisotropic").sig("...") = mochi::ActiveNeoHookeanMaterialParams{}.activeAnisotropic
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::ActiveNeoHookeanMaterialParams const& self) { return mochi::ActiveNeoHookeanMaterialParams(self); })
-    .def("__deepcopy__", [](mochi::ActiveNeoHookeanMaterialParams const& self, py::dict) { return mochi::ActiveNeoHookeanMaterialParams(self); })
-    .def_readwrite("passive_isotropic", &mochi::ActiveNeoHookeanMaterialParams::passiveIsotropic, "Passive isotropic hyperelastic component parameters (Neo-Hookean).\n\nSee Also:\n    :class:`~superdex.physics.NeoHookeanMaterialParams`")
-    .def_readwrite("active_anisotropic", &mochi::ActiveNeoHookeanMaterialParams::activeAnisotropic, "Active anisotropic fiber contraction component parameters (Active Aniso ARAP).\n\nSee Also:\n    :class:`~superdex.physics.ActiveAnisoArapMaterialParams`")
+    .def("__deepcopy__", [](mochi::ActiveNeoHookeanMaterialParams const& self, nb::dict) { return mochi::ActiveNeoHookeanMaterialParams(self); })
+    .def_rw("passive_isotropic", &mochi::ActiveNeoHookeanMaterialParams::passiveIsotropic, "Passive isotropic hyperelastic component parameters (Neo-Hookean).\n\nSee Also:\n    :class:`~superdex.physics.NeoHookeanMaterialParams`")
+    .def_rw("active_anisotropic", &mochi::ActiveNeoHookeanMaterialParams::activeAnisotropic, "Active anisotropic fiber contraction component parameters (Active Aniso ARAP).\n\nSee Also:\n    :class:`~superdex.physics.ActiveAnisoArapMaterialParams`")
   ;
 
   registry.GetClass<mochi::ArapMaterialParams>()
-    .def(py::init([](py::object stiffness, py::object psd_strategy) {
-      mochi::ArapMaterialParams result;
-      result.stiffness = py::cast<mochi::real>(stiffness);
-      result.psdStrategy = py::cast<mochi::MaterialPsdStrategy>(psd_strategy);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::ArapMaterialParams{}.stiffness
-      , py::arg("psd_strategy") = mochi::ArapMaterialParams{}.psdStrategy
+    .def("__init__", [](mochi::ArapMaterialParams* self, nb::object stiffness, nb::object psd_strategy) {
+      mochi::ArapMaterialParams result{};
+      result.stiffness = nb::cast<mochi::real>(stiffness);
+      result.psdStrategy = nb::cast<mochi::MaterialPsdStrategy>(psd_strategy);
+      new (self) mochi::ArapMaterialParams(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::ArapMaterialParams{}.stiffness
+      , nb::arg("psd_strategy") = mochi::ArapMaterialParams{}.psdStrategy
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::ArapMaterialParams const& self) { return mochi::ArapMaterialParams(self); })
-    .def("__deepcopy__", [](mochi::ArapMaterialParams const& self, py::dict) { return mochi::ArapMaterialParams(self); })
-    .def_readwrite("stiffness", &mochi::ArapMaterialParams::stiffness, "ARAP stiffness parameter (μ) [Pa].\n\nNote:\n    Must be greater than zero.")
-    .def_readwrite("psd_strategy", &mochi::ArapMaterialParams::psdStrategy, "Strategy for ensuring positive semi-definite Hessian matrices.\n\nSee Also:\n    :class:`~superdex.physics.MaterialPsdStrategy`")
+    .def("__deepcopy__", [](mochi::ArapMaterialParams const& self, nb::dict) { return mochi::ArapMaterialParams(self); })
+    .def_rw("stiffness", &mochi::ArapMaterialParams::stiffness, "ARAP stiffness parameter (μ) [Pa].\n\nNote:\n    Must be greater than zero.")
+    .def_rw("psd_strategy", &mochi::ArapMaterialParams::psdStrategy, "Strategy for ensuring positive semi-definite Hessian matrices.\n\nSee Also:\n    :class:`~superdex.physics.MaterialPsdStrategy`")
   ;
 
   registry.GetClass<mochi::ActiveShapeTargetingArapMaterialParams>()
-    .def(py::init([](py::object stiffness, py::object shape_target_tensor, py::object psd_strategy) {
-      mochi::ActiveShapeTargetingArapMaterialParams result;
-      result.stiffness = py::cast<mochi::real>(stiffness);
-      result.shapeTargetTensor = py::cast<mochi::Real6>(shape_target_tensor);
-      result.psdStrategy = py::cast<mochi::MaterialPsdStrategy>(psd_strategy);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("stiffness") = mochi::ActiveShapeTargetingArapMaterialParams{}.stiffness
-      , py::arg("shape_target_tensor") = mochi::ActiveShapeTargetingArapMaterialParams{}.shapeTargetTensor
-      , py::arg("psd_strategy") = mochi::ActiveShapeTargetingArapMaterialParams{}.psdStrategy
+    .def("__init__", [](mochi::ActiveShapeTargetingArapMaterialParams* self, nb::object stiffness, nb::object shape_target_tensor, nb::object psd_strategy) {
+      mochi::ActiveShapeTargetingArapMaterialParams result{};
+      result.stiffness = nb::cast<mochi::real>(stiffness);
+      result.shapeTargetTensor = nb::cast<mochi::Real6>(shape_target_tensor);
+      result.psdStrategy = nb::cast<mochi::MaterialPsdStrategy>(psd_strategy);
+      new (self) mochi::ActiveShapeTargetingArapMaterialParams(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("stiffness") = mochi::ActiveShapeTargetingArapMaterialParams{}.stiffness
+      , nb::arg("shape_target_tensor").sig("...") = mochi::ActiveShapeTargetingArapMaterialParams{}.shapeTargetTensor
+      , nb::arg("psd_strategy") = mochi::ActiveShapeTargetingArapMaterialParams{}.psdStrategy
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::ActiveShapeTargetingArapMaterialParams const& self) { return mochi::ActiveShapeTargetingArapMaterialParams(self); })
-    .def("__deepcopy__", [](mochi::ActiveShapeTargetingArapMaterialParams const& self, py::dict) { return mochi::ActiveShapeTargetingArapMaterialParams(self); })
-    .def_readwrite("stiffness", &mochi::ActiveShapeTargetingArapMaterialParams::stiffness, "ARAP stiffness parameter (μ) [Pa].\n\nNote:\n    Must be greater than zero.")
-    .def_property("shape_target_tensor", [](mochi::ActiveShapeTargetingArapMaterialParams& self) -> mochi::Real6& { return self.shapeTargetTensor; }, [](mochi::ActiveShapeTargetingArapMaterialParams& self, py::object val) { self.shapeTargetTensor = py::cast<mochi::Real6>(val); }, py::return_value_policy::reference_internal, "Shape target tensor (6 values).\n\nDefines the shape target tensor as a symmetric 3x3 matrix added to the identity:\nS_t = I + [[s0, s1, s2], [s1, s3, s4], [s2, s4, s5]]. The shape target tensor\nspecifies the desired local shape of the object. The model then resists\ndeformation from this target shape while allowing rigid rotation.")
-    .def_readwrite("psd_strategy", &mochi::ActiveShapeTargetingArapMaterialParams::psdStrategy, "Strategy for ensuring positive semi-definite Hessian matrices.\n\nSee Also:\n    :class:`~superdex.physics.MaterialPsdStrategy`")
+    .def("__deepcopy__", [](mochi::ActiveShapeTargetingArapMaterialParams const& self, nb::dict) { return mochi::ActiveShapeTargetingArapMaterialParams(self); })
+    .def_rw("stiffness", &mochi::ActiveShapeTargetingArapMaterialParams::stiffness, "ARAP stiffness parameter (μ) [Pa].\n\nNote:\n    Must be greater than zero.")
+    .def_prop_rw("shape_target_tensor", [](mochi::ActiveShapeTargetingArapMaterialParams& self) -> mochi::Real6& { return self.shapeTargetTensor; }, [](mochi::ActiveShapeTargetingArapMaterialParams& self, nb::object val) { self.shapeTargetTensor = nb::cast<mochi::Real6>(val); }, "Shape target tensor (6 values).\n\nDefines the shape target tensor as a symmetric 3x3 matrix added to the identity:\nS_t = I + [[s0, s1, s2], [s1, s3, s4], [s2, s4, s5]]. The shape target tensor\nspecifies the desired local shape of the object. The model then resists\ndeformation from this target shape while allowing rigid rotation.")
+    .def_rw("psd_strategy", &mochi::ActiveShapeTargetingArapMaterialParams::psdStrategy, "Strategy for ensuring positive semi-definite Hessian matrices.\n\nSee Also:\n    :class:`~superdex.physics.MaterialPsdStrategy`")
   ;
 
   registry.GetClass<mochi::SoftMaterialParams>()
-    .def(py::init([](py::object type, py::object neo_hookean, py::object st_venant_kirchhoff, py::object linear_elastic, py::object active_neo_hookean, py::object active_shape_targeting_arap, py::object arap, py::object density, py::object mass_damping_coefficient, py::object stiffness_damping_coefficient, py::object stiffness_damping_include_geometric_term) {
-      mochi::SoftMaterialParams result;
-      result.type = py::cast<mochi::SoftMaterialType>(type);
-      result.neoHookean = py::cast<mochi::NeoHookeanMaterialParams>(neo_hookean);
-      result.stVenantKirchhoff = py::cast<mochi::StVenantKirchhoffMaterialParams>(st_venant_kirchhoff);
-      result.linearElastic = py::cast<mochi::LinearElasticMaterialParams>(linear_elastic);
-      result.activeNeoHookean = py::cast<mochi::ActiveNeoHookeanMaterialParams>(active_neo_hookean);
-      result.activeShapeTargetingArap = py::cast<mochi::ActiveShapeTargetingArapMaterialParams>(active_shape_targeting_arap);
-      result.arap = py::cast<mochi::ArapMaterialParams>(arap);
-      result.density = py::cast<mochi::real>(density);
-      result.massDampingCoefficient = py::cast<mochi::real>(mass_damping_coefficient);
-      result.stiffnessDampingCoefficient = py::cast<mochi::real>(stiffness_damping_coefficient);
-      result.stiffnessDampingIncludeGeometricTerm = py::cast<bool>(stiffness_damping_include_geometric_term);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("type") = mochi::SoftMaterialParams{}.type
-      , py::arg("neo_hookean") = mochi::SoftMaterialParams{}.neoHookean
-      , py::arg("st_venant_kirchhoff") = mochi::SoftMaterialParams{}.stVenantKirchhoff
-      , py::arg("linear_elastic") = mochi::SoftMaterialParams{}.linearElastic
-      , py::arg("active_neo_hookean") = mochi::SoftMaterialParams{}.activeNeoHookean
-      , py::arg("active_shape_targeting_arap") = mochi::SoftMaterialParams{}.activeShapeTargetingArap
-      , py::arg("arap") = mochi::SoftMaterialParams{}.arap
-      , py::arg("density") = mochi::SoftMaterialParams{}.density
-      , py::arg("mass_damping_coefficient") = mochi::SoftMaterialParams{}.massDampingCoefficient
-      , py::arg("stiffness_damping_coefficient") = mochi::SoftMaterialParams{}.stiffnessDampingCoefficient
-      , py::arg("stiffness_damping_include_geometric_term") = mochi::SoftMaterialParams{}.stiffnessDampingIncludeGeometricTerm
+    .def("__init__", [](mochi::SoftMaterialParams* self, nb::object type, nb::object neo_hookean, nb::object st_venant_kirchhoff, nb::object linear_elastic, nb::object active_neo_hookean, nb::object active_shape_targeting_arap, nb::object arap, nb::object density, nb::object mass_damping_coefficient, nb::object stiffness_damping_coefficient, nb::object stiffness_damping_include_geometric_term) {
+      mochi::SoftMaterialParams result{};
+      result.type = nb::cast<mochi::SoftMaterialType>(type);
+      result.neoHookean = nb::cast<mochi::NeoHookeanMaterialParams>(neo_hookean);
+      result.stVenantKirchhoff = nb::cast<mochi::StVenantKirchhoffMaterialParams>(st_venant_kirchhoff);
+      result.linearElastic = nb::cast<mochi::LinearElasticMaterialParams>(linear_elastic);
+      result.activeNeoHookean = nb::cast<mochi::ActiveNeoHookeanMaterialParams>(active_neo_hookean);
+      result.activeShapeTargetingArap = nb::cast<mochi::ActiveShapeTargetingArapMaterialParams>(active_shape_targeting_arap);
+      result.arap = nb::cast<mochi::ArapMaterialParams>(arap);
+      result.density = nb::cast<mochi::real>(density);
+      result.massDampingCoefficient = nb::cast<mochi::real>(mass_damping_coefficient);
+      result.stiffnessDampingCoefficient = nb::cast<mochi::real>(stiffness_damping_coefficient);
+      result.stiffnessDampingIncludeGeometricTerm = nb::cast<bool>(stiffness_damping_include_geometric_term);
+      new (self) mochi::SoftMaterialParams(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("type") = mochi::SoftMaterialParams{}.type
+      , nb::arg("neo_hookean").sig("...") = mochi::SoftMaterialParams{}.neoHookean
+      , nb::arg("st_venant_kirchhoff").sig("...") = mochi::SoftMaterialParams{}.stVenantKirchhoff
+      , nb::arg("linear_elastic").sig("...") = mochi::SoftMaterialParams{}.linearElastic
+      , nb::arg("active_neo_hookean").sig("...") = mochi::SoftMaterialParams{}.activeNeoHookean
+      , nb::arg("active_shape_targeting_arap").sig("...") = mochi::SoftMaterialParams{}.activeShapeTargetingArap
+      , nb::arg("arap").sig("...") = mochi::SoftMaterialParams{}.arap
+      , nb::arg("density") = mochi::SoftMaterialParams{}.density
+      , nb::arg("mass_damping_coefficient") = mochi::SoftMaterialParams{}.massDampingCoefficient
+      , nb::arg("stiffness_damping_coefficient") = mochi::SoftMaterialParams{}.stiffnessDampingCoefficient
+      , nb::arg("stiffness_damping_include_geometric_term") = mochi::SoftMaterialParams{}.stiffnessDampingIncludeGeometricTerm
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::SoftMaterialParams const& self) { return mochi::SoftMaterialParams(self); })
-    .def("__deepcopy__", [](mochi::SoftMaterialParams const& self, py::dict) { return mochi::SoftMaterialParams(self); })
-    .def_readwrite("type", &mochi::SoftMaterialParams::type, "Material constitutive model.")
-    .def_readwrite("neo_hookean", &mochi::SoftMaterialParams::neoHookean, "Parameters for the Neo-Hookean material model.")
-    .def_readwrite("st_venant_kirchhoff", &mochi::SoftMaterialParams::stVenantKirchhoff, "Parameters for the St. Venant-Kirchhoff material model.")
-    .def_readwrite("linear_elastic", &mochi::SoftMaterialParams::linearElastic, "Parameters for the Linear Elastic material model.")
-    .def_readwrite("active_neo_hookean", &mochi::SoftMaterialParams::activeNeoHookean, "Parameters for the Active Neo-Hookean material model.")
-    .def_readwrite("active_shape_targeting_arap", &mochi::SoftMaterialParams::activeShapeTargetingArap, "Parameters for the Active Shape Targeting ARAP material model.")
-    .def_readwrite("arap", &mochi::SoftMaterialParams::arap, "Parameters for the ARAP material model.")
-    .def_readwrite("density", &mochi::SoftMaterialParams::density, "Material density in the undeformed configuration [kg/m³]. Must be positive.")
-    .def_readwrite("mass_damping_coefficient", &mochi::SoftMaterialParams::massDampingCoefficient, "Mass damping coefficient [1/s]. Applies a velocity-proportional force `α·M·v`.\n\nMust be non-negative. Active only when the actor has inertia. A nonzero value\nwith no inertia is valid but inactive (logged as a warning at actor\ninitialization).")
-    .def_readwrite("stiffness_damping_coefficient", &mochi::SoftMaterialParams::stiffnessDampingCoefficient, "Stiffness damping coefficient `β` [s]. Adds a strain-rate-proportional viscous\nstress.\n\nMust be non-negative. Active only when the actor has stress. A nonzero value\nwith no stress is valid but inactive (logged as a warning at actor\ninitialization).\n\nThis is a total-Lagrangian variant of Kelvin–Voigt damping: it adds a viscous\nsecond Piola–Kirchhoff stress\n\n::\n\n      S_visc = β · C₀ : Ė\n\nwhere `Ė` is the material time derivative of the Green–Lagrange strain, and `C₀\n= ∂²Ψ/∂E²` is the Lagrangian material stiffness evaluated at zero deformation.\n\nNote:\n    While the parameterization in terms of a timescale β is similar, this\n    differs from standard Rayleigh damping using the global assembled stiffness\n    matrix; it depends only on strain rate, therefore dissipating energy only\n    during deformation.")
-    .def_readwrite("stiffness_damping_include_geometric_term", &mochi::SoftMaterialParams::stiffnessDampingIncludeGeometricTerm, "[Experimental] Include the geometric term in the stiffness-damping tangent.\nDefaults to `false`.\n\nOnly affects the Jacobian for Newton iteration, not the energy, residual, or\nconverged solution. When `false` (default), the viscous tangent uses a cheaper\nquasi-Newton approximation. When `true`, the Newton Jacobian includes a\ngeometric term, which is proportional to the per-stage strain increment and may\nimprove nonlinear solver convergence in certain scenarios.\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk.")
+    .def("__deepcopy__", [](mochi::SoftMaterialParams const& self, nb::dict) { return mochi::SoftMaterialParams(self); })
+    .def_rw("type", &mochi::SoftMaterialParams::type, "Material constitutive model.")
+    .def_rw("neo_hookean", &mochi::SoftMaterialParams::neoHookean, "Parameters for the Neo-Hookean material model.")
+    .def_rw("st_venant_kirchhoff", &mochi::SoftMaterialParams::stVenantKirchhoff, "Parameters for the St. Venant-Kirchhoff material model.")
+    .def_rw("linear_elastic", &mochi::SoftMaterialParams::linearElastic, "Parameters for the Linear Elastic material model.")
+    .def_rw("active_neo_hookean", &mochi::SoftMaterialParams::activeNeoHookean, "Parameters for the Active Neo-Hookean material model.")
+    .def_rw("active_shape_targeting_arap", &mochi::SoftMaterialParams::activeShapeTargetingArap, "Parameters for the Active Shape Targeting ARAP material model.")
+    .def_rw("arap", &mochi::SoftMaterialParams::arap, "Parameters for the ARAP material model.")
+    .def_rw("density", &mochi::SoftMaterialParams::density, "Material density in the undeformed configuration [kg/m³]. Must be positive.")
+    .def_rw("mass_damping_coefficient", &mochi::SoftMaterialParams::massDampingCoefficient, "Mass damping coefficient [1/s]. Applies a velocity-proportional force `α·M·v`.\n\nMust be non-negative. Active only when the actor has inertia. A nonzero value\nwith no inertia is valid but inactive (logged as a warning at actor\ninitialization).")
+    .def_rw("stiffness_damping_coefficient", &mochi::SoftMaterialParams::stiffnessDampingCoefficient, "Stiffness damping coefficient `β` [s]. Adds a strain-rate-proportional viscous\nstress.\n\nMust be non-negative. Active only when the actor has stress. A nonzero value\nwith no stress is valid but inactive (logged as a warning at actor\ninitialization).\n\nThis is a total-Lagrangian variant of Kelvin–Voigt damping: it adds a viscous\nsecond Piola–Kirchhoff stress\n\n::\n\n      S_visc = β · C₀ : Ė\n\nwhere `Ė` is the material time derivative of the Green–Lagrange strain, and `C₀\n= ∂²Ψ/∂E²` is the Lagrangian material stiffness evaluated at zero deformation.\n\nNote:\n    While the parameterization in terms of a timescale β is similar, this\n    differs from standard Rayleigh damping using the global assembled stiffness\n    matrix; it depends only on strain rate, therefore dissipating energy only\n    during deformation.")
+    .def_rw("stiffness_damping_include_geometric_term", &mochi::SoftMaterialParams::stiffnessDampingIncludeGeometricTerm, "[Experimental] Include the geometric term in the stiffness-damping tangent.\nDefaults to `false`.\n\nOnly affects the Jacobian for Newton iteration, not the energy, residual, or\nconverged solution. When `false` (default), the viscous tangent uses a cheaper\nquasi-Newton approximation. When `true`, the Newton Jacobian includes a\ngeometric term, which is proportional to the per-stage strain increment and may\nimprove nonlinear solver convergence in certain scenarios.\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk.")
   ;
 
   registry.GetClass<mochi::PerElementSoftMaterialData>()
-    .def(py::init([](py::object type, py::object psd_strategy, py::object youngs_modulus, py::object poisson_ratio, py::object aniso_alpha, py::object aniso_length, py::object aniso_theta, py::object aniso_phi, py::object arap_stiffness, py::object shape_target_tensor) {
-      mochi::PerElementSoftMaterialData result;
-      result.type = py::cast<mochi::SoftMaterialType>(type);
-      result.psdStrategy = py::cast<mochi::MaterialPsdStrategy>(psd_strategy);
-      result.youngsModulus = py::cast<mochi::DynamicArray<mochi::real>>(youngs_modulus);
-      result.poissonRatio = py::cast<mochi::DynamicArray<mochi::real>>(poisson_ratio);
-      result.anisoAlpha = py::cast<mochi::DynamicArray<mochi::real>>(aniso_alpha);
-      result.anisoLength = py::cast<mochi::DynamicArray<mochi::real>>(aniso_length);
-      result.anisoTheta = py::cast<mochi::DynamicArray<mochi::real>>(aniso_theta);
-      result.anisoPhi = py::cast<mochi::DynamicArray<mochi::real>>(aniso_phi);
-      result.arapStiffness = py::cast<mochi::DynamicArray<mochi::real>>(arap_stiffness);
-      result.shapeTargetTensor = py::cast<mochi::DynamicArray<mochi::real>>(shape_target_tensor);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("type") = mochi::PerElementSoftMaterialData{}.type
-      , py::arg("psd_strategy") = mochi::PerElementSoftMaterialData{}.psdStrategy
-      , py::arg("youngs_modulus") = mochi::PerElementSoftMaterialData{}.youngsModulus
-      , py::arg("poisson_ratio") = mochi::PerElementSoftMaterialData{}.poissonRatio
-      , py::arg("aniso_alpha") = mochi::PerElementSoftMaterialData{}.anisoAlpha
-      , py::arg("aniso_length") = mochi::PerElementSoftMaterialData{}.anisoLength
-      , py::arg("aniso_theta") = mochi::PerElementSoftMaterialData{}.anisoTheta
-      , py::arg("aniso_phi") = mochi::PerElementSoftMaterialData{}.anisoPhi
-      , py::arg("arap_stiffness") = mochi::PerElementSoftMaterialData{}.arapStiffness
-      , py::arg("shape_target_tensor") = mochi::PerElementSoftMaterialData{}.shapeTargetTensor
+    .def("__init__", [](mochi::PerElementSoftMaterialData* self, nb::object type, nb::object psd_strategy, nb::object youngs_modulus, nb::object poisson_ratio, nb::object aniso_alpha, nb::object aniso_length, nb::object aniso_theta, nb::object aniso_phi, nb::object arap_stiffness, nb::object shape_target_tensor) {
+      mochi::PerElementSoftMaterialData result{};
+      result.type = nb::cast<mochi::SoftMaterialType>(type);
+      result.psdStrategy = nb::cast<mochi::MaterialPsdStrategy>(psd_strategy);
+      result.youngsModulus = nb::cast<mochi::DynamicArray<mochi::real>>(youngs_modulus);
+      result.poissonRatio = nb::cast<mochi::DynamicArray<mochi::real>>(poisson_ratio);
+      result.anisoAlpha = nb::cast<mochi::DynamicArray<mochi::real>>(aniso_alpha);
+      result.anisoLength = nb::cast<mochi::DynamicArray<mochi::real>>(aniso_length);
+      result.anisoTheta = nb::cast<mochi::DynamicArray<mochi::real>>(aniso_theta);
+      result.anisoPhi = nb::cast<mochi::DynamicArray<mochi::real>>(aniso_phi);
+      result.arapStiffness = nb::cast<mochi::DynamicArray<mochi::real>>(arap_stiffness);
+      result.shapeTargetTensor = nb::cast<mochi::DynamicArray<mochi::real>>(shape_target_tensor);
+      new (self) mochi::PerElementSoftMaterialData(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("type") = mochi::PerElementSoftMaterialData{}.type
+      , nb::arg("psd_strategy") = mochi::PerElementSoftMaterialData{}.psdStrategy
+      , nb::arg("youngs_modulus").sig("...") = mochi::PerElementSoftMaterialData{}.youngsModulus
+      , nb::arg("poisson_ratio").sig("...") = mochi::PerElementSoftMaterialData{}.poissonRatio
+      , nb::arg("aniso_alpha").sig("...") = mochi::PerElementSoftMaterialData{}.anisoAlpha
+      , nb::arg("aniso_length").sig("...") = mochi::PerElementSoftMaterialData{}.anisoLength
+      , nb::arg("aniso_theta").sig("...") = mochi::PerElementSoftMaterialData{}.anisoTheta
+      , nb::arg("aniso_phi").sig("...") = mochi::PerElementSoftMaterialData{}.anisoPhi
+      , nb::arg("arap_stiffness").sig("...") = mochi::PerElementSoftMaterialData{}.arapStiffness
+      , nb::arg("shape_target_tensor").sig("...") = mochi::PerElementSoftMaterialData{}.shapeTargetTensor
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::PerElementSoftMaterialData const& self) { return mochi::PerElementSoftMaterialData(self); })
-    .def("__deepcopy__", [](mochi::PerElementSoftMaterialData const& self, py::dict) { return mochi::PerElementSoftMaterialData(self); })
-    .def_readwrite("type", &mochi::PerElementSoftMaterialData::type, "Material constitutive model.")
-    .def_readwrite("psd_strategy", &mochi::PerElementSoftMaterialData::psdStrategy, "Strategy for ensuring positive semi-definite Hessian matrices.\n\nSee Also:\n    :class:`~superdex.physics.MaterialPsdStrategy`")
-    .def_property("youngs_modulus", [](mochi::PerElementSoftMaterialData& self) -> mochi::DynamicArray<mochi::real>& { return self.youngsModulus; }, [](mochi::PerElementSoftMaterialData& self, py::object val) { self.youngsModulus = py::cast<mochi::DynamicArray<mochi::real>>(val); }, py::return_value_policy::reference_internal, "Young's modulus [Pa]. 1 per element.")
-    .def_property("poisson_ratio", [](mochi::PerElementSoftMaterialData& self) -> mochi::DynamicArray<mochi::real>& { return self.poissonRatio; }, [](mochi::PerElementSoftMaterialData& self, py::object val) { self.poissonRatio = py::cast<mochi::DynamicArray<mochi::real>>(val); }, py::return_value_policy::reference_internal, "Poisson's ratio (dimensionless). 1 per element.")
-    .def_property("aniso_alpha", [](mochi::PerElementSoftMaterialData& self) -> mochi::DynamicArray<mochi::real>& { return self.anisoAlpha; }, [](mochi::PerElementSoftMaterialData& self, py::object val) { self.anisoAlpha = py::cast<mochi::DynamicArray<mochi::real>>(val); }, py::return_value_policy::reference_internal, "Anisotropic stiffness (α) [Pa]. 1 per element.")
-    .def_property("aniso_length", [](mochi::PerElementSoftMaterialData& self) -> mochi::DynamicArray<mochi::real>& { return self.anisoLength; }, [](mochi::PerElementSoftMaterialData& self, py::object val) { self.anisoLength = py::cast<mochi::DynamicArray<mochi::real>>(val); }, py::return_value_policy::reference_internal, "Anisotropic reference length (dimensionless). 1 per element.")
-    .def_property("aniso_theta", [](mochi::PerElementSoftMaterialData& self) -> mochi::DynamicArray<mochi::real>& { return self.anisoTheta; }, [](mochi::PerElementSoftMaterialData& self, py::object val) { self.anisoTheta = py::cast<mochi::DynamicArray<mochi::real>>(val); }, py::return_value_policy::reference_internal, "Fiber azimuthal angle (θ) [rad]. 1 per element.")
-    .def_property("aniso_phi", [](mochi::PerElementSoftMaterialData& self) -> mochi::DynamicArray<mochi::real>& { return self.anisoPhi; }, [](mochi::PerElementSoftMaterialData& self, py::object val) { self.anisoPhi = py::cast<mochi::DynamicArray<mochi::real>>(val); }, py::return_value_policy::reference_internal, "Fiber elevation angle (φ) [rad]. 1 per element.")
-    .def_property("arap_stiffness", [](mochi::PerElementSoftMaterialData& self) -> mochi::DynamicArray<mochi::real>& { return self.arapStiffness; }, [](mochi::PerElementSoftMaterialData& self, py::object val) { self.arapStiffness = py::cast<mochi::DynamicArray<mochi::real>>(val); }, py::return_value_policy::reference_internal, "ARAP stiffness (μ) [Pa]. 1 per element.")
-    .def_property("shape_target_tensor", [](mochi::PerElementSoftMaterialData& self) -> mochi::DynamicArray<mochi::real>& { return self.shapeTargetTensor; }, [](mochi::PerElementSoftMaterialData& self, py::object val) { self.shapeTargetTensor = py::cast<mochi::DynamicArray<mochi::real>>(val); }, py::return_value_policy::reference_internal, "Shape target tensor offset in flat symmetric upper-triangle layout.\n\nSix values per element. Defines S_t = I + [[s0, s1, s2], [s1, s3, s4], [s2, s4,\ns5]].")
-    .def(py::init<mochi::PerElementSoftMaterialDataView const&>()
-      , py::arg("src")
+    .def("__deepcopy__", [](mochi::PerElementSoftMaterialData const& self, nb::dict) { return mochi::PerElementSoftMaterialData(self); })
+    .def_rw("type", &mochi::PerElementSoftMaterialData::type, "Material constitutive model.")
+    .def_rw("psd_strategy", &mochi::PerElementSoftMaterialData::psdStrategy, "Strategy for ensuring positive semi-definite Hessian matrices.\n\nSee Also:\n    :class:`~superdex.physics.MaterialPsdStrategy`")
+    .def_prop_rw("youngs_modulus", [](mochi::PerElementSoftMaterialData& self) -> mochi::DynamicArray<mochi::real>& { return self.youngsModulus; }, [](mochi::PerElementSoftMaterialData& self, nb::object val) { self.youngsModulus = nb::cast<mochi::DynamicArray<mochi::real>>(val); }, "Young's modulus [Pa]. 1 per element.")
+    .def_prop_rw("poisson_ratio", [](mochi::PerElementSoftMaterialData& self) -> mochi::DynamicArray<mochi::real>& { return self.poissonRatio; }, [](mochi::PerElementSoftMaterialData& self, nb::object val) { self.poissonRatio = nb::cast<mochi::DynamicArray<mochi::real>>(val); }, "Poisson's ratio (dimensionless). 1 per element.")
+    .def_prop_rw("aniso_alpha", [](mochi::PerElementSoftMaterialData& self) -> mochi::DynamicArray<mochi::real>& { return self.anisoAlpha; }, [](mochi::PerElementSoftMaterialData& self, nb::object val) { self.anisoAlpha = nb::cast<mochi::DynamicArray<mochi::real>>(val); }, "Anisotropic stiffness (α) [Pa]. 1 per element.")
+    .def_prop_rw("aniso_length", [](mochi::PerElementSoftMaterialData& self) -> mochi::DynamicArray<mochi::real>& { return self.anisoLength; }, [](mochi::PerElementSoftMaterialData& self, nb::object val) { self.anisoLength = nb::cast<mochi::DynamicArray<mochi::real>>(val); }, "Anisotropic reference length (dimensionless). 1 per element.")
+    .def_prop_rw("aniso_theta", [](mochi::PerElementSoftMaterialData& self) -> mochi::DynamicArray<mochi::real>& { return self.anisoTheta; }, [](mochi::PerElementSoftMaterialData& self, nb::object val) { self.anisoTheta = nb::cast<mochi::DynamicArray<mochi::real>>(val); }, "Fiber azimuthal angle (θ) [rad]. 1 per element.")
+    .def_prop_rw("aniso_phi", [](mochi::PerElementSoftMaterialData& self) -> mochi::DynamicArray<mochi::real>& { return self.anisoPhi; }, [](mochi::PerElementSoftMaterialData& self, nb::object val) { self.anisoPhi = nb::cast<mochi::DynamicArray<mochi::real>>(val); }, "Fiber elevation angle (φ) [rad]. 1 per element.")
+    .def_prop_rw("arap_stiffness", [](mochi::PerElementSoftMaterialData& self) -> mochi::DynamicArray<mochi::real>& { return self.arapStiffness; }, [](mochi::PerElementSoftMaterialData& self, nb::object val) { self.arapStiffness = nb::cast<mochi::DynamicArray<mochi::real>>(val); }, "ARAP stiffness (μ) [Pa]. 1 per element.")
+    .def_prop_rw("shape_target_tensor", [](mochi::PerElementSoftMaterialData& self) -> mochi::DynamicArray<mochi::real>& { return self.shapeTargetTensor; }, [](mochi::PerElementSoftMaterialData& self, nb::object val) { self.shapeTargetTensor = nb::cast<mochi::DynamicArray<mochi::real>>(val); }, "Shape target tensor offset in flat symmetric upper-triangle layout.\n\nSix values per element. Defines S_t = I + [[s0, s1, s2], [s1, s3, s4], [s2, s4,\ns5]].")
+    .def(nb::init<mochi::PerElementSoftMaterialDataView const&>()
+      , nb::arg("src")
       , "Copy from :class:`~superdex.physics.PerElementSoftMaterialDataView`.\n\nArgs:\n    src (PerElementSoftMaterialDataView): Source data."
     )
     .def("get_num_elements", &mochi::PerElementSoftMaterialData::GetNumElements
@@ -1071,156 +1125,156 @@ void mochi::DefineMochiCore_MochiCore([[maybe_unused]] py::module_& m, [[maybe_u
   ;
 
   registry.GetClass<mochi::PerElementSoftMaterialDataView>()
-    .def(py::init([](py::object type, py::object psd_strategy, py::object youngs_modulus, py::object poisson_ratio, py::object aniso_alpha, py::object aniso_length, py::object aniso_theta, py::object aniso_phi, py::object arap_stiffness, py::object shape_target_tensor) {
-      mochi::PerElementSoftMaterialDataView result;
-      result.type = py::cast<mochi::SoftMaterialType>(type);
-      result.psdStrategy = py::cast<mochi::MaterialPsdStrategy>(psd_strategy);
-      result.youngsModulus = py::cast<mochi::Span<mochi::real const>>(youngs_modulus);
-      result.poissonRatio = py::cast<mochi::Span<mochi::real const>>(poisson_ratio);
-      result.anisoAlpha = py::cast<mochi::Span<mochi::real const>>(aniso_alpha);
-      result.anisoLength = py::cast<mochi::Span<mochi::real const>>(aniso_length);
-      result.anisoTheta = py::cast<mochi::Span<mochi::real const>>(aniso_theta);
-      result.anisoPhi = py::cast<mochi::Span<mochi::real const>>(aniso_phi);
-      result.arapStiffness = py::cast<mochi::Span<mochi::real const>>(arap_stiffness);
-      result.shapeTargetTensor = py::cast<mochi::Span<mochi::real const>>(shape_target_tensor);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("type") = mochi::PerElementSoftMaterialDataView{}.type
-      , py::arg("psd_strategy") = mochi::PerElementSoftMaterialDataView{}.psdStrategy
-      , py::arg("youngs_modulus") = mochi::PerElementSoftMaterialDataView{}.youngsModulus
-      , py::arg("poisson_ratio") = mochi::PerElementSoftMaterialDataView{}.poissonRatio
-      , py::arg("aniso_alpha") = mochi::PerElementSoftMaterialDataView{}.anisoAlpha
-      , py::arg("aniso_length") = mochi::PerElementSoftMaterialDataView{}.anisoLength
-      , py::arg("aniso_theta") = mochi::PerElementSoftMaterialDataView{}.anisoTheta
-      , py::arg("aniso_phi") = mochi::PerElementSoftMaterialDataView{}.anisoPhi
-      , py::arg("arap_stiffness") = mochi::PerElementSoftMaterialDataView{}.arapStiffness
-      , py::arg("shape_target_tensor") = mochi::PerElementSoftMaterialDataView{}.shapeTargetTensor
+    .def("__init__", [](mochi::PerElementSoftMaterialDataView* self, nb::object type, nb::object psd_strategy, nb::object youngs_modulus, nb::object poisson_ratio, nb::object aniso_alpha, nb::object aniso_length, nb::object aniso_theta, nb::object aniso_phi, nb::object arap_stiffness, nb::object shape_target_tensor) {
+      mochi::PerElementSoftMaterialDataView result{};
+      result.type = nb::cast<mochi::SoftMaterialType>(type);
+      result.psdStrategy = nb::cast<mochi::MaterialPsdStrategy>(psd_strategy);
+      result.youngsModulus = nb::cast<mochi::Span<mochi::real const>>(youngs_modulus);
+      result.poissonRatio = nb::cast<mochi::Span<mochi::real const>>(poisson_ratio);
+      result.anisoAlpha = nb::cast<mochi::Span<mochi::real const>>(aniso_alpha);
+      result.anisoLength = nb::cast<mochi::Span<mochi::real const>>(aniso_length);
+      result.anisoTheta = nb::cast<mochi::Span<mochi::real const>>(aniso_theta);
+      result.anisoPhi = nb::cast<mochi::Span<mochi::real const>>(aniso_phi);
+      result.arapStiffness = nb::cast<mochi::Span<mochi::real const>>(arap_stiffness);
+      result.shapeTargetTensor = nb::cast<mochi::Span<mochi::real const>>(shape_target_tensor);
+      new (self) mochi::PerElementSoftMaterialDataView(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("type") = mochi::PerElementSoftMaterialDataView{}.type
+      , nb::arg("psd_strategy") = mochi::PerElementSoftMaterialDataView{}.psdStrategy
+      , nb::arg("youngs_modulus").sig("...") = mochi::PerElementSoftMaterialDataView{}.youngsModulus
+      , nb::arg("poisson_ratio").sig("...") = mochi::PerElementSoftMaterialDataView{}.poissonRatio
+      , nb::arg("aniso_alpha").sig("...") = mochi::PerElementSoftMaterialDataView{}.anisoAlpha
+      , nb::arg("aniso_length").sig("...") = mochi::PerElementSoftMaterialDataView{}.anisoLength
+      , nb::arg("aniso_theta").sig("...") = mochi::PerElementSoftMaterialDataView{}.anisoTheta
+      , nb::arg("aniso_phi").sig("...") = mochi::PerElementSoftMaterialDataView{}.anisoPhi
+      , nb::arg("arap_stiffness").sig("...") = mochi::PerElementSoftMaterialDataView{}.arapStiffness
+      , nb::arg("shape_target_tensor").sig("...") = mochi::PerElementSoftMaterialDataView{}.shapeTargetTensor
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
-    .def("__copy__", [](mochi::PerElementSoftMaterialDataView const&) { throw py::type_error("PerElementSoftMaterialDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer)."); })
-    .def("__deepcopy__", [](mochi::PerElementSoftMaterialDataView const&, py::dict) { throw py::type_error("PerElementSoftMaterialDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer). Shallow copy is not currently allowed either, to prevent mistakes."); })
-    .def_readwrite("type", &mochi::PerElementSoftMaterialDataView::type, "Material constitutive model.")
-    .def_readwrite("psd_strategy", &mochi::PerElementSoftMaterialDataView::psdStrategy, "Strategy for ensuring positive semi-definite Hessian matrices.\n\nSee Also:\n    :class:`~superdex.physics.MaterialPsdStrategy`")
-    .def_property("youngs_modulus", [](mochi::PerElementSoftMaterialDataView& self) -> mochi::Span<mochi::real const>& { return self.youngsModulus; }, [](mochi::PerElementSoftMaterialDataView& self, py::object val) { self.youngsModulus = py::cast<mochi::Span<mochi::real const>>(val); }, py::return_value_policy::reference_internal, "Young's modulus [Pa]. 1 per element.")
-    .def_property("poisson_ratio", [](mochi::PerElementSoftMaterialDataView& self) -> mochi::Span<mochi::real const>& { return self.poissonRatio; }, [](mochi::PerElementSoftMaterialDataView& self, py::object val) { self.poissonRatio = py::cast<mochi::Span<mochi::real const>>(val); }, py::return_value_policy::reference_internal, "Poisson's ratio (dimensionless). 1 per element.")
-    .def_property("aniso_alpha", [](mochi::PerElementSoftMaterialDataView& self) -> mochi::Span<mochi::real const>& { return self.anisoAlpha; }, [](mochi::PerElementSoftMaterialDataView& self, py::object val) { self.anisoAlpha = py::cast<mochi::Span<mochi::real const>>(val); }, py::return_value_policy::reference_internal, "Anisotropic stiffness (α) [Pa]. 1 per element.")
-    .def_property("aniso_length", [](mochi::PerElementSoftMaterialDataView& self) -> mochi::Span<mochi::real const>& { return self.anisoLength; }, [](mochi::PerElementSoftMaterialDataView& self, py::object val) { self.anisoLength = py::cast<mochi::Span<mochi::real const>>(val); }, py::return_value_policy::reference_internal, "Anisotropic reference length (dimensionless). 1 per element.")
-    .def_property("aniso_theta", [](mochi::PerElementSoftMaterialDataView& self) -> mochi::Span<mochi::real const>& { return self.anisoTheta; }, [](mochi::PerElementSoftMaterialDataView& self, py::object val) { self.anisoTheta = py::cast<mochi::Span<mochi::real const>>(val); }, py::return_value_policy::reference_internal, "Fiber azimuthal angle (θ) [rad]. 1 per element.")
-    .def_property("aniso_phi", [](mochi::PerElementSoftMaterialDataView& self) -> mochi::Span<mochi::real const>& { return self.anisoPhi; }, [](mochi::PerElementSoftMaterialDataView& self, py::object val) { self.anisoPhi = py::cast<mochi::Span<mochi::real const>>(val); }, py::return_value_policy::reference_internal, "Fiber elevation angle (φ) [rad]. 1 per element.")
-    .def_property("arap_stiffness", [](mochi::PerElementSoftMaterialDataView& self) -> mochi::Span<mochi::real const>& { return self.arapStiffness; }, [](mochi::PerElementSoftMaterialDataView& self, py::object val) { self.arapStiffness = py::cast<mochi::Span<mochi::real const>>(val); }, py::return_value_policy::reference_internal, "ARAP stiffness (μ) [Pa]. 1 per element.")
-    .def_property("shape_target_tensor", [](mochi::PerElementSoftMaterialDataView& self) -> mochi::Span<mochi::real const>& { return self.shapeTargetTensor; }, [](mochi::PerElementSoftMaterialDataView& self, py::object val) { self.shapeTargetTensor = py::cast<mochi::Span<mochi::real const>>(val); }, py::return_value_policy::reference_internal, "Shape target tensor offset in flat symmetric upper-triangle layout.\n\nSix values per element. Defines S_t = I + [[s0, s1, s2], [s1, s3, s4], [s2, s4,\ns5]].")
-    .def(py::init<mochi::PerElementSoftMaterialData const&>()
-      , py::arg("src"), py::keep_alive<1, 2>()
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
+    .def("__copy__", [](mochi::PerElementSoftMaterialDataView const&) { throw nb::type_error("PerElementSoftMaterialDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer)."); })
+    .def("__deepcopy__", [](mochi::PerElementSoftMaterialDataView const&, nb::dict) { throw nb::type_error("PerElementSoftMaterialDataView cannot be copied because it contains non-owning members (Span, StringView, or pointer). Shallow copy is not currently allowed either, to prevent mistakes."); })
+    .def_rw("type", &mochi::PerElementSoftMaterialDataView::type, "Material constitutive model.")
+    .def_rw("psd_strategy", &mochi::PerElementSoftMaterialDataView::psdStrategy, "Strategy for ensuring positive semi-definite Hessian matrices.\n\nSee Also:\n    :class:`~superdex.physics.MaterialPsdStrategy`")
+    .def_prop_rw("youngs_modulus", [](mochi::PerElementSoftMaterialDataView& self) -> mochi::Span<mochi::real const>& { return self.youngsModulus; }, [](mochi::PerElementSoftMaterialDataView& self, nb::object val) { self.youngsModulus = nb::cast<mochi::Span<mochi::real const>>(val); }, "Young's modulus [Pa]. 1 per element.")
+    .def_prop_rw("poisson_ratio", [](mochi::PerElementSoftMaterialDataView& self) -> mochi::Span<mochi::real const>& { return self.poissonRatio; }, [](mochi::PerElementSoftMaterialDataView& self, nb::object val) { self.poissonRatio = nb::cast<mochi::Span<mochi::real const>>(val); }, "Poisson's ratio (dimensionless). 1 per element.")
+    .def_prop_rw("aniso_alpha", [](mochi::PerElementSoftMaterialDataView& self) -> mochi::Span<mochi::real const>& { return self.anisoAlpha; }, [](mochi::PerElementSoftMaterialDataView& self, nb::object val) { self.anisoAlpha = nb::cast<mochi::Span<mochi::real const>>(val); }, "Anisotropic stiffness (α) [Pa]. 1 per element.")
+    .def_prop_rw("aniso_length", [](mochi::PerElementSoftMaterialDataView& self) -> mochi::Span<mochi::real const>& { return self.anisoLength; }, [](mochi::PerElementSoftMaterialDataView& self, nb::object val) { self.anisoLength = nb::cast<mochi::Span<mochi::real const>>(val); }, "Anisotropic reference length (dimensionless). 1 per element.")
+    .def_prop_rw("aniso_theta", [](mochi::PerElementSoftMaterialDataView& self) -> mochi::Span<mochi::real const>& { return self.anisoTheta; }, [](mochi::PerElementSoftMaterialDataView& self, nb::object val) { self.anisoTheta = nb::cast<mochi::Span<mochi::real const>>(val); }, "Fiber azimuthal angle (θ) [rad]. 1 per element.")
+    .def_prop_rw("aniso_phi", [](mochi::PerElementSoftMaterialDataView& self) -> mochi::Span<mochi::real const>& { return self.anisoPhi; }, [](mochi::PerElementSoftMaterialDataView& self, nb::object val) { self.anisoPhi = nb::cast<mochi::Span<mochi::real const>>(val); }, "Fiber elevation angle (φ) [rad]. 1 per element.")
+    .def_prop_rw("arap_stiffness", [](mochi::PerElementSoftMaterialDataView& self) -> mochi::Span<mochi::real const>& { return self.arapStiffness; }, [](mochi::PerElementSoftMaterialDataView& self, nb::object val) { self.arapStiffness = nb::cast<mochi::Span<mochi::real const>>(val); }, "ARAP stiffness (μ) [Pa]. 1 per element.")
+    .def_prop_rw("shape_target_tensor", [](mochi::PerElementSoftMaterialDataView& self) -> mochi::Span<mochi::real const>& { return self.shapeTargetTensor; }, [](mochi::PerElementSoftMaterialDataView& self, nb::object val) { self.shapeTargetTensor = nb::cast<mochi::Span<mochi::real const>>(val); }, "Shape target tensor offset in flat symmetric upper-triangle layout.\n\nSix values per element. Defines S_t = I + [[s0, s1, s2], [s1, s3, s4], [s2, s4,\ns5]].")
+    .def(nb::init<mochi::PerElementSoftMaterialData const&>()
+      , nb::arg("src"), nb::keep_alive<1, 2>()
       , "Implicit conversion from :class:`~superdex.physics.PerElementSoftMaterialData`.\n\nArgs:\n    src (PerElementSoftMaterialData): Source data."
     )
   ;
 
   registry.GetClass<mochi::ContactParams>()
-    .def(py::init([](py::object penalty_coefficient, py::object penalty_smoothing_half_distance, py::object penalty_threshold_default, py::object penalty_threshold_extra_padding, py::object friction_with_collider_normal, py::object max_alignment_normals, py::object viscous_friction_coefficient, py::object coulomb_friction_coefficient, py::object friction_falloff_vel, py::object normal_viscous_damping_coefficient, py::object distance_error_bound, py::object obj_scale, py::object colliding_penalty_length_scale) {
-      mochi::ContactParams result;
-      result.penaltyCoefficient = py::cast<mochi::real>(penalty_coefficient);
-      result.penaltySmoothingHalfDistance = py::cast<mochi::real>(penalty_smoothing_half_distance);
-      result.penaltyThresholdDefault = py::cast<mochi::real>(penalty_threshold_default);
-      result.penaltyThresholdExtraPadding = py::cast<mochi::real>(penalty_threshold_extra_padding);
-      result.frictionWithColliderNormal = py::cast<bool>(friction_with_collider_normal);
-      result.maxAlignmentNormals = py::cast<mochi::real>(max_alignment_normals);
-      result.viscousFrictionCoefficient = py::cast<mochi::real>(viscous_friction_coefficient);
-      result.coulombFrictionCoefficient = py::cast<mochi::real>(coulomb_friction_coefficient);
-      result.frictionFalloffVel = py::cast<mochi::real>(friction_falloff_vel);
-      result.normalViscousDampingCoefficient = py::cast<mochi::real>(normal_viscous_damping_coefficient);
-      result.distanceErrorBound = py::cast<mochi::real>(distance_error_bound);
-      result.objScale = py::cast<mochi::real>(obj_scale);
-      result.collidingPenaltyLengthScale = py::cast<mochi::real>(colliding_penalty_length_scale);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("penalty_coefficient") = mochi::ContactParams{}.penaltyCoefficient
-      , py::arg("penalty_smoothing_half_distance") = mochi::ContactParams{}.penaltySmoothingHalfDistance
-      , py::arg("penalty_threshold_default") = mochi::ContactParams{}.penaltyThresholdDefault
-      , py::arg("penalty_threshold_extra_padding") = mochi::ContactParams{}.penaltyThresholdExtraPadding
-      , py::arg("friction_with_collider_normal") = mochi::ContactParams{}.frictionWithColliderNormal
-      , py::arg("max_alignment_normals") = mochi::ContactParams{}.maxAlignmentNormals
-      , py::arg("viscous_friction_coefficient") = mochi::ContactParams{}.viscousFrictionCoefficient
-      , py::arg("coulomb_friction_coefficient") = mochi::ContactParams{}.coulombFrictionCoefficient
-      , py::arg("friction_falloff_vel") = mochi::ContactParams{}.frictionFalloffVel
-      , py::arg("normal_viscous_damping_coefficient") = mochi::ContactParams{}.normalViscousDampingCoefficient
-      , py::arg("distance_error_bound") = mochi::ContactParams{}.distanceErrorBound
-      , py::arg("obj_scale") = mochi::ContactParams{}.objScale
-      , py::arg("colliding_penalty_length_scale") = mochi::ContactParams{}.collidingPenaltyLengthScale
+    .def("__init__", [](mochi::ContactParams* self, nb::object penalty_coefficient, nb::object penalty_smoothing_half_distance, nb::object penalty_threshold_default, nb::object penalty_threshold_extra_padding, nb::object friction_with_collider_normal, nb::object max_alignment_normals, nb::object viscous_friction_coefficient, nb::object coulomb_friction_coefficient, nb::object friction_falloff_vel, nb::object normal_viscous_damping_coefficient, nb::object distance_error_bound, nb::object obj_scale, nb::object colliding_penalty_length_scale) {
+      mochi::ContactParams result{};
+      result.penaltyCoefficient = nb::cast<mochi::real>(penalty_coefficient);
+      result.penaltySmoothingHalfDistance = nb::cast<mochi::real>(penalty_smoothing_half_distance);
+      result.penaltyThresholdDefault = nb::cast<mochi::real>(penalty_threshold_default);
+      result.penaltyThresholdExtraPadding = nb::cast<mochi::real>(penalty_threshold_extra_padding);
+      result.frictionWithColliderNormal = nb::cast<bool>(friction_with_collider_normal);
+      result.maxAlignmentNormals = nb::cast<mochi::real>(max_alignment_normals);
+      result.viscousFrictionCoefficient = nb::cast<mochi::real>(viscous_friction_coefficient);
+      result.coulombFrictionCoefficient = nb::cast<mochi::real>(coulomb_friction_coefficient);
+      result.frictionFalloffVel = nb::cast<mochi::real>(friction_falloff_vel);
+      result.normalViscousDampingCoefficient = nb::cast<mochi::real>(normal_viscous_damping_coefficient);
+      result.distanceErrorBound = nb::cast<mochi::real>(distance_error_bound);
+      result.objScale = nb::cast<mochi::real>(obj_scale);
+      result.collidingPenaltyLengthScale = nb::cast<mochi::real>(colliding_penalty_length_scale);
+      new (self) mochi::ContactParams(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("penalty_coefficient") = mochi::ContactParams{}.penaltyCoefficient
+      , nb::arg("penalty_smoothing_half_distance") = mochi::ContactParams{}.penaltySmoothingHalfDistance
+      , nb::arg("penalty_threshold_default") = mochi::ContactParams{}.penaltyThresholdDefault
+      , nb::arg("penalty_threshold_extra_padding") = mochi::ContactParams{}.penaltyThresholdExtraPadding
+      , nb::arg("friction_with_collider_normal") = mochi::ContactParams{}.frictionWithColliderNormal
+      , nb::arg("max_alignment_normals") = mochi::ContactParams{}.maxAlignmentNormals
+      , nb::arg("viscous_friction_coefficient") = mochi::ContactParams{}.viscousFrictionCoefficient
+      , nb::arg("coulomb_friction_coefficient") = mochi::ContactParams{}.coulombFrictionCoefficient
+      , nb::arg("friction_falloff_vel") = mochi::ContactParams{}.frictionFalloffVel
+      , nb::arg("normal_viscous_damping_coefficient") = mochi::ContactParams{}.normalViscousDampingCoefficient
+      , nb::arg("distance_error_bound") = mochi::ContactParams{}.distanceErrorBound
+      , nb::arg("obj_scale") = mochi::ContactParams{}.objScale
+      , nb::arg("colliding_penalty_length_scale") = mochi::ContactParams{}.collidingPenaltyLengthScale
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::ContactParams const& self) { return mochi::ContactParams(self); })
-    .def("__deepcopy__", [](mochi::ContactParams const& self, py::dict) { return mochi::ContactParams(self); })
-    .def_readwrite("penalty_coefficient", &mochi::ContactParams::penaltyCoefficient, "Stiffness of the contact penalty force [Pa/m].\n\nNote:\n    Must be finite and strictly positive.\n\nNote:\n    Higher penalties create stiffer contacts and reduce penetration.\n\nNote:\n    Arbitrarily large penalties may degrade stability.\n\nNote:\n    The default penalty is appropriate for actors with default density. For\n    actors with much higher/lower density than the default density, the penalty\n    coefficient may need to be increased/decreased accordingly.\n\nNote:\n    Without an actor-pair override for this field, the value used in a collision\n    is the geometric mean of the colliding and collider's coefficients. The\n    exception is if the collider is static, in which case the colliding's\n    penalty is used.\n\nNote:\n    The penalty coefficient is additionally scaled by length-scale corrections\n    when the colliding or collider integrates contact over a non-2D manifold\n    (e.g., rod, shell). See\n    :attr:`~superdex.physics.ContactParams.colliding_penalty_length_scale`.")
-    .def_readwrite("penalty_smoothing_half_distance", &mochi::ContactParams::penaltySmoothingHalfDistance, "PolyReLU smoothing half-width [m].\n\nThe penalty force transitions from 0 to linear over the decreasing distance\nrange (penaltyThreshold, penaltyThreshold - 2 *\n:attr:`~superdex.physics.ContactParams.penalty_smoothing_half_distance`).\n\nNote:\n    Must be finite and not negative.\n\nNote:\n    Larger smoothing distances improve stability but may increase penetration.\n\nNote:\n    Smoothing distance is expected to be small relative to the collider\n    geometry.")
-    .def_readwrite("penalty_threshold_default", &mochi::ContactParams::penaltyThresholdDefault, "Default contact detection threshold [m].\n\nThe penalty force transitions from 0 to linear over the decreasing distance\nrange (penaltyThreshold, penaltyThreshold - 2 *\n:attr:`~superdex.physics.ContactParams.penalty_smoothing_half_distance`).\n\nNote:\n    Must be finite. Negative values are legal.\n\nNote:\n    If the colliding actor has :class:`NONE <superdex.physics.ColliderType>` or\n    :class:`POINT_CLOUD <superdex.physics.ColliderType>`, penaltyThreshold =\n    penaltyThresholdDefault +\n    :attr:`~superdex.physics.ContactParams.penalty_threshold_extra_padding`.\n    Otherwise, penaltyThreshold = penaltyThresholdDefault.\n\nSee Also:\n    :attr:`~superdex.physics.ContactParams.penalty_threshold_extra_padding`,\n    :meth:`~superdex.physics.ContactParams.get_penalty_threshold_dist`")
-    .def_readwrite("penalty_threshold_extra_padding", &mochi::ContactParams::penaltyThresholdExtraPadding, "Extra padding [m] added to the default contact detection threshold if the\ncolliding actor has :class:`NONE <superdex.physics.ColliderType>` or\n:class:`POINT_CLOUD <superdex.physics.ColliderType>`.\n\nNote:\n    Must be finite and not negative.\n\nNote:\n    Extra padding is useful to avoid tunneling through thin actors when the\n    other actor has :class:`NONE <superdex.physics.ColliderType>` or\n    :class:`POINT_CLOUD <superdex.physics.ColliderType>`.\n\nSee Also:\n    :attr:`~superdex.physics.ContactParams.penalty_threshold_default`,\n    :meth:`~superdex.physics.ContactParams.get_penalty_threshold_dist`")
-    .def_readwrite("friction_with_collider_normal", &mochi::ContactParams::frictionWithColliderNormal, "Use collider's normal (normalized SDF gradient) for friction direction if true,\nor the colliding's surface normal at the sample point if false.\n\nNote:\n    For co-dimensional colliding actors with ambiguous normals, the collider's\n    normal is always used regardless of frictionWithColliderNormal.")
-    .def_readwrite("max_alignment_normals", &mochi::ContactParams::maxAlignmentNormals, "Maximum normal alignment threshold.\n\nNormal alignment is defined as the dot product between colliding and collider\nnormals. Contact is disabled for sample points whose normal alignment exceeds\nthis threshold. This prevents sample points from being trapped inside the\ncollider when penetration is large.\n\nNote:\n    Must be in [-1, 1]. -1 allows contact only for perfectly opposing normals, 1\n    allows all contacts.\n\nNote:\n    For co-dimensional colliding actors with ambiguous normals, contact is not\n    disabled regardless of maxAlignmentNormals (normal alignment cannot be\n    computed).")
-    .def_readwrite("viscous_friction_coefficient", &mochi::ContactParams::viscousFrictionCoefficient, "Viscous friction coefficient [s/m].\n\nNote:\n    Friction force is proportional to contact force and tangential velocity.\n\nNote:\n    Must be finite and not negative.\n\nNote:\n    Both viscousFrictionCoefficient and\n    :attr:`~superdex.physics.ContactParams.coulomb_friction_coefficient` can be\n    >0.\n\nNote:\n    Without an actor-pair override for this field, the value used in a collision\n    is the geometric mean of the colliding and collider's coefficients. This\n    disables viscous friction if either of them does.")
-    .def_readwrite("coulomb_friction_coefficient", &mochi::ContactParams::coulombFrictionCoefficient, "Coulomb friction coefficient (dimensionless).\n\nNote:\n    Must be finite and not negative.\n\nNote:\n    Both :attr:`~superdex.physics.ContactParams.viscous_friction_coefficient`\n    and coulombFrictionCoefficient can be >0.\n\nNote:\n    Without an actor-pair override for this field, the value used in a collision\n    is the geometric mean of the colliding and collider's coefficients. This\n    disables Coulomb friction if either of them does.")
-    .def_readwrite("friction_falloff_vel", &mochi::ContactParams::frictionFalloffVel, "Velocity threshold for Coulomb friction smoothing [m/s].\n\nFor C1Regularized, the Coulomb friction force smoothly transitions from 0 to\nfull strength as tangential velocity increases from 0 to frictionFalloffVel\n(compact support). For CinfRegularized, the force asymptotically approaches full\nstrength with no compact support boundary; frictionFalloffVel controls the\nregularization scale.\n\nNote:\n    Must be finite and not negative. For CinfRegularized, a value of zero is\n    clamped internally to avoid numerical issues.\n\nNote:\n    Smaller velocity thresholds improve physical accuracy but may degrade\n    stability.\n\nNote:\n    Without an actor-pair override for this field, the value used in a collision\n    is the geometric mean of the colliding and collider's thresholds. The\n    exception is if the collider is static, in which case the colliding's\n    threshold is used.")
-    .def_readwrite("normal_viscous_damping_coefficient", &mochi::ContactParams::normalViscousDampingCoefficient, "Normal viscous damping coefficient [s/m].\n\nDamping force in the normal direction, proportional to the elastic normal\ncontact force and the normal velocity. Analogous to\n:attr:`~superdex.physics.ContactParams.viscous_friction_coefficient` but acting\nin the normal direction instead of tangentially.\n\nNote:\n    Must be finite and not negative.\n\nNote:\n    Without an actor-pair override for this field, the value used in a collision\n    is the geometric mean of the colliding and collider's coefficients. This\n    disables normal damping if either of them does.\n\nNote:\n    The resulting coefficient of restitution (CoR) is velocity-dependent. For a\n    characteristic impact velocity,\n    :func:`~superdex.physics.experimental.calibrate_normal_viscous_damping_coefficient`\n    computes the coefficient that approximates a target CoR, while\n    :func:`~superdex.physics.experimental.effective_coefficient_of_restitution`\n    recovers the CoR produced by a coefficient.\n\nNote:\n    Because the damping force depends on the normal velocity at each contact\n    point, it also introduces rolling resistance: a body rolling on a surface\n    dissipates energy through the differing normal velocities across its\n    contacting region.\n\nWarning:\n    The calibration diverges as CoR approaches zero, which may cause numerical\n    problems when approaching fully-inelastic collisions.")
-    .def_readwrite("distance_error_bound", &mochi::ContactParams::distanceErrorBound, "[Experimental] Padding [m] added to the collider's bounding volume for collision\nculling.\n\nNote:\n    Must be finite.\n\nNote:\n    Useful, for example, with approximate SDFs (e.g., deep flow map) to\n    compensate for potentially overestimating the true distance.\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk.")
-    .def_readwrite("obj_scale", &mochi::ContactParams::objScale, "[Experimental] Object scale relative to default size (dimensionless). Used by\ndeep flow only.\n\nNote:\n    Must be finite and strictly positive.\n\nWarning:\n    Deep flow is an experimental feature. It may be changed or removed in the\n    future. Use at your own risk.")
-    .def_readwrite("colliding_penalty_length_scale", &mochi::ContactParams::collidingPenaltyLengthScale, "[Experimental] Length scale [m] used to correct the penalty coefficient when the\ncolliding body integrates contact traction over a lower-than-two-dimensional\nmanifold, such as a rod or point mass. E.g., the penalty is scaled by this value\nif the colliding body lumps contact tractions on a line, or this value squared\nif lumping contact forces on a point.\n\nNote:\n    Must be finite and strictly positive.\n\nNote:\n    This value is not used in the most common case, where contact traction is\n    integrated over a two-dimensional surface.\n\nNote:\n    The colliding body's value is always used in a contact pair, because the\n    colliding body determines the dimension of the contact traction integral.\n\nWarning:\n    Contact with lower-dimensional bodies is an experimental feature. It may be\n    changed or removed in the future. Use at your own risk.")
+    .def("__deepcopy__", [](mochi::ContactParams const& self, nb::dict) { return mochi::ContactParams(self); })
+    .def_rw("penalty_coefficient", &mochi::ContactParams::penaltyCoefficient, "Stiffness of the contact penalty force [Pa/m].\n\nNote:\n    Must be finite and strictly positive.\n\nNote:\n    Higher penalties create stiffer contacts and reduce penetration.\n\nNote:\n    Arbitrarily large penalties may degrade stability.\n\nNote:\n    The default penalty is appropriate for actors with default density. For\n    actors with much higher/lower density than the default density, the penalty\n    coefficient may need to be increased/decreased accordingly.\n\nNote:\n    Without an actor-pair override for this field, the value used in a collision\n    is the geometric mean of the colliding and collider's coefficients. The\n    exception is if the collider is static, in which case the colliding's\n    penalty is used.\n\nNote:\n    The penalty coefficient is additionally scaled by length-scale corrections\n    when the colliding or collider integrates contact over a non-2D manifold\n    (e.g., rod, shell). See\n    :attr:`~superdex.physics.ContactParams.colliding_penalty_length_scale`.")
+    .def_rw("penalty_smoothing_half_distance", &mochi::ContactParams::penaltySmoothingHalfDistance, "PolyReLU smoothing half-width [m].\n\nThe penalty force transitions from 0 to linear over the decreasing distance\nrange (penaltyThreshold, penaltyThreshold - 2 *\n:attr:`~superdex.physics.ContactParams.penalty_smoothing_half_distance`).\n\nNote:\n    Must be finite and not negative.\n\nNote:\n    Larger smoothing distances improve stability but may increase penetration.\n\nNote:\n    Smoothing distance is expected to be small relative to the collider\n    geometry.")
+    .def_rw("penalty_threshold_default", &mochi::ContactParams::penaltyThresholdDefault, "Default contact detection threshold [m].\n\nThe penalty force transitions from 0 to linear over the decreasing distance\nrange (penaltyThreshold, penaltyThreshold - 2 *\n:attr:`~superdex.physics.ContactParams.penalty_smoothing_half_distance`).\n\nNote:\n    Must be finite. Negative values are legal.\n\nNote:\n    If the colliding actor has :class:`NONE <superdex.physics.ColliderType>` or\n    :class:`POINT_CLOUD <superdex.physics.ColliderType>`, penaltyThreshold =\n    penaltyThresholdDefault +\n    :attr:`~superdex.physics.ContactParams.penalty_threshold_extra_padding`.\n    Otherwise, penaltyThreshold = penaltyThresholdDefault.\n\nSee Also:\n    :attr:`~superdex.physics.ContactParams.penalty_threshold_extra_padding`,\n    :meth:`~superdex.physics.ContactParams.get_penalty_threshold_dist`")
+    .def_rw("penalty_threshold_extra_padding", &mochi::ContactParams::penaltyThresholdExtraPadding, "Extra padding [m] added to the default contact detection threshold if the\ncolliding actor has :class:`NONE <superdex.physics.ColliderType>` or\n:class:`POINT_CLOUD <superdex.physics.ColliderType>`.\n\nNote:\n    Must be finite and not negative.\n\nNote:\n    Extra padding is useful to avoid tunneling through thin actors when the\n    other actor has :class:`NONE <superdex.physics.ColliderType>` or\n    :class:`POINT_CLOUD <superdex.physics.ColliderType>`.\n\nSee Also:\n    :attr:`~superdex.physics.ContactParams.penalty_threshold_default`,\n    :meth:`~superdex.physics.ContactParams.get_penalty_threshold_dist`")
+    .def_rw("friction_with_collider_normal", &mochi::ContactParams::frictionWithColliderNormal, "Use collider's normal (normalized SDF gradient) for friction direction if true,\nor the colliding's surface normal at the sample point if false.\n\nNote:\n    For co-dimensional colliding actors with ambiguous normals, the collider's\n    normal is always used regardless of frictionWithColliderNormal.")
+    .def_rw("max_alignment_normals", &mochi::ContactParams::maxAlignmentNormals, "Maximum normal alignment threshold.\n\nNormal alignment is defined as the dot product between colliding and collider\nnormals. Contact is disabled for sample points whose normal alignment exceeds\nthis threshold. This prevents sample points from being trapped inside the\ncollider when penetration is large.\n\nNote:\n    Must be in [-1, 1]. -1 allows contact only for perfectly opposing normals, 1\n    allows all contacts.\n\nNote:\n    For co-dimensional colliding actors with ambiguous normals, contact is not\n    disabled regardless of maxAlignmentNormals (normal alignment cannot be\n    computed).")
+    .def_rw("viscous_friction_coefficient", &mochi::ContactParams::viscousFrictionCoefficient, "Viscous friction coefficient [s/m].\n\nNote:\n    Friction force is proportional to contact force and tangential velocity.\n\nNote:\n    Must be finite and not negative.\n\nNote:\n    Both viscousFrictionCoefficient and\n    :attr:`~superdex.physics.ContactParams.coulomb_friction_coefficient` can be\n    >0.\n\nNote:\n    Without an actor-pair override for this field, the value used in a collision\n    is the geometric mean of the colliding and collider's coefficients. This\n    disables viscous friction if either of them does.")
+    .def_rw("coulomb_friction_coefficient", &mochi::ContactParams::coulombFrictionCoefficient, "Coulomb friction coefficient (dimensionless).\n\nNote:\n    Must be finite and not negative.\n\nNote:\n    Both :attr:`~superdex.physics.ContactParams.viscous_friction_coefficient`\n    and coulombFrictionCoefficient can be >0.\n\nNote:\n    Without an actor-pair override for this field, the value used in a collision\n    is the geometric mean of the colliding and collider's coefficients. This\n    disables Coulomb friction if either of them does.")
+    .def_rw("friction_falloff_vel", &mochi::ContactParams::frictionFalloffVel, "Velocity threshold for Coulomb friction smoothing [m/s].\n\nFor C1Regularized, the Coulomb friction force smoothly transitions from 0 to\nfull strength as tangential velocity increases from 0 to frictionFalloffVel\n(compact support). For CinfRegularized, the force asymptotically approaches full\nstrength with no compact support boundary; frictionFalloffVel controls the\nregularization scale.\n\nNote:\n    Must be finite and not negative. For CinfRegularized, a value of zero is\n    clamped internally to avoid numerical issues.\n\nNote:\n    Smaller velocity thresholds improve physical accuracy but may degrade\n    stability.\n\nNote:\n    Without an actor-pair override for this field, the value used in a collision\n    is the geometric mean of the colliding and collider's thresholds. The\n    exception is if the collider is static, in which case the colliding's\n    threshold is used.")
+    .def_rw("normal_viscous_damping_coefficient", &mochi::ContactParams::normalViscousDampingCoefficient, "Normal viscous damping coefficient [s/m].\n\nDamping force in the normal direction, proportional to the elastic normal\ncontact force and the normal velocity. Analogous to\n:attr:`~superdex.physics.ContactParams.viscous_friction_coefficient` but acting\nin the normal direction instead of tangentially.\n\nNote:\n    Must be finite and not negative.\n\nNote:\n    Without an actor-pair override for this field, the value used in a collision\n    is the geometric mean of the colliding and collider's coefficients. This\n    disables normal damping if either of them does.\n\nNote:\n    The resulting coefficient of restitution (CoR) is velocity-dependent. For a\n    characteristic impact velocity,\n    :func:`~superdex.physics.experimental.calibrate_normal_viscous_damping_coefficient`\n    computes the coefficient that approximates a target CoR, while\n    :func:`~superdex.physics.experimental.effective_coefficient_of_restitution`\n    recovers the CoR produced by a coefficient.\n\nNote:\n    Because the damping force depends on the normal velocity at each contact\n    point, it also introduces rolling resistance: a body rolling on a surface\n    dissipates energy through the differing normal velocities across its\n    contacting region.\n\nWarning:\n    The calibration diverges as CoR approaches zero, which may cause numerical\n    problems when approaching fully-inelastic collisions.")
+    .def_rw("distance_error_bound", &mochi::ContactParams::distanceErrorBound, "[Experimental] Padding [m] added to the collider's bounding volume for collision\nculling.\n\nNote:\n    Must be finite.\n\nNote:\n    Useful, for example, with approximate SDFs (e.g., deep flow map) to\n    compensate for potentially overestimating the true distance.\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk.")
+    .def_rw("obj_scale", &mochi::ContactParams::objScale, "[Experimental] Object scale relative to default size (dimensionless). Used by\ndeep flow only.\n\nNote:\n    Must be finite and strictly positive.\n\nWarning:\n    Deep flow is an experimental feature. It may be changed or removed in the\n    future. Use at your own risk.")
+    .def_rw("colliding_penalty_length_scale", &mochi::ContactParams::collidingPenaltyLengthScale, "[Experimental] Length scale [m] used to correct the penalty coefficient when the\ncolliding body integrates contact traction over a lower-than-two-dimensional\nmanifold, such as a rod or point mass. E.g., the penalty is scaled by this value\nif the colliding body lumps contact tractions on a line, or this value squared\nif lumping contact forces on a point.\n\nNote:\n    Must be finite and strictly positive.\n\nNote:\n    This value is not used in the most common case, where contact traction is\n    integrated over a two-dimensional surface.\n\nNote:\n    The colliding body's value is always used in a contact pair, because the\n    colliding body determines the dimension of the contact traction integral.\n\nWarning:\n    Contact with lower-dimensional bodies is an experimental feature. It may be\n    changed or removed in the future. Use at your own risk.")
     .def("get_penalty_threshold_dist", &mochi::ContactParams::GetPenaltyThresholdDist
-      , py::arg("add_padding")
+      , nb::arg("add_padding")
       , "Get the total contact detection threshold.\n\nArgs:\n    add_padding (bool): If true, includes\n        :attr:`~superdex.physics.ContactParams.penalty_threshold_extra_padding`.\n\nReturns:\n    Total contact detection threshold [m]."
     )
   ;
 
   registry.GetClass<mochi::ArticulatedJointFrictionParams>()
-    .def(py::init([](py::object viscous, py::object coulomb, py::object falloff_vel, py::object stiction_extra, py::object stribeck_vel) {
-      mochi::ArticulatedJointFrictionParams result;
-      result.viscous = py::cast<mochi::real>(viscous);
-      result.coulomb = py::cast<mochi::real>(coulomb);
-      result.falloffVel = py::cast<mochi::real>(falloff_vel);
-      result.stictionExtra = py::cast<mochi::real>(stiction_extra);
-      result.stribeckVel = py::cast<mochi::real>(stribeck_vel);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("viscous") = mochi::ArticulatedJointFrictionParams{}.viscous
-      , py::arg("coulomb") = mochi::ArticulatedJointFrictionParams{}.coulomb
-      , py::arg("falloff_vel") = mochi::ArticulatedJointFrictionParams{}.falloffVel
-      , py::arg("stiction_extra") = mochi::ArticulatedJointFrictionParams{}.stictionExtra
-      , py::arg("stribeck_vel") = mochi::ArticulatedJointFrictionParams{}.stribeckVel
+    .def("__init__", [](mochi::ArticulatedJointFrictionParams* self, nb::object viscous, nb::object coulomb, nb::object falloff_vel, nb::object stiction_extra, nb::object stribeck_vel) {
+      mochi::ArticulatedJointFrictionParams result{};
+      result.viscous = nb::cast<mochi::real>(viscous);
+      result.coulomb = nb::cast<mochi::real>(coulomb);
+      result.falloffVel = nb::cast<mochi::real>(falloff_vel);
+      result.stictionExtra = nb::cast<mochi::real>(stiction_extra);
+      result.stribeckVel = nb::cast<mochi::real>(stribeck_vel);
+      new (self) mochi::ArticulatedJointFrictionParams(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("viscous") = mochi::ArticulatedJointFrictionParams{}.viscous
+      , nb::arg("coulomb") = mochi::ArticulatedJointFrictionParams{}.coulomb
+      , nb::arg("falloff_vel") = mochi::ArticulatedJointFrictionParams{}.falloffVel
+      , nb::arg("stiction_extra") = mochi::ArticulatedJointFrictionParams{}.stictionExtra
+      , nb::arg("stribeck_vel") = mochi::ArticulatedJointFrictionParams{}.stribeckVel
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::ArticulatedJointFrictionParams const& self) { return mochi::ArticulatedJointFrictionParams(self); })
-    .def("__deepcopy__", [](mochi::ArticulatedJointFrictionParams const& self, py::dict) { return mochi::ArticulatedJointFrictionParams(self); })
-    .def_readwrite("viscous", &mochi::ArticulatedJointFrictionParams::viscous, "Viscous friction coefficient [N·s/m or N·m·s/rad].\n\nNote:\n    Default is zero (no viscous friction).")
-    .def_readwrite("coulomb", &mochi::ArticulatedJointFrictionParams::coulomb, "Coulomb friction coefficient [N or N·m].\n\nNote:\n    Default is zero (no Coulomb friction).")
-    .def_readwrite("falloff_vel", &mochi::ArticulatedJointFrictionParams::falloffVel, "Velocity threshold for dry friction smoothing [m/s or rad/s].\n\nThe dry friction force/torque smoothly transitions from 0 to the peak value as\n(linear or angular) velocity increases from 0 to\n:attr:`~superdex.physics.ArticulatedJointFrictionParams.falloff_vel`.\n\nNote:\n    Smaller velocity thresholds improve physical accuracy but may degrade\n    stability.")
-    .def_readwrite("stiction_extra", &mochi::ArticulatedJointFrictionParams::stictionExtra, "[Experimental] Extra stiction force/torque [N or N·m] representing the\ndifference between static and dynamic friction.\n\nNote:\n    Must not be negative. The\n    :attr:`~superdex.physics.ArticulatedJointFrictionParams.coulomb` represents\n    dynamic friction in the high-velocity limit, and peak static friction is\n    :attr:`~superdex.physics.ArticulatedJointFrictionParams.coulomb` +\n    :attr:`~superdex.physics.ArticulatedJointFrictionParams.stiction_extra`.\n\nNote:\n    Defaults to zero (no difference between static and dynamic friction).\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk.\n\nWarning:\n    Nonzero values may harm convergence.\n\nWarning:\n    Nonzero extra stiction with zero Stribeck velocity results in a nonsmooth\n    force.")
-    .def_readwrite("stribeck_vel", &mochi::ArticulatedJointFrictionParams::stribeckVel, "[Experimental] Stribeck velocity [m/s or rad/s] governing how sharply friction\ntransitions from static to dynamic coefficients as velocity increases.\n\nNote:\n    Must not be negative. A smaller value means a sharper transition.\n\nNote:\n    Defaults to zero.\n\nNote:\n    This has no effect if\n    :attr:`~superdex.physics.ArticulatedJointFrictionParams.stiction_extra` is\n    zero.\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk.\n\nWarning:\n    Nonzero values may harm convergence.\n\nWarning:\n    Nonzero extra stiction with zero Stribeck velocity results in a nonsmooth\n    force.")
+    .def("__deepcopy__", [](mochi::ArticulatedJointFrictionParams const& self, nb::dict) { return mochi::ArticulatedJointFrictionParams(self); })
+    .def_rw("viscous", &mochi::ArticulatedJointFrictionParams::viscous, "Viscous friction coefficient [N·s/m or N·m·s/rad].\n\nNote:\n    Default is zero (no viscous friction).")
+    .def_rw("coulomb", &mochi::ArticulatedJointFrictionParams::coulomb, "Coulomb friction coefficient [N or N·m].\n\nNote:\n    Default is zero (no Coulomb friction).")
+    .def_rw("falloff_vel", &mochi::ArticulatedJointFrictionParams::falloffVel, "Velocity threshold for dry friction smoothing [m/s or rad/s].\n\nThe dry friction force/torque smoothly transitions from 0 to the peak value as\n(linear or angular) velocity increases from 0 to\n:attr:`~superdex.physics.ArticulatedJointFrictionParams.falloff_vel`.\n\nNote:\n    Smaller velocity thresholds improve physical accuracy but may degrade\n    stability.")
+    .def_rw("stiction_extra", &mochi::ArticulatedJointFrictionParams::stictionExtra, "[Experimental] Extra stiction force/torque [N or N·m] representing the\ndifference between static and dynamic friction.\n\nNote:\n    Must not be negative. The\n    :attr:`~superdex.physics.ArticulatedJointFrictionParams.coulomb` represents\n    dynamic friction in the high-velocity limit, and peak static friction is\n    :attr:`~superdex.physics.ArticulatedJointFrictionParams.coulomb` +\n    :attr:`~superdex.physics.ArticulatedJointFrictionParams.stiction_extra`.\n\nNote:\n    Defaults to zero (no difference between static and dynamic friction).\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk.\n\nWarning:\n    Nonzero values may harm convergence.\n\nWarning:\n    Nonzero extra stiction with zero Stribeck velocity results in a nonsmooth\n    force.")
+    .def_rw("stribeck_vel", &mochi::ArticulatedJointFrictionParams::stribeckVel, "[Experimental] Stribeck velocity [m/s or rad/s] governing how sharply friction\ntransitions from static to dynamic coefficients as velocity increases.\n\nNote:\n    Must not be negative. A smaller value means a sharper transition.\n\nNote:\n    Defaults to zero.\n\nNote:\n    This has no effect if\n    :attr:`~superdex.physics.ArticulatedJointFrictionParams.stiction_extra` is\n    zero.\n\nWarning:\n    This is an experimental feature. It may be changed or removed in the future.\n    Use at your own risk.\n\nWarning:\n    Nonzero values may harm convergence.\n\nWarning:\n    Nonzero extra stiction with zero Stribeck velocity results in a nonsmooth\n    force.")
   ;
 
   registry.GetClass<mochi::ArticulatedDofInfo>()
-    .def(py::init([](py::object offset, py::object trans_size, py::object rot_size) {
-      mochi::ArticulatedDofInfo result;
-      result.offset = py::cast<int>(offset);
-      result.transSize = py::cast<int>(trans_size);
-      result.rotSize = py::cast<int>(rot_size);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("offset") = mochi::ArticulatedDofInfo{}.offset
-      , py::arg("trans_size") = mochi::ArticulatedDofInfo{}.transSize
-      , py::arg("rot_size") = mochi::ArticulatedDofInfo{}.rotSize
+    .def("__init__", [](mochi::ArticulatedDofInfo* self, nb::object offset, nb::object trans_size, nb::object rot_size) {
+      mochi::ArticulatedDofInfo result{};
+      result.offset = nb::cast<int>(offset);
+      result.transSize = nb::cast<int>(trans_size);
+      result.rotSize = nb::cast<int>(rot_size);
+      new (self) mochi::ArticulatedDofInfo(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("offset") = mochi::ArticulatedDofInfo{}.offset
+      , nb::arg("trans_size") = mochi::ArticulatedDofInfo{}.transSize
+      , nb::arg("rot_size") = mochi::ArticulatedDofInfo{}.rotSize
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::ArticulatedDofInfo const& self) { return mochi::ArticulatedDofInfo(self); })
-    .def("__deepcopy__", [](mochi::ArticulatedDofInfo const& self, py::dict) { return mochi::ArticulatedDofInfo(self); })
-    .def_readwrite("offset", &mochi::ArticulatedDofInfo::offset, "Offset of this joint's DoFs in the flattened DoF array.")
-    .def_readwrite("trans_size", &mochi::ArticulatedDofInfo::transSize, "Number of translational DoFs for this joint.")
-    .def_readwrite("rot_size", &mochi::ArticulatedDofInfo::rotSize, "Number of rotational DoFs for this joint.")
+    .def("__deepcopy__", [](mochi::ArticulatedDofInfo const& self, nb::dict) { return mochi::ArticulatedDofInfo(self); })
+    .def_rw("offset", &mochi::ArticulatedDofInfo::offset, "Offset of this joint's DoFs in the flattened DoF array.")
+    .def_rw("trans_size", &mochi::ArticulatedDofInfo::transSize, "Number of translational DoFs for this joint.")
+    .def_rw("rot_size", &mochi::ArticulatedDofInfo::rotSize, "Number of rotational DoFs for this joint.")
     .def("get_trans_offset", &mochi::ArticulatedDofInfo::GetTransOffset
       , "Offset of this joint's translational DoFs in the flattened DoF array.\n\nReturns:\n    The translational DoF offset (equal to\n    :attr:`~superdex.physics.ArticulatedDofInfo.offset`)."
     )
@@ -1233,26 +1287,26 @@ void mochi::DefineMochiCore_MochiCore([[maybe_unused]] py::module_& m, [[maybe_u
   ;
 
   registry.GetClass<mochi::SaturationHessianParams>()
-    .def(py::init([](py::object contact_friction, py::object joint_friction, py::object constraint_saturation) {
-      mochi::SaturationHessianParams result;
-      result.contactFriction = py::cast<bool>(contact_friction);
-      result.jointFriction = py::cast<bool>(joint_friction);
-      result.constraintSaturation = py::cast<bool>(constraint_saturation);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("contact_friction") = mochi::SaturationHessianParams{}.contactFriction
-      , py::arg("joint_friction") = mochi::SaturationHessianParams{}.jointFriction
-      , py::arg("constraint_saturation") = mochi::SaturationHessianParams{}.constraintSaturation
+    .def("__init__", [](mochi::SaturationHessianParams* self, nb::object contact_friction, nb::object joint_friction, nb::object constraint_saturation) {
+      mochi::SaturationHessianParams result{};
+      result.contactFriction = nb::cast<bool>(contact_friction);
+      result.jointFriction = nb::cast<bool>(joint_friction);
+      result.constraintSaturation = nb::cast<bool>(constraint_saturation);
+      new (self) mochi::SaturationHessianParams(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("contact_friction") = mochi::SaturationHessianParams{}.contactFriction
+      , nb::arg("joint_friction") = mochi::SaturationHessianParams{}.jointFriction
+      , nb::arg("constraint_saturation") = mochi::SaturationHessianParams{}.constraintSaturation
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::SaturationHessianParams const& self) { return mochi::SaturationHessianParams(self); })
-    .def("__deepcopy__", [](mochi::SaturationHessianParams const& self, py::dict) { return mochi::SaturationHessianParams(self); })
-    .def_readwrite("contact_friction", &mochi::SaturationHessianParams::contactFriction, "Use fitted Hessian for contact-friction saturation.")
-    .def_readwrite("joint_friction", &mochi::SaturationHessianParams::jointFriction, "Use fitted Hessian for joint-friction saturation.")
-    .def_readwrite("constraint_saturation", &mochi::SaturationHessianParams::constraintSaturation, "Use fitted Hessian for constraint saturation.")
+    .def("__deepcopy__", [](mochi::SaturationHessianParams const& self, nb::dict) { return mochi::SaturationHessianParams(self); })
+    .def_rw("contact_friction", &mochi::SaturationHessianParams::contactFriction, "Use fitted Hessian for contact-friction saturation.")
+    .def_rw("joint_friction", &mochi::SaturationHessianParams::jointFriction, "Use fitted Hessian for joint-friction saturation.")
+    .def_rw("constraint_saturation", &mochi::SaturationHessianParams::constraintSaturation, "Use fitted Hessian for constraint saturation.")
     .def_static("all", &mochi::SaturationHessianParams::All
-      , py::arg("value")
+      , nb::arg("value")
       , "Construct with all three flags set to the given value.\n\nArgs:\n    value (bool): Value assigned to all three flags.\n\nReturns:\n    A :class:`~superdex.physics.SaturationHessianParams` with every flag set to\n    ``value``."
     )
     .def("all_true", &mochi::SaturationHessianParams::AllTrue
@@ -1261,176 +1315,176 @@ void mochi::DefineMochiCore_MochiCore([[maybe_unused]] py::module_& m, [[maybe_u
   ;
 
   registry.GetClass<mochi::ExperimentalEvalParams>()
-    .def(py::init([](py::object explicit_normals, py::object fade_friction, py::object implicit_normal_force_for_dissipation, py::object fitted_saturation_hessian, py::object friction_model, py::object consistency_res_norm, py::object consistency_res_norm_step) {
-      mochi::ExperimentalEvalParams result;
-      result.explicitNormals = py::cast<bool>(explicit_normals);
-      result.fadeFriction = py::cast<bool>(fade_friction);
-      result.implicitNormalForceForDissipation = py::cast<bool>(implicit_normal_force_for_dissipation);
-      result.fittedSaturationHessian = py::cast<mochi::SaturationHessianParams>(fitted_saturation_hessian);
-      result.frictionModel = py::cast<mochi::CoulombFrictionModel>(friction_model);
-      result.consistencyResNorm = py::cast<bool>(consistency_res_norm);
-      result.consistencyResNormStep = py::cast<mochi::real>(consistency_res_norm_step);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("explicit_normals") = mochi::ExperimentalEvalParams{}.explicitNormals
-      , py::arg("fade_friction") = mochi::ExperimentalEvalParams{}.fadeFriction
-      , py::arg("implicit_normal_force_for_dissipation") = mochi::ExperimentalEvalParams{}.implicitNormalForceForDissipation
-      , py::arg("fitted_saturation_hessian") = mochi::ExperimentalEvalParams{}.fittedSaturationHessian
-      , py::arg("friction_model") = mochi::ExperimentalEvalParams{}.frictionModel
-      , py::arg("consistency_res_norm") = mochi::ExperimentalEvalParams{}.consistencyResNorm
-      , py::arg("consistency_res_norm_step") = mochi::ExperimentalEvalParams{}.consistencyResNormStep
+    .def("__init__", [](mochi::ExperimentalEvalParams* self, nb::object explicit_normals, nb::object fade_friction, nb::object implicit_normal_force_for_dissipation, nb::object fitted_saturation_hessian, nb::object friction_model, nb::object consistency_res_norm, nb::object consistency_res_norm_step) {
+      mochi::ExperimentalEvalParams result{};
+      result.explicitNormals = nb::cast<bool>(explicit_normals);
+      result.fadeFriction = nb::cast<bool>(fade_friction);
+      result.implicitNormalForceForDissipation = nb::cast<bool>(implicit_normal_force_for_dissipation);
+      result.fittedSaturationHessian = nb::cast<mochi::SaturationHessianParams>(fitted_saturation_hessian);
+      result.frictionModel = nb::cast<mochi::CoulombFrictionModel>(friction_model);
+      result.consistencyResNorm = nb::cast<bool>(consistency_res_norm);
+      result.consistencyResNormStep = nb::cast<mochi::real>(consistency_res_norm_step);
+      new (self) mochi::ExperimentalEvalParams(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("explicit_normals") = mochi::ExperimentalEvalParams{}.explicitNormals
+      , nb::arg("fade_friction") = mochi::ExperimentalEvalParams{}.fadeFriction
+      , nb::arg("implicit_normal_force_for_dissipation") = mochi::ExperimentalEvalParams{}.implicitNormalForceForDissipation
+      , nb::arg("fitted_saturation_hessian").sig("...") = mochi::ExperimentalEvalParams{}.fittedSaturationHessian
+      , nb::arg("friction_model") = mochi::ExperimentalEvalParams{}.frictionModel
+      , nb::arg("consistency_res_norm") = mochi::ExperimentalEvalParams{}.consistencyResNorm
+      , nb::arg("consistency_res_norm_step") = mochi::ExperimentalEvalParams{}.consistencyResNormStep
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::ExperimentalEvalParams const& self) { return mochi::ExperimentalEvalParams(self); })
-    .def("__deepcopy__", [](mochi::ExperimentalEvalParams const& self, py::dict) { return mochi::ExperimentalEvalParams(self); })
-    .def_readwrite("explicit_normals", &mochi::ExperimentalEvalParams::explicitNormals, "Use explicit normals (from stage-start kinematics) for the evaluation of\nfriction.\n\nWhether to treat the colliding and collider normals explicitly (using\nstage-start kinematics) or implicitly (using current kinematics) for the\nevaluation of alignment and the friction plane.\n\nNote:\n    The SDF gradient for the normal collision force is always implicit.\n\nNote:\n    explicitNormals = true and implicitNormalForceForDissipation = false\n    produces contact residuals that are the exact gradients of the contact\n    merit. This improves convergence guarantees of the Newton solve, but may be\n    less stable due to the explicit treatment.\n\nNote:\n    A differentiable scene requires explicitNormals = true.")
-    .def_readwrite("fade_friction", &mochi::ExperimentalEvalParams::fadeFriction, "Fade friction coefficient based on normal alignment.\n\nWhen enabled, friction is scaled by (maxAlignmentNormals - alignment) /\n(maxAlignmentNormals + 1), where \"alignment\" is defined as the dot product\nbetween colliding and collider normals.\n\nNote:\n    For co-dimensional colliding actors with ambiguous normals, friction fading\n    is disabled regardless of fadeFriction (normal alignment cannot be\n    computed).\n\nNote:\n    fadeFriction = true adds a non-integrable term to the residual unless\n    :attr:`~superdex.physics.ExperimentalEvalParams.explicit_normals` = true.\n\nSee Also:\n    :attr:`~superdex.physics.ContactParams.max_alignment_normals`")
-    .def_readwrite("implicit_normal_force_for_dissipation", &mochi::ExperimentalEvalParams::implicitNormalForceForDissipation, "Treat the normal contact force implicitly (if true) or explicitly (if false) for\ndissipative contact terms.\n\nNote:\n    Implicit treatment improves stability (especially with high-order time\n    integrators) but the resulting dissipative force is not integrable, hence it\n    cannot be derived from an objective function. This (a) may hurt convergence\n    with an objective-based line search, and (b) makes the force dresidual\n    non-symmetric (a symmetric approximation is used). With\n    implicitNormalForceForDissipation = false, the distance used for the\n    explicit normal force is approximate when\n    :attr:`~superdex.physics.ExperimentalEvalParams.explicit_normals` is false,\n    but accurate when it is true.\n\nNote:\n    Dissipative contact terms include Coulomb friction, viscous friction, and\n    normal viscous damping. Using an implicit normal force for normal damping\n    can improve the accuracy of the effective coefficient of restitution at a\n    given time step size.")
-    .def_readwrite("fitted_saturation_hessian", &mochi::ExperimentalEvalParams::fittedSaturationHessian, "Controls whether force-saturation terms use a fitted quadratic Hessian (more\nstable) or the exact analytical Hessian (faster convergence but less stable),\nindependently for each saturation pathway.\n\nNote:\n    For any flag set to false, the solver will try first with the true Hessian.\n    If it fails, it will retry with the fitted Hessian.")
-    .def_readwrite("friction_model", &mochi::ExperimentalEvalParams::frictionModel, "Selects which Coulomb friction smoothing model to use.\n\nC1Regularized (default) preserves existing behavior exactly. CinfRegularized is\nan additional model that can be selected at runtime without affecting\nC1Regularized users.")
-    .def_readwrite("consistency_res_norm", &mochi::ExperimentalEvalParams::consistencyResNorm, "Validate that the residual is the gradient of the objective by a directional\nfinite-difference consistency check.\n\nNote:\n    This operation is expensive and should only be used for debugging.")
-    .def_readwrite("consistency_res_norm_step", &mochi::ExperimentalEvalParams::consistencyResNormStep, "Step size for finite-difference consistency check.")
+    .def("__deepcopy__", [](mochi::ExperimentalEvalParams const& self, nb::dict) { return mochi::ExperimentalEvalParams(self); })
+    .def_rw("explicit_normals", &mochi::ExperimentalEvalParams::explicitNormals, "Use explicit normals (from stage-start kinematics) for the evaluation of\nfriction.\n\nWhether to treat the colliding and collider normals explicitly (using\nstage-start kinematics) or implicitly (using current kinematics) for the\nevaluation of alignment and the friction plane.\n\nNote:\n    The SDF gradient for the normal collision force is always implicit.\n\nNote:\n    explicitNormals = true and implicitNormalForceForDissipation = false\n    produces contact residuals that are the exact gradients of the contact\n    merit. This improves convergence guarantees of the Newton solve, but may be\n    less stable due to the explicit treatment.\n\nNote:\n    A differentiable scene requires explicitNormals = true.")
+    .def_rw("fade_friction", &mochi::ExperimentalEvalParams::fadeFriction, "Fade friction coefficient based on normal alignment.\n\nWhen enabled, friction is scaled by (maxAlignmentNormals - alignment) /\n(maxAlignmentNormals + 1), where \"alignment\" is defined as the dot product\nbetween colliding and collider normals.\n\nNote:\n    For co-dimensional colliding actors with ambiguous normals, friction fading\n    is disabled regardless of fadeFriction (normal alignment cannot be\n    computed).\n\nNote:\n    fadeFriction = true adds a non-integrable term to the residual unless\n    :attr:`~superdex.physics.ExperimentalEvalParams.explicit_normals` = true.\n\nSee Also:\n    :attr:`~superdex.physics.ContactParams.max_alignment_normals`")
+    .def_rw("implicit_normal_force_for_dissipation", &mochi::ExperimentalEvalParams::implicitNormalForceForDissipation, "Treat the normal contact force implicitly (if true) or explicitly (if false) for\ndissipative contact terms.\n\nNote:\n    Implicit treatment improves stability (especially with high-order time\n    integrators) but the resulting dissipative force is not integrable, hence it\n    cannot be derived from an objective function. This (a) may hurt convergence\n    with an objective-based line search, and (b) makes the force dresidual\n    non-symmetric (a symmetric approximation is used). With\n    implicitNormalForceForDissipation = false, the distance used for the\n    explicit normal force is approximate when\n    :attr:`~superdex.physics.ExperimentalEvalParams.explicit_normals` is false,\n    but accurate when it is true.\n\nNote:\n    Dissipative contact terms include Coulomb friction, viscous friction, and\n    normal viscous damping. Using an implicit normal force for normal damping\n    can improve the accuracy of the effective coefficient of restitution at a\n    given time step size.")
+    .def_rw("fitted_saturation_hessian", &mochi::ExperimentalEvalParams::fittedSaturationHessian, "Controls whether force-saturation terms use a fitted quadratic Hessian (more\nstable) or the exact analytical Hessian (faster convergence but less stable),\nindependently for each saturation pathway.\n\nNote:\n    For any flag set to false, the solver will try first with the true Hessian.\n    If it fails, it will retry with the fitted Hessian.")
+    .def_rw("friction_model", &mochi::ExperimentalEvalParams::frictionModel, "Selects which Coulomb friction smoothing model to use.\n\nC1Regularized (default) preserves existing behavior exactly. CinfRegularized is\nan additional model that can be selected at runtime without affecting\nC1Regularized users.")
+    .def_rw("consistency_res_norm", &mochi::ExperimentalEvalParams::consistencyResNorm, "Validate that the residual is the gradient of the objective by a directional\nfinite-difference consistency check.\n\nNote:\n    This operation is expensive and should only be used for debugging.")
+    .def_rw("consistency_res_norm_step", &mochi::ExperimentalEvalParams::consistencyResNormStep, "Step size for finite-difference consistency check.")
   ;
 
   registry.GetClass<mochi::NonLinearSolverParams>()
-    .def(py::init([](py::object solver_type, py::object d_residual_assembly_period, py::object max_iter, py::object max_elapsed_time_seconds, py::object convergence_mode, py::object abs_tol, py::object rel_tol, py::object rel_step_tol, py::object stop_if_no_improvement, py::object psd_proj_mode, py::object gradient_descent_fallback, py::object explosion_control, py::object abs_div_tol, py::object rel_div_tol, py::object line_search_max_iter, py::object line_search_alpha, py::object line_search_wolfe1, py::object line_search_wolfe2, py::object line_search_max_rel_increase, py::object line_search_type, py::object linear_tolerance_strategy, py::object verbosity) {
-      mochi::NonLinearSolverParams result;
-      result.solverType = py::cast<mochi::NonLinearSolverType>(solver_type);
-      result.dResidualAssemblyPeriod = py::cast<int>(d_residual_assembly_period);
-      result.maxIter = py::cast<int>(max_iter);
-      result.maxElapsedTimeSeconds = py::cast<double>(max_elapsed_time_seconds);
-      result.convergenceMode = py::cast<mochi::NonLinearSolverConvergenceMode>(convergence_mode);
-      result.absTol = py::cast<mochi::real>(abs_tol);
-      result.relTol = py::cast<mochi::real>(rel_tol);
-      result.relStepTol = py::cast<mochi::real>(rel_step_tol);
-      result.stopIfNoImprovement = py::cast<bool>(stop_if_no_improvement);
-      result.psdProjMode = py::cast<mochi::PsdProjectionMode>(psd_proj_mode);
-      result.gradientDescentFallback = py::cast<bool>(gradient_descent_fallback);
-      result.explosionControl = py::cast<bool>(explosion_control);
-      result.absDivTol = py::cast<mochi::real>(abs_div_tol);
-      result.relDivTol = py::cast<mochi::real>(rel_div_tol);
-      result.lineSearchMaxIter = py::cast<int>(line_search_max_iter);
-      result.lineSearchAlpha = py::cast<mochi::real>(line_search_alpha);
-      result.lineSearchWolfe1 = py::cast<mochi::real>(line_search_wolfe1);
-      result.lineSearchWolfe2 = py::cast<mochi::real>(line_search_wolfe2);
-      result.lineSearchMaxRelIncrease = py::cast<mochi::real>(line_search_max_rel_increase);
-      result.lineSearchType = py::cast<mochi::LineSearchType>(line_search_type);
-      result.linearToleranceStrategy = py::cast<mochi::LinearToleranceStrategy>(linear_tolerance_strategy);
-      result.verbosity = py::cast<mochi::VerbosityLevel>(verbosity);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("solver_type") = mochi::NonLinearSolverParams{}.solverType
-      , py::arg("d_residual_assembly_period") = mochi::NonLinearSolverParams{}.dResidualAssemblyPeriod
-      , py::arg("max_iter") = mochi::NonLinearSolverParams{}.maxIter
-      , py::arg("max_elapsed_time_seconds") = mochi::NonLinearSolverParams{}.maxElapsedTimeSeconds
-      , py::arg("convergence_mode") = mochi::NonLinearSolverParams{}.convergenceMode
-      , py::arg("abs_tol") = mochi::NonLinearSolverParams{}.absTol
-      , py::arg("rel_tol") = mochi::NonLinearSolverParams{}.relTol
-      , py::arg("rel_step_tol") = mochi::NonLinearSolverParams{}.relStepTol
-      , py::arg("stop_if_no_improvement") = mochi::NonLinearSolverParams{}.stopIfNoImprovement
-      , py::arg("psd_proj_mode") = mochi::NonLinearSolverParams{}.psdProjMode
-      , py::arg("gradient_descent_fallback") = mochi::NonLinearSolverParams{}.gradientDescentFallback
-      , py::arg("explosion_control") = mochi::NonLinearSolverParams{}.explosionControl
-      , py::arg("abs_div_tol") = mochi::NonLinearSolverParams{}.absDivTol
-      , py::arg("rel_div_tol") = mochi::NonLinearSolverParams{}.relDivTol
-      , py::arg("line_search_max_iter") = mochi::NonLinearSolverParams{}.lineSearchMaxIter
-      , py::arg("line_search_alpha") = mochi::NonLinearSolverParams{}.lineSearchAlpha
-      , py::arg("line_search_wolfe1") = mochi::NonLinearSolverParams{}.lineSearchWolfe1
-      , py::arg("line_search_wolfe2") = mochi::NonLinearSolverParams{}.lineSearchWolfe2
-      , py::arg("line_search_max_rel_increase") = mochi::NonLinearSolverParams{}.lineSearchMaxRelIncrease
-      , py::arg("line_search_type") = mochi::NonLinearSolverParams{}.lineSearchType
-      , py::arg("linear_tolerance_strategy") = mochi::NonLinearSolverParams{}.linearToleranceStrategy
-      , py::arg("verbosity") = mochi::NonLinearSolverParams{}.verbosity
+    .def("__init__", [](mochi::NonLinearSolverParams* self, nb::object solver_type, nb::object d_residual_assembly_period, nb::object max_iter, nb::object max_elapsed_time_seconds, nb::object convergence_mode, nb::object abs_tol, nb::object rel_tol, nb::object rel_step_tol, nb::object stop_if_no_improvement, nb::object psd_proj_mode, nb::object gradient_descent_fallback, nb::object explosion_control, nb::object abs_div_tol, nb::object rel_div_tol, nb::object line_search_max_iter, nb::object line_search_alpha, nb::object line_search_wolfe1, nb::object line_search_wolfe2, nb::object line_search_max_rel_increase, nb::object line_search_type, nb::object linear_tolerance_strategy, nb::object verbosity) {
+      mochi::NonLinearSolverParams result{};
+      result.solverType = nb::cast<mochi::NonLinearSolverType>(solver_type);
+      result.dResidualAssemblyPeriod = nb::cast<int>(d_residual_assembly_period);
+      result.maxIter = nb::cast<int>(max_iter);
+      result.maxElapsedTimeSeconds = nb::cast<double>(max_elapsed_time_seconds);
+      result.convergenceMode = nb::cast<mochi::NonLinearSolverConvergenceMode>(convergence_mode);
+      result.absTol = nb::cast<mochi::real>(abs_tol);
+      result.relTol = nb::cast<mochi::real>(rel_tol);
+      result.relStepTol = nb::cast<mochi::real>(rel_step_tol);
+      result.stopIfNoImprovement = nb::cast<bool>(stop_if_no_improvement);
+      result.psdProjMode = nb::cast<mochi::PsdProjectionMode>(psd_proj_mode);
+      result.gradientDescentFallback = nb::cast<bool>(gradient_descent_fallback);
+      result.explosionControl = nb::cast<bool>(explosion_control);
+      result.absDivTol = nb::cast<mochi::real>(abs_div_tol);
+      result.relDivTol = nb::cast<mochi::real>(rel_div_tol);
+      result.lineSearchMaxIter = nb::cast<int>(line_search_max_iter);
+      result.lineSearchAlpha = nb::cast<mochi::real>(line_search_alpha);
+      result.lineSearchWolfe1 = nb::cast<mochi::real>(line_search_wolfe1);
+      result.lineSearchWolfe2 = nb::cast<mochi::real>(line_search_wolfe2);
+      result.lineSearchMaxRelIncrease = nb::cast<mochi::real>(line_search_max_rel_increase);
+      result.lineSearchType = nb::cast<mochi::LineSearchType>(line_search_type);
+      result.linearToleranceStrategy = nb::cast<mochi::LinearToleranceStrategy>(linear_tolerance_strategy);
+      result.verbosity = nb::cast<mochi::VerbosityLevel>(verbosity);
+      new (self) mochi::NonLinearSolverParams(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("solver_type") = mochi::NonLinearSolverParams{}.solverType
+      , nb::arg("d_residual_assembly_period") = mochi::NonLinearSolverParams{}.dResidualAssemblyPeriod
+      , nb::arg("max_iter") = mochi::NonLinearSolverParams{}.maxIter
+      , nb::arg("max_elapsed_time_seconds") = mochi::NonLinearSolverParams{}.maxElapsedTimeSeconds
+      , nb::arg("convergence_mode") = mochi::NonLinearSolverParams{}.convergenceMode
+      , nb::arg("abs_tol") = mochi::NonLinearSolverParams{}.absTol
+      , nb::arg("rel_tol") = mochi::NonLinearSolverParams{}.relTol
+      , nb::arg("rel_step_tol") = mochi::NonLinearSolverParams{}.relStepTol
+      , nb::arg("stop_if_no_improvement") = mochi::NonLinearSolverParams{}.stopIfNoImprovement
+      , nb::arg("psd_proj_mode") = mochi::NonLinearSolverParams{}.psdProjMode
+      , nb::arg("gradient_descent_fallback") = mochi::NonLinearSolverParams{}.gradientDescentFallback
+      , nb::arg("explosion_control") = mochi::NonLinearSolverParams{}.explosionControl
+      , nb::arg("abs_div_tol") = mochi::NonLinearSolverParams{}.absDivTol
+      , nb::arg("rel_div_tol") = mochi::NonLinearSolverParams{}.relDivTol
+      , nb::arg("line_search_max_iter") = mochi::NonLinearSolverParams{}.lineSearchMaxIter
+      , nb::arg("line_search_alpha") = mochi::NonLinearSolverParams{}.lineSearchAlpha
+      , nb::arg("line_search_wolfe1") = mochi::NonLinearSolverParams{}.lineSearchWolfe1
+      , nb::arg("line_search_wolfe2") = mochi::NonLinearSolverParams{}.lineSearchWolfe2
+      , nb::arg("line_search_max_rel_increase") = mochi::NonLinearSolverParams{}.lineSearchMaxRelIncrease
+      , nb::arg("line_search_type") = mochi::NonLinearSolverParams{}.lineSearchType
+      , nb::arg("linear_tolerance_strategy") = mochi::NonLinearSolverParams{}.linearToleranceStrategy
+      , nb::arg("verbosity") = mochi::NonLinearSolverParams{}.verbosity
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::NonLinearSolverParams const& self) { return mochi::NonLinearSolverParams(self); })
-    .def("__deepcopy__", [](mochi::NonLinearSolverParams const& self, py::dict) { return mochi::NonLinearSolverParams(self); })
-    .def_readwrite("solver_type", &mochi::NonLinearSolverParams::solverType, "Non-linear solver type.")
-    .def_readwrite("d_residual_assembly_period", &mochi::NonLinearSolverParams::dResidualAssemblyPeriod, "Every how many non-linear iterations to assemble the dresidual matrix.\n\nNote:\n    For Newton's method, set to >1 to reuse the dresidual across iterations.\n\nNote:\n    For quasi-Newton methods (e.g., BFGS, SR1), it must be >1 and indicates\n    every how many iterations to restart the algorithm with the actual\n    dresidual.")
-    .def_readwrite("max_iter", &mochi::NonLinearSolverParams::maxIter, "Maximum number of non-linear iterations.")
-    .def_readwrite("max_elapsed_time_seconds", &mochi::NonLinearSolverParams::maxElapsedTimeSeconds, "Maximum elapsed time [s].\n\nNote:\n    The solve terminates if the elapsed time exceeds this threshold.\n\nNote:\n    0 means no time limit.")
-    .def_readwrite("convergence_mode", &mochi::NonLinearSolverParams::convergenceMode, "Convergence monitoring mode.\n\nNote:\n    Applies to :attr:`~superdex.physics.NonLinearSolverParams.abs_tol` and\n    :attr:`~superdex.physics.NonLinearSolverParams.rel_tol`.")
-    .def_readwrite("abs_tol", &mochi::NonLinearSolverParams::absTol, "Absolute residual norm tolerance for convergence.")
-    .def_readwrite("rel_tol", &mochi::NonLinearSolverParams::relTol, "Relative residual norm tolerance for convergence, relative to the initial\nresidual.")
-    .def_readwrite("rel_step_tol", &mochi::NonLinearSolverParams::relStepTol, "Relative tolerance on the L2 norm of the raw linear-solve increment before line\nsearch scaling.\n\nNote:\n    The solve terminates with :class:`STOPPED\n    <superdex.physics.ConvergenceStatus>` status if ``|dx|/|x|`` is below this\n    threshold (i.e., the step norm is below this fraction of the current\n    solution norm).\n\nNote:\n    0 disables this criterion.\n\nNote:\n    Default is :const:`~superdex.physics.DEFAULT_REL_STEP_TOL`.")
-    .def_readwrite("stop_if_no_improvement", &mochi::NonLinearSolverParams::stopIfNoImprovement, "Stop the solve if the line search figure of merit does not improve from the\nprevious iteration.")
-    .def_readwrite("psd_proj_mode", &mochi::NonLinearSolverParams::psdProjMode, "Positive Semi-Definite (PSD) projection mode for the dresidual matrix.")
-    .def_readwrite("gradient_descent_fallback", &mochi::NonLinearSolverParams::gradientDescentFallback, "Fall back to gradient descent direction if the solver search direction fails.")
-    .def_readwrite("explosion_control", &mochi::NonLinearSolverParams::explosionControl, "Enable heuristic explosion prevention.")
-    .def_readwrite("abs_div_tol", &mochi::NonLinearSolverParams::absDivTol, "Absolute divergence tolerance.\n\nNote:\n    Triggers explosion control if residual norm exceeds this value.\n\nNote:\n    Used only if\n    :attr:`~superdex.physics.NonLinearSolverParams.explosion_control` is true.")
-    .def_readwrite("rel_div_tol", &mochi::NonLinearSolverParams::relDivTol, "Relative divergence tolerance, relative to the initial residual.\n\nNote:\n    Triggers explosion control if relative residual norm exceeds this value.\n\nNote:\n    Used only if\n    :attr:`~superdex.physics.NonLinearSolverParams.explosion_control` is true.")
-    .def_readwrite("line_search_max_iter", &mochi::NonLinearSolverParams::lineSearchMaxIter, "Maximum number of line search iterations.\n\nNote:\n    Must be >= 1 unless\n    :attr:`~superdex.physics.NonLinearSolverParams.line_search_type` is\n    :class:`NONE <superdex.physics.LineSearchType>`.")
-    .def_readwrite("line_search_alpha", &mochi::NonLinearSolverParams::lineSearchAlpha, "Step length reduction factor for line search.\n\nNote:\n    Must be in (0, 1).")
-    .def_readwrite("line_search_wolfe1", &mochi::NonLinearSolverParams::lineSearchWolfe1, "Wolfe condition parameter c1 (sufficient decrease).\n\nNote:\n    Must be in (0, 1).\n\nNote:\n    Used only by :class:`ARMIJO <superdex.physics.LineSearchType>`,\n    :class:`WOLFE_WEAK <superdex.physics.LineSearchType>`, :class:`WOLFE_STRONG\n    <superdex.physics.LineSearchType>`, and :class:`ARMIJO_OR_RESIDUAL_NORM\n    <superdex.physics.LineSearchType>` line search types.")
-    .def_readwrite("line_search_wolfe2", &mochi::NonLinearSolverParams::lineSearchWolfe2, "Wolfe condition parameter c2 (curvature).\n\nNote:\n    Must be in\n    (:attr:`~superdex.physics.NonLinearSolverParams.line_search_wolfe1`, 1).\n\nNote:\n    Used only by :class:`WOLFE_WEAK <superdex.physics.LineSearchType>` and\n    :class:`WOLFE_STRONG <superdex.physics.LineSearchType>` line search types.")
-    .def_readwrite("line_search_max_rel_increase", &mochi::NonLinearSolverParams::lineSearchMaxRelIncrease, "Maximum relative increase in the objective to accept the step.\n\nNote:\n    Only applies to :class:`SIMPLE <superdex.physics.LineSearchType>`.")
-    .def_readwrite("line_search_type", &mochi::NonLinearSolverParams::lineSearchType, "Line search type.")
-    .def_readwrite("linear_tolerance_strategy", &mochi::NonLinearSolverParams::linearToleranceStrategy, "Strategy for adaptive linear solver tolerance (forcing term).")
-    .def_readwrite("verbosity", &mochi::NonLinearSolverParams::verbosity, "Verbosity level for logging output.")
+    .def("__deepcopy__", [](mochi::NonLinearSolverParams const& self, nb::dict) { return mochi::NonLinearSolverParams(self); })
+    .def_rw("solver_type", &mochi::NonLinearSolverParams::solverType, "Non-linear solver type.")
+    .def_rw("d_residual_assembly_period", &mochi::NonLinearSolverParams::dResidualAssemblyPeriod, "Every how many non-linear iterations to assemble the dresidual matrix.\n\nNote:\n    For Newton's method, set to >1 to reuse the dresidual across iterations.\n\nNote:\n    For quasi-Newton methods (e.g., BFGS, SR1), it must be >1 and indicates\n    every how many iterations to restart the algorithm with the actual\n    dresidual.")
+    .def_rw("max_iter", &mochi::NonLinearSolverParams::maxIter, "Maximum number of non-linear iterations.")
+    .def_rw("max_elapsed_time_seconds", &mochi::NonLinearSolverParams::maxElapsedTimeSeconds, "Maximum elapsed time [s].\n\nNote:\n    The solve terminates if the elapsed time exceeds this threshold.\n\nNote:\n    0 means no time limit.")
+    .def_rw("convergence_mode", &mochi::NonLinearSolverParams::convergenceMode, "Convergence monitoring mode.\n\nNote:\n    Applies to :attr:`~superdex.physics.NonLinearSolverParams.abs_tol` and\n    :attr:`~superdex.physics.NonLinearSolverParams.rel_tol`.")
+    .def_rw("abs_tol", &mochi::NonLinearSolverParams::absTol, "Absolute residual norm tolerance for convergence.")
+    .def_rw("rel_tol", &mochi::NonLinearSolverParams::relTol, "Relative residual norm tolerance for convergence, relative to the initial\nresidual.")
+    .def_rw("rel_step_tol", &mochi::NonLinearSolverParams::relStepTol, "Relative tolerance on the L2 norm of the raw linear-solve increment before line\nsearch scaling.\n\nNote:\n    The solve terminates with :class:`STOPPED\n    <superdex.physics.ConvergenceStatus>` status if ``|dx|/|x|`` is below this\n    threshold (i.e., the step norm is below this fraction of the current\n    solution norm).\n\nNote:\n    0 disables this criterion.\n\nNote:\n    Default is :const:`~superdex.physics.DEFAULT_REL_STEP_TOL`.")
+    .def_rw("stop_if_no_improvement", &mochi::NonLinearSolverParams::stopIfNoImprovement, "Stop the solve if the line search figure of merit does not improve from the\nprevious iteration.")
+    .def_rw("psd_proj_mode", &mochi::NonLinearSolverParams::psdProjMode, "Positive Semi-Definite (PSD) projection mode for the dresidual matrix.")
+    .def_rw("gradient_descent_fallback", &mochi::NonLinearSolverParams::gradientDescentFallback, "Fall back to gradient descent direction if the solver search direction fails.")
+    .def_rw("explosion_control", &mochi::NonLinearSolverParams::explosionControl, "Enable heuristic explosion prevention.")
+    .def_rw("abs_div_tol", &mochi::NonLinearSolverParams::absDivTol, "Absolute divergence tolerance.\n\nNote:\n    Triggers explosion control if residual norm exceeds this value.\n\nNote:\n    Used only if\n    :attr:`~superdex.physics.NonLinearSolverParams.explosion_control` is true.")
+    .def_rw("rel_div_tol", &mochi::NonLinearSolverParams::relDivTol, "Relative divergence tolerance, relative to the initial residual.\n\nNote:\n    Triggers explosion control if relative residual norm exceeds this value.\n\nNote:\n    Used only if\n    :attr:`~superdex.physics.NonLinearSolverParams.explosion_control` is true.")
+    .def_rw("line_search_max_iter", &mochi::NonLinearSolverParams::lineSearchMaxIter, "Maximum number of line search iterations.\n\nNote:\n    Must be >= 1 unless\n    :attr:`~superdex.physics.NonLinearSolverParams.line_search_type` is\n    :class:`NONE <superdex.physics.LineSearchType>`.")
+    .def_rw("line_search_alpha", &mochi::NonLinearSolverParams::lineSearchAlpha, "Step length reduction factor for line search.\n\nNote:\n    Must be in (0, 1).")
+    .def_rw("line_search_wolfe1", &mochi::NonLinearSolverParams::lineSearchWolfe1, "Wolfe condition parameter c1 (sufficient decrease).\n\nNote:\n    Must be in (0, 1).\n\nNote:\n    Used only by :class:`ARMIJO <superdex.physics.LineSearchType>`,\n    :class:`WOLFE_WEAK <superdex.physics.LineSearchType>`, :class:`WOLFE_STRONG\n    <superdex.physics.LineSearchType>`, and :class:`ARMIJO_OR_RESIDUAL_NORM\n    <superdex.physics.LineSearchType>` line search types.")
+    .def_rw("line_search_wolfe2", &mochi::NonLinearSolverParams::lineSearchWolfe2, "Wolfe condition parameter c2 (curvature).\n\nNote:\n    Must be in\n    (:attr:`~superdex.physics.NonLinearSolverParams.line_search_wolfe1`, 1).\n\nNote:\n    Used only by :class:`WOLFE_WEAK <superdex.physics.LineSearchType>` and\n    :class:`WOLFE_STRONG <superdex.physics.LineSearchType>` line search types.")
+    .def_rw("line_search_max_rel_increase", &mochi::NonLinearSolverParams::lineSearchMaxRelIncrease, "Maximum relative increase in the objective to accept the step.\n\nNote:\n    Only applies to :class:`SIMPLE <superdex.physics.LineSearchType>`.")
+    .def_rw("line_search_type", &mochi::NonLinearSolverParams::lineSearchType, "Line search type.")
+    .def_rw("linear_tolerance_strategy", &mochi::NonLinearSolverParams::linearToleranceStrategy, "Strategy for adaptive linear solver tolerance (forcing term).")
+    .def_rw("verbosity", &mochi::NonLinearSolverParams::verbosity, "Verbosity level for logging output.")
   ;
 
   registry.GetClass<mochi::LinearSolverParams>()
-    .def(py::init([](py::object solver_type, py::object preconditioner_type, py::object norm_type, py::object abs_tol, py::object rel_tol, py::object rel_div_tol, py::object max_iter, py::object restart_size, py::object abort_if_not_spd, py::object verbosity) {
-      mochi::LinearSolverParams result;
-      result.solverType = py::cast<mochi::LinearSolverType>(solver_type);
-      result.preconditionerType = py::cast<mochi::PreconditionerType>(preconditioner_type);
-      result.normType = py::cast<mochi::LinearSolverConvergenceNorm>(norm_type);
-      result.absTol = py::cast<mochi::real>(abs_tol);
-      result.relTol = py::cast<mochi::real>(rel_tol);
-      result.relDivTol = py::cast<mochi::real>(rel_div_tol);
-      result.maxIter = py::cast<int>(max_iter);
-      result.restartSize = py::cast<int>(restart_size);
-      result.abortIfNotSpd = py::cast<bool>(abort_if_not_spd);
-      result.verbosity = py::cast<mochi::VerbosityLevel>(verbosity);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("solver_type") = mochi::LinearSolverParams{}.solverType
-      , py::arg("preconditioner_type") = mochi::LinearSolverParams{}.preconditionerType
-      , py::arg("norm_type") = mochi::LinearSolverParams{}.normType
-      , py::arg("abs_tol") = mochi::LinearSolverParams{}.absTol
-      , py::arg("rel_tol") = mochi::LinearSolverParams{}.relTol
-      , py::arg("rel_div_tol") = mochi::LinearSolverParams{}.relDivTol
-      , py::arg("max_iter") = mochi::LinearSolverParams{}.maxIter
-      , py::arg("restart_size") = mochi::LinearSolverParams{}.restartSize
-      , py::arg("abort_if_not_spd") = mochi::LinearSolverParams{}.abortIfNotSpd
-      , py::arg("verbosity") = mochi::LinearSolverParams{}.verbosity
+    .def("__init__", [](mochi::LinearSolverParams* self, nb::object solver_type, nb::object preconditioner_type, nb::object norm_type, nb::object abs_tol, nb::object rel_tol, nb::object rel_div_tol, nb::object max_iter, nb::object restart_size, nb::object abort_if_not_spd, nb::object verbosity) {
+      mochi::LinearSolverParams result{};
+      result.solverType = nb::cast<mochi::LinearSolverType>(solver_type);
+      result.preconditionerType = nb::cast<mochi::PreconditionerType>(preconditioner_type);
+      result.normType = nb::cast<mochi::LinearSolverConvergenceNorm>(norm_type);
+      result.absTol = nb::cast<mochi::real>(abs_tol);
+      result.relTol = nb::cast<mochi::real>(rel_tol);
+      result.relDivTol = nb::cast<mochi::real>(rel_div_tol);
+      result.maxIter = nb::cast<int>(max_iter);
+      result.restartSize = nb::cast<int>(restart_size);
+      result.abortIfNotSpd = nb::cast<bool>(abort_if_not_spd);
+      result.verbosity = nb::cast<mochi::VerbosityLevel>(verbosity);
+      new (self) mochi::LinearSolverParams(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("solver_type") = mochi::LinearSolverParams{}.solverType
+      , nb::arg("preconditioner_type") = mochi::LinearSolverParams{}.preconditionerType
+      , nb::arg("norm_type") = mochi::LinearSolverParams{}.normType
+      , nb::arg("abs_tol") = mochi::LinearSolverParams{}.absTol
+      , nb::arg("rel_tol") = mochi::LinearSolverParams{}.relTol
+      , nb::arg("rel_div_tol") = mochi::LinearSolverParams{}.relDivTol
+      , nb::arg("max_iter") = mochi::LinearSolverParams{}.maxIter
+      , nb::arg("restart_size") = mochi::LinearSolverParams{}.restartSize
+      , nb::arg("abort_if_not_spd") = mochi::LinearSolverParams{}.abortIfNotSpd
+      , nb::arg("verbosity") = mochi::LinearSolverParams{}.verbosity
     )
-    .def(py::init<>())
+    .def(nb::init<>())
     .def("__copy__", [](mochi::LinearSolverParams const& self) { return mochi::LinearSolverParams(self); })
-    .def("__deepcopy__", [](mochi::LinearSolverParams const& self, py::dict) { return mochi::LinearSolverParams(self); })
-    .def_readwrite("solver_type", &mochi::LinearSolverParams::solverType, "Linear solver type.")
-    .def_readwrite("preconditioner_type", &mochi::LinearSolverParams::preconditionerType, "Preconditioner type.\n\nNote:\n    Applies only to iterative solvers.")
-    .def_readwrite("norm_type", &mochi::LinearSolverParams::normType, "Norm used for the stopping criteria.\n\nNote:\n    Applies only to the solvers documented in\n    :class:`~superdex.physics.LinearSolverConvergenceNorm`.")
-    .def_readwrite("abs_tol", &mochi::LinearSolverParams::absTol, "Absolute residual norm tolerance for convergence.\n\nNote:\n    Applies only to iterative solvers.")
-    .def_readwrite("rel_tol", &mochi::LinearSolverParams::relTol, "Relative residual norm tolerance for convergence, relative to the initial\nresidual.\n\nNote:\n    Applies only to iterative solvers.\n\nNote:\n    Ignored when using :class:`EISENSTAT_WALKER1\n    <superdex.physics.LinearToleranceStrategy>` or :class:`EISENSTAT_WALKER2\n    <superdex.physics.LinearToleranceStrategy>` in the non-linear solver.\n\nNote:\n    For :class:`EISENSTAT_WALKER3 <superdex.physics.LinearToleranceStrategy>`,\n    this is used as a lower bound on the adaptive tolerance in every non-linear\n    iteration.")
-    .def_readwrite("rel_div_tol", &mochi::LinearSolverParams::relDivTol, "Relative residual norm tolerance for divergence, relative to the initial\nresidual.\n\nNote:\n    Applies only to iterative solvers.")
-    .def_readwrite("max_iter", &mochi::LinearSolverParams::maxIter, "Maximum number of linear solver iterations.\n\nNote:\n    Applies only to iterative solvers.\n\nNote:\n    Must be non-negative or\n    :const:`~superdex.physics.AUTO_LINEAR_SOLVER_MAX_ITER`.\n\nNote:\n    :const:`~superdex.physics.AUTO_LINEAR_SOLVER_MAX_ITER` lets Mochi select the\n    maximum number of iterations based on the problem.")
-    .def_readwrite("restart_size", &mochi::LinearSolverParams::restartSize, "Krylov subspace dimension before restarting.\n\nNote:\n    Applies only to GMRES solvers (e.g., :class:`GMRES\n    <superdex.physics.LinearSolverType>`, :class:`CUDA_GMRES\n    <superdex.physics.LinearSolverType>`).")
-    .def_readwrite("abort_if_not_spd", &mochi::LinearSolverParams::abortIfNotSpd, "Abort solve if matrix is not SPD.\n\nNote:\n    Applies only to iterative SPD solvers (e.g., :class:`CG\n    <superdex.physics.LinearSolverType>`, :class:`CUDA_CG\n    <superdex.physics.LinearSolverType>`, :class:`AUGMENTED_CG\n    <superdex.physics.LinearSolverType>`).")
-    .def_readwrite("verbosity", &mochi::LinearSolverParams::verbosity, "Verbosity level for logging output.")
+    .def("__deepcopy__", [](mochi::LinearSolverParams const& self, nb::dict) { return mochi::LinearSolverParams(self); })
+    .def_rw("solver_type", &mochi::LinearSolverParams::solverType, "Linear solver type.")
+    .def_rw("preconditioner_type", &mochi::LinearSolverParams::preconditionerType, "Preconditioner type.\n\nNote:\n    Applies only to iterative solvers.")
+    .def_rw("norm_type", &mochi::LinearSolverParams::normType, "Norm used for the stopping criteria.\n\nNote:\n    Applies only to the solvers documented in\n    :class:`~superdex.physics.LinearSolverConvergenceNorm`.")
+    .def_rw("abs_tol", &mochi::LinearSolverParams::absTol, "Absolute residual norm tolerance for convergence.\n\nNote:\n    Applies only to iterative solvers.")
+    .def_rw("rel_tol", &mochi::LinearSolverParams::relTol, "Relative residual norm tolerance for convergence, relative to the initial\nresidual.\n\nNote:\n    Applies only to iterative solvers.\n\nNote:\n    Ignored when using :class:`EISENSTAT_WALKER1\n    <superdex.physics.LinearToleranceStrategy>` or :class:`EISENSTAT_WALKER2\n    <superdex.physics.LinearToleranceStrategy>` in the non-linear solver.\n\nNote:\n    For :class:`EISENSTAT_WALKER3 <superdex.physics.LinearToleranceStrategy>`,\n    this is used as a lower bound on the adaptive tolerance in every non-linear\n    iteration.")
+    .def_rw("rel_div_tol", &mochi::LinearSolverParams::relDivTol, "Relative residual norm tolerance for divergence, relative to the initial\nresidual.\n\nNote:\n    Applies only to iterative solvers.")
+    .def_rw("max_iter", &mochi::LinearSolverParams::maxIter, "Maximum number of iterations for iterative solvers.\n\nNote:\n    Applies only to iterative solvers.\n\nNote:\n    Must be positive or :const:`~superdex.physics.AUTO_LINEAR_SOLVER_MAX_ITER`.\n\nNote:\n    :const:`~superdex.physics.AUTO_LINEAR_SOLVER_MAX_ITER` lets Mochi select the\n    maximum number of iterations based on the problem.")
+    .def_rw("restart_size", &mochi::LinearSolverParams::restartSize, "Krylov subspace dimension before restarting.\n\nNote:\n    Applies only to GMRES solvers (e.g., :class:`GMRES\n    <superdex.physics.LinearSolverType>`, :class:`CUDA_GMRES\n    <superdex.physics.LinearSolverType>`).")
+    .def_rw("abort_if_not_spd", &mochi::LinearSolverParams::abortIfNotSpd, "Abort solve if matrix is not SPD.\n\nNote:\n    Applies only to iterative SPD solvers (e.g., :class:`CG\n    <superdex.physics.LinearSolverType>`, :class:`CUDA_CG\n    <superdex.physics.LinearSolverType>`, :class:`AUGMENTED_CG\n    <superdex.physics.LinearSolverType>`).")
+    .def_rw("verbosity", &mochi::LinearSolverParams::verbosity, "Verbosity level for logging output.")
   ;
 
   registry.GetClass<mochi::CoordinateSpace>()
-    .def(py::init([](py::object axes, py::object units_per_meter) {
-      mochi::CoordinateSpace result;
-      result.axes = py::cast<mochi::CoordinateSpaceAxes>(axes);
-      result.unitsPerMeter = py::cast<double>(units_per_meter);
-      return result;
-    })
-      , py::kw_only()
-      , py::arg("axes") = mochi::CoordinateSpace{}.axes
-      , py::arg("units_per_meter") = mochi::CoordinateSpace{}.unitsPerMeter
+    .def("__init__", [](mochi::CoordinateSpace* self, nb::object axes, nb::object units_per_meter) {
+      mochi::CoordinateSpace result{};
+      result.axes = nb::cast<mochi::CoordinateSpaceAxes>(axes);
+      result.unitsPerMeter = nb::cast<double>(units_per_meter);
+      new (self) mochi::CoordinateSpace(std::move(result));
+    }
+      , nb::kw_only()
+      , nb::arg("axes") = mochi::CoordinateSpace{}.axes
+      , nb::arg("units_per_meter") = mochi::CoordinateSpace{}.unitsPerMeter
     )
-    .def(py::init<>())
-    .def(py::self == py::self)
-    .def(py::self != py::self)
+    .def(nb::init<>())
+    .def(nb::self == nb::self)
+    .def(nb::self != nb::self)
     .def("__copy__", [](mochi::CoordinateSpace const& self) { return mochi::CoordinateSpace(self); })
-    .def("__deepcopy__", [](mochi::CoordinateSpace const& self, py::dict) { return mochi::CoordinateSpace(self); })
-    .def_readwrite("axes", &mochi::CoordinateSpace::axes, "Semantic direction of the positive X, Y, and Z axes.")
-    .def_readwrite("units_per_meter", &mochi::CoordinateSpace::unitsPerMeter, "Length of one meter, expressed in this space's linear units.\n\nNote:\n    Must be positive and finite. For example, 100 for a space measured in\n    centimeters.")
+    .def("__deepcopy__", [](mochi::CoordinateSpace const& self, nb::dict) { return mochi::CoordinateSpace(self); })
+    .def_rw("axes", &mochi::CoordinateSpace::axes, "Semantic direction of the positive X, Y, and Z axes.")
+    .def_rw("units_per_meter", &mochi::CoordinateSpace::unitsPerMeter, "Length of one meter, expressed in this space's linear units.\n\nNote:\n    Must be positive and finite. For example, 100 for a space measured in\n    centimeters.")
     .def("validate", [](mochi::CoordinateSpace& self) {
       mochi::Error error;
       self.Validate(error);

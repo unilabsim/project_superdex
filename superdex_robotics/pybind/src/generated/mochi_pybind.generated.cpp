@@ -20,22 +20,22 @@
 
 #if !MOCHI_INTERNAL
 
-#include <pybind11/pybind11.h>
+#include <limits>
+#include <nanobind/nanobind.h>
 #include "../pybind_include.h"
 
 using namespace mochi;
-namespace py = pybind11;
-using namespace pybind11::literals;
+namespace nb = nanobind;
 
 namespace mochi {
-  void DefineSuperdexRobotics_SuperdexRobotics([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry);
-  void DeclareSuperdexRobotics_SuperdexRobotics([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry);
+  void DefineSuperdexRobotics_SuperdexRobotics([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry);
+  void DeclareSuperdexRobotics_SuperdexRobotics([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry);
 
-  inline void DefineNamespaces([[maybe_unused]] py::module_& m) {
+  inline void DefineNamespaces([[maybe_unused]] nb::module_& m) {
     auto m_bots = m.def_submodule("bots");
   }
 
-  inline void DefineSpecializations([[maybe_unused]] py::module_& m) {
+  inline void DefineSpecializations([[maybe_unused]] nb::module_& m) {
     auto m_bots = m.def_submodule("bots");
 
     DefDynamicArray<superdex::robotics::ActuatorHandle>(m_bots, "DynamicArrayActuatorHandle");
@@ -51,10 +51,10 @@ namespace mochi {
     DefDynamicArray<superdex::robotics::SensorHandle>(m_bots, "DynamicArraySensorHandle");
   }
 
-  inline void DefineFinalize([[maybe_unused]] py::module_& m) {
+  inline void DefineFinalize([[maybe_unused]] nb::module_& m) {
   }
 
-  void DefineAll(py::module_& m) {
+  void DefineAll(nb::module_& m) {
     PybindRegistry registry;
     DefineNamespaces(m);
     DeclareSuperdexRobotics_SuperdexRobotics(m, registry);

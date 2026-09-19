@@ -14,8 +14,8 @@
 
 """Benchmark environments.
 
-Environments here are found and registered automatically by
-:mod:`superdex.lab.gym.utils.env_discovery` (call ``register_all_envs()``); this package
-intentionally has no import-time side effects. Import concrete classes from their
-modules, e.g. ``from superdex.lab.gym.envs.benchmarks.cartpole_env import CartPoleEnv``.
+Environments here are registered explicitly with Gymnasium by
+:mod:`superdex.lab.gym.registration`; this package intentionally has no import-time side
+effects. Import concrete classes from their modules, e.g.
+``from superdex.lab.gym.envs.benchmarks.cartpole_env import CartPoleEnv``.
 """

@@ -21,6 +21,7 @@
 #include <mochi_core/linear_algebra/sparse_matrix.h>
 #include <mochi_core/linear_algebra/utils/matrix_concepts.h>
 
+#include <limits>
 #include <type_traits>
 #include <variant>
 #include <vector>
@@ -135,19 +136,22 @@ inline auto FlopsPerApply(MatrixT const& mat) {
 }
 
 template <typename MatrixT>
-auto GetRowRangesPerWorker(MatrixT const& A, int numWorkers) {
+std::vector<int> GetRowRangesPerWorker(MatrixT const& A, int numWorkers) {
   static_assert(IsAnyMatrix<MatrixT>, "Matrix type not supported");
-  MOCHI_ASSERT_VERBOSE(numWorkers > 0, "Number of workers must be positive.");
   using Idx = std::remove_const_t<decltype(GetNumBlockRows(A))>;
+  static_assert(
+      std::numeric_limits<Idx>::max() <= std::numeric_limits<int>::max(),
+      "Matrix row indices must be representable as int.");
+  MOCHI_ASSERT_VERBOSE(numWorkers > 0, "Number of workers must be positive.");
   auto const numBlockRows = GetNumBlockRows(A);
   auto const blockSize = GetNumRows(A) / numBlockRows;
-  std::vector<Idx> workerRowRanges(numWorkers + 1, 0);
+  std::vector<int> workerRowRanges(numWorkers + 1, 0);
   for (int i = 1; i < numWorkers; ++i) {
     // Ensure row range is consistent with the block size.
     workerRowRanges[i] =
-        blockSize * static_cast<Idx>(static_cast<int64_t>(i * numBlockRows) / numWorkers);
+        static_cast<int>(blockSize * (static_cast<int64_t>(i) * numBlockRows / numWorkers));
   }
-  workerRowRanges[numWorkers] = blockSize * numBlockRows;
+  workerRowRanges[numWorkers] = static_cast<int>(blockSize * numBlockRows);
   return workerRowRanges;
 }
 

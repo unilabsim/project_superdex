@@ -521,13 +521,17 @@ class ParallelBarrier final {
   ParallelBarrier(ParallelBarrier&&) = default;
   MOCHI_DECLARE_NO_ASSIGN(ParallelBarrier);
 
-  explicit ParallelBarrier(int numWorkers) : _numWorkers(numWorkers), _target(numWorkers) {
+  explicit ParallelBarrier(int numWorkers)
+      : _numWorkers(numWorkers),
+        _count(numWorkers > 1 ? std::make_shared<std::atomic<uint64_t>>() : nullptr),
+        _target(numWorkers) {
     MOCHI_ASSERT_VERBOSE(_numWorkers > 0, "Number of workers must be positive.");
   }
 
   // Reduce the number of workers that use the parallel barrier.
   void ReduceNumWorkers(int numWorkers, bool /*isMaster*/) {
-    MOCHI_ASSERT_VERBOSE(numWorkers <= _numWorkers, "Invalid new number of workers.");
+    MOCHI_ASSERT_VERBOSE(
+        numWorkers > 0 && numWorkers <= _numWorkers, "Invalid new number of workers.");
     _target -= (_numWorkers - numWorkers);
     _numWorkers = numWorkers;
   }
@@ -547,7 +551,7 @@ class ParallelBarrier final {
 
  private:
   int _numWorkers = {};
-  std::shared_ptr<std::atomic<uint64_t>> const _count = std::make_shared<std::atomic<uint64_t>>();
+  std::shared_ptr<std::atomic<uint64_t>> _count;
   mutable uint64_t _target = 0;
 };
 

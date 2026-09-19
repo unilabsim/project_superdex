@@ -18,54 +18,54 @@
 
 // clang-format off
 
-#include <pybind11/pybind11.h>
+#include <limits>
+#include <nanobind/nanobind.h>
 #include "../pybind_include.h"
 
 using namespace mochi;
-namespace py = pybind11;
-using namespace pybind11::literals;
+namespace nb = nanobind;
 
 namespace mochi {
   // Forward declarations for the definitions below.
-  void DeclareMochiPhysics_MochiPhysicsDebugDraw(py::module_& m, PybindRegistry& registry);
-  void DefineMochiPhysics_MochiPhysicsDebugDraw(py::module_& m, PybindRegistry& registry);
+  void DeclareMochiPhysics_MochiPhysicsDebugDraw(nb::module_& m, PybindRegistry& registry);
+  void DefineMochiPhysics_MochiPhysicsDebugDraw(nb::module_& m, PybindRegistry& registry);
 } // namespace mochi
 
-void mochi::DeclareMochiPhysics_MochiPhysicsDebugDraw([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
-  registry.StoreClass(py::class_<mochi::DebugDraw, std::unique_ptr<mochi::DebugDraw, py::nodelete>>(m, "DebugDraw", "Manages debug visualization features for a scene.\n\nProvides a feature-based system for visualizing various aspects of the physics\nsimulation. The client application is responsible for rendering the generated\nprimitives using its own graphics API. Features can be individually enabled or\ndisabled, such as visualizing contact points, normals, velocities, or AABBs.\n\nNote:\n    Must be accessed on the same thread as the owning\n    :class:`~superdex.physics.Scene`.\n\nNote:\n    Debug draw is disabled by default.\n\nNote:\n    If consuming the data on a different thread, the client must deep-copy the\n    underlying data into client-owned buffers before the scene thread calls\n    :meth:`gather_data` again or modifies the :class:`~superdex.physics.Scene`.\n    Copying :class:`~superdex.physics.DebugDrawData` itself is a shallow copy of\n    ``mochi::Span`` views into internal buffers and does not transfer ownership.\n\nWarning:\n    This documentation references the following C++ API, which is not available\n    in Python: ``mochi::Span``.\n\nWarning:\n    Debug drawing has significant performance overhead due to geometry\n    generation and data gathering.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.get_debug_draw`,\n    :class:`~superdex.physics.DebugDrawData`"));
+void mochi::DeclareMochiPhysics_MochiPhysicsDebugDraw([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+  registry.StoreClass(nb::class_<mochi::DebugDraw>(m, "DebugDraw", "Manages debug visualization features for a scene.\n\nProvides a feature-based system for visualizing various aspects of the physics\nsimulation. The client application is responsible for rendering the generated\nprimitives using its own graphics API. Features can be individually enabled or\ndisabled, such as visualizing contact points, normals, velocities, or AABBs.\n\nNote:\n    Must be accessed on the same thread as the owning\n    :class:`~superdex.physics.Scene`.\n\nNote:\n    Debug draw is disabled by default.\n\nNote:\n    If consuming the data on a different thread, the client must deep-copy the\n    underlying data into client-owned buffers before the scene thread calls\n    :meth:`gather_data` again or modifies the :class:`~superdex.physics.Scene`.\n    Copying :class:`~superdex.physics.DebugDrawData` itself is a shallow copy of\n    ``mochi::Span`` views into internal buffers and does not transfer ownership.\n\nWarning:\n    This documentation references the following C++ API, which is not available\n    in Python: ``mochi::Span``.\n\nWarning:\n    Debug drawing has significant performance overhead due to geometry\n    generation and data gathering.\n\nSee Also:\n    :meth:`~superdex.physics.Scene.get_debug_draw`,\n    :class:`~superdex.physics.DebugDrawData`", nb::never_destruct()));
 }
 
-void mochi::DefineMochiPhysics_MochiPhysicsDebugDraw([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
-  registry.GetClass<mochi::DebugDraw, std::unique_ptr<mochi::DebugDraw, py::nodelete>>()
+void mochi::DefineMochiPhysics_MochiPhysicsDebugDraw([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+  registry.GetClass<mochi::DebugDraw>()
     .def("is_enabled", &mochi::DebugDraw::IsEnabled
       , "Check if debug drawing is enabled for the scene.\n\nReturns:\n    True if debug drawing is enabled, false otherwise.\n\nNote:\n    When disabled, :meth:`~superdex.physics.DebugDraw.gather_data` returns empty\n    data regardless of feature settings.\n\nSee Also:\n    :meth:`~superdex.physics.DebugDraw.enable`"
     )
     .def("enable", &mochi::DebugDraw::Enable
-      , py::arg("enable")
+      , nb::arg("enable")
       , "Enable or disable debug drawing for the entire scene.\n\nArgs:\n    enable (bool): True to enable, false to disable.\n\nNote:\n    This is a master switch that overrides all individual feature settings.\n\nSee Also:\n    :meth:`~superdex.physics.DebugDraw.is_enabled`"
     )
     .def("get_num_features", &mochi::DebugDraw::GetNumFeatures
       , "Get the number of debug draw features available.\n\nReturns:\n    Number of features that can be individually enabled or disabled.\n\nSee Also:\n    :meth:`~superdex.physics.DebugDraw.find_feature`,\n    :meth:`~superdex.physics.DebugDraw.get_feature_name`"
     )
     .def("find_feature", &mochi::DebugDraw::FindFeature
-      , py::arg("name")
+      , nb::arg("name")
       , "Find a feature by name.\n\nArgs:\n    name (str): Feature name (case sensitive).\n\nReturns:\n    Feature index if found, or -1 if not found.\n\nSee Also:\n    :meth:`~superdex.physics.DebugDraw.get_feature_name`,\n    :meth:`~superdex.physics.DebugDraw.enable_feature`"
     )
     .def("get_feature_name", &mochi::DebugDraw::GetFeatureName
-      , py::arg("index")
+      , nb::arg("index")
       , "Get the name of a feature by index.\n\nArgs:\n    index (int): Feature index in the range [0,\n        :meth:`~superdex.physics.DebugDraw.get_num_features`).\n\nReturns:\n    Name of the feature.\n\nSee Also:\n    :meth:`~superdex.physics.DebugDraw.get_num_features`,\n    :meth:`~superdex.physics.DebugDraw.find_feature`"
     )
     .def("get_feature_description", &mochi::DebugDraw::GetFeatureDescription
-      , py::arg("index")
+      , nb::arg("index")
       , "Get the description of a feature by index.\n\nArgs:\n    index (int): Feature index in the range [0,\n        :meth:`~superdex.physics.DebugDraw.get_num_features`).\n\nReturns:\n    Human-readable description of the feature.\n\nSee Also:\n    :meth:`~superdex.physics.DebugDraw.get_num_features`,\n    :meth:`~superdex.physics.DebugDraw.get_feature_name`"
     )
     .def("is_feature_enabled", &mochi::DebugDraw::IsFeatureEnabled
-      , py::arg("index")
+      , nb::arg("index")
       , "Check if a feature is currently enabled.\n\nArgs:\n    index (int): Feature index in the range [0,\n        :meth:`~superdex.physics.DebugDraw.get_num_features`).\n\nReturns:\n    True if the feature is enabled, false otherwise.\n\nSee Also:\n    :meth:`~superdex.physics.DebugDraw.enable_feature`"
     )
     .def("enable_feature", &mochi::DebugDraw::EnableFeature
-      , py::arg("index")
-      , py::arg("enable")
+      , nb::arg("index")
+      , nb::arg("enable")
       , "Enable or disable a specific feature.\n\nArgs:\n    index (int): Feature index in the range [0,\n        :meth:`~superdex.physics.DebugDraw.get_num_features`).\n    enable (bool): True to enable the feature, false to disable.\n\nNote:\n    No debug-draw data is generated while the master switch\n    (:meth:`~superdex.physics.DebugDraw.is_enabled`) is false, but per-feature\n    settings are remembered and take effect when the master switch is enabled.\n\nSee Also:\n    :meth:`~superdex.physics.DebugDraw.is_feature_enabled`,\n    :meth:`~superdex.physics.DebugDraw.enable`"
     )
     .def("gather_data", &mochi::DebugDraw::GatherData
@@ -78,8 +78,8 @@ void mochi::DefineMochiPhysics_MochiPhysicsDebugDraw([[maybe_unused]] py::module
         throw MochiErrorException(error);
       }
     }
-      , py::arg("actor")
-      , py::arg("enable")
+      , nb::arg("actor")
+      , nb::arg("enable")
       , "Enable or disable debug drawing for a specific actor.\n\nArgs:\n    actor (ActorHandle): Handle of the actor to enable or disable debug drawing\n        for.\n    enable (bool): True to enable, false to disable.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Enabled by default for all actors, including nested actors (child actors of\n    articulated, soft-skinned and blended actors).\n\nNote:\n    Debug draw data won't be generated for any actor if the master switch, i.e.\n    :meth:`~superdex.physics.DebugDraw.is_enabled`, is false."
     )
   ;

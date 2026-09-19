@@ -71,6 +71,14 @@ void ResolveAllNodeBlendingDisplacementsPipeline(
     entt::registry& reg,
     Span<entt::entity const> entities);
 
+// Blend world-space nested soft velocities into world-space skinning velocity.
+void UpdateBlendingVelocity(
+    ecs::PartialRegistry<CVelocitySlice<real, TimeStep::Current, DisplacementLayer::Skinned> const>
+        reg,
+    CBlendedComposition const& composition,
+    CBlendingData const& blendingData,
+    CVelocitySlice<real, TimeStep::Current, DisplacementLayer::Skinned>& inOutVelocity);
+
 /*
  * Pipeline to update quantities that are a function of the state (aka derived state) of the
  * blended actor and make them consistent with the state. Must be called after

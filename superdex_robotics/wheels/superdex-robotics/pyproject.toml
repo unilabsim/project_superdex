@@ -19,7 +19,7 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "superdex-robotics"
 version = "1.0.0"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12"
 authors = [{name = "SuperDex Team"}]
 description = "Robotics bindings and runtime surfaces for SuperDex"
 readme = "README.md"
@@ -31,6 +31,8 @@ classifiers = [
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering",
 ]
 
@@ -49,6 +51,7 @@ managed = false
 build-dir = "../../../build-fp32/{wheel_tag}"
 wheel.packages = ["../../superdex"]
 wheel.install-dir = "superdex/robotics/_native"
+wheel.py-api = "cp312"
 build.targets = ["superdex_robotics_pybind"]
 install.components = ["superdex_robotics_pybind"]
 
@@ -57,6 +60,7 @@ CC = { env = "CC" }
 CXX = { env = "CXX" }
 
 [tool.scikit-build.cmake]
+version = ">=3.26"
 source-dir = "../../.."
 args = [
     "-GNinja",

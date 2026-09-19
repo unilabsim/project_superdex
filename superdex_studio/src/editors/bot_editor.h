@@ -19,6 +19,7 @@
 #include "editors/asset_editor.h"
 #include "editors/bot_editor_contact.h"
 #include "editors/bot_editor_control.h"
+#include "io/glb_export.h"
 #include "rendering/bot_visualization.h"
 #include "rendering/scene_stage.h"
 #include "rendering/viewport.h"
@@ -165,6 +166,20 @@ class BotEditor : public AssetEditor {
       std::vector<std::string>& outNewNames,
       std::vector<bool>& outRowInvalid);
 
+  //------------------------------------------------------------------------------------------------
+  // Export Skeletal GLB
+  //------------------------------------------------------------------------------------------------
+
+  struct GlbExportState {
+    bool open = false;
+    GlbExportOptions options;
+    bool requestExport = false;
+  };
+  // Reset the options to their defaults and request the modal to open.
+  void OpenExportSkeletalGlbModal();
+  // Shows the modal for .glb export with customization options
+  void ShowExportSkeletalGlbModal();
+
  private:
   // target asset
   BotAsset* _botAsset = nullptr;
@@ -207,6 +222,8 @@ class BotEditor : public AssetEditor {
   BotContactEstimator _contactEstimator;
   // batch rename dialog state
   BatchRenameState _batchRename;
+  // export skeletal GLB dialog state
+  GlbExportState _glbExport;
 };
 
 } // namespace superdex::studio

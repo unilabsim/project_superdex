@@ -44,6 +44,7 @@
 #include "mochi_simulation.h"
 #include "mochi_soft.h"
 #include "mochi_soft_init.h"
+#include "mochi_soft_rom_components.h"
 #include "mochi_soft_rom_init.h"
 #include "mochi_soft_skinned.h"
 #include "mochi_step.h"
@@ -220,9 +221,9 @@ template <typename EnumT>
 
 static void CheckStateCaptureSupported(entt::registry const& reg, Error& error) {
   MOCHI_ERROR_IF(
-      !reg.storage<TagRomActor>().empty(),
+      !reg.storage<TagRomActor>().empty() || !reg.storage<CRomFomSwitchingParams>().empty(),
       error,
-      "State capture is not supported for scenes with ROM actors.");
+      "State capture is not supported for scenes with ROM actors or ROM/FOM switching.");
 }
 
 [[nodiscard]] static bool ActorCanOwnNestedActors(Actor const& actor) {
@@ -341,9 +342,6 @@ static void ComputeAggregateBackPropSolverSceneStats(
   });
   outStats.residualNorm = Sqrt(sqrResNorm);
 }
-
-// Declared in MochiDebugDrawSystems.cpp
-void RegisterDebugDrawSystems(DebugDrawInternal& debugDraw);
 
 // This ECS component simply ensures that its entity cannot be accidentally
 // destroyed before final shutdown.
@@ -544,9 +542,9 @@ void SceneImpl::SetSolverParams(SolverParams const& params, Error& error) {
   }
 
   MOCHI_ERROR_IF(
-      params.linearSolver.maxIter != kAutoLinearSolverMaxIter && params.linearSolver.maxIter < 0,
+      params.linearSolver.maxIter != kAutoLinearSolverMaxIter && params.linearSolver.maxIter <= 0,
       error,
-      "Maximum number of linear solver iterations (LinearSolverParams::maxIter) must not be negative.");
+      "Maximum number of iterations for iterative linear solvers (LinearSolverParams::maxIter) must be positive or Auto.");
   MOCHI_ERROR_IF_NOT(
       IsFinite(params.linearSolver.absTol) && params.linearSolver.absTol >= 0_r,
       error,
@@ -629,6 +627,13 @@ void SceneImpl::Step(double timeStepSec) {
 
   timer.Reset();
 
+  // Check if a SceneDebugger needs to be cleaned up on this thread
+  DynamicArray<std::shared_ptr<dbg::SceneDebugger>> debuggersToShutdown;
+  _debugger.Mutate([&](auto& info) { debuggersToShutdown = std::move(info.pendingShutdown); });
+  for (auto& ptr : debuggersToShutdown) {
+    ptr->ShutdownOnSceneThread(this);
+  }
+
   // Fire pre-step callbacks one at a time
   {
     MOCHI_PROFILE_SCOPE_N("PreStepCallbacks");
@@ -681,13 +686,6 @@ void SceneImpl::Step(double timeStepSec) {
   {
     MOCHI_PROFILE_SCOPE_N("PostStepCallbacks");
     _postStepCallbacks.Call(stepInfo);
-  }
-
-  // Check if a SceneDebugger needs to be cleaned up on this thread
-  DynamicArray<std::shared_ptr<dbg::SceneDebugger>> debuggersToShutdown;
-  _debugger.Mutate([&](auto& info) { debuggersToShutdown = std::move(info.pendingShutdown); });
-  for (auto& ptr : debuggersToShutdown) {
-    ptr->ShutdownOnSceneThread(this);
   }
 
   TimeSpan postStepDuration = timer.GetElapsed();
@@ -844,10 +842,7 @@ bool SceneImpl::IsEqualState(StateHandle a, StateHandle b) const {
 void SceneImpl::CaptureStateToFile(std::string_view filePath, Error& error) {
   MOCHI_ERROR_RETURN(error);
   MOCHI_ERROR_IF(filePath.empty(), error, "Empty file path");
-  MOCHI_ERROR_IF(
-      !_registry.storage<TagRomActor>().empty(),
-      error,
-      "CaptureStateToFile is not supported for scenes with ROM actors.");
+  CheckStateCaptureSupported(_registry, error);
   MOCHI_ERROR_RETURN(error);
   std::string json = capture::CaptureStateToJson(_registry, /*prettyMultiLine*/ true, error);
   WriteFile(filePath, json, error);
@@ -2436,6 +2431,8 @@ static std::shared_ptr<TetrahedralMeshShape const> CreateDuplicateShapeWithSkinn
       srcShape->GetMeshBlending(),
       srcShape->GetVisualMesh(),
       srcShape->GetVisualEmbedding(),
+      srcShape->GetContactSkin(),
+      srcShape->GetContactSkinEmbedding(),
       srcShape->GetGridSdf(),
       srcShape->GetRomData(), // Deep copy
       srcShape->GetSampleMeshes(), // Deep copy

@@ -40,7 +40,7 @@ namespace mochi::krylov {
  * @param[in] b The right-hand side vector of \f$ A x = b\f$.
  * @param[in,out] x Vector containing the initial guess at input and the solution at output.
  * @param[in] prec The preconditioner application functor.
- * @param[in] maxIter Maximum number of iterations.
+ * @param[in] maxIter Maximum number of iterations. Must be positive.
  * @param[in,out] statusCheck A functor called at each iteration to check the stop criteria.
  * @param[in] abortIfNotSpd Boolean to abort the solve if the matrix is detected not to be symmetric
  * positive definite. Default is false.
@@ -95,8 +95,11 @@ LinearSolverStatus PCG(
   constexpr bool kNeedPrecResidual =
       std::is_same_v<StopCriterion, StatusPreconditionedResidualL2<Dot, Scalar>> ||
       std::is_same_v<StopCriterion, StatusResidualPreconditionerInduced<Dot, Scalar>>;
-  constexpr bool kCheckStatusComputesRTz =
+  // The criterion owns a separate Dot. Reusing its rTz is safe only when both instances produce
+  // identical results. UsualDot guarantees this.
+  constexpr bool kCanReuseCriterionRTz = std::is_same_v<Dot, UsualDot> &&
       std::is_same_v<StopCriterion, StatusResidualPreconditionerInduced<Dot, Scalar>>;
+  MOCHI_ASSERT_VERBOSE(maxIter > 0, "Maximum number of iterations must be positive.");
   MOCHI_ASSERT_VERBOSE(
       initialGuessHint != InitialGuessHint::Zero || dot(x, x) == 0,
       "InitialGuessHint::Zero requires an exactly zero initial guess.");
@@ -137,7 +140,7 @@ LinearSolverStatus PCG(
 
   p = z;
   Scalar rTz_current{}; // r_0^T z_0
-  if constexpr (kCheckStatusComputesRTz) {
+  if constexpr (kCanReuseCriterionRTz) {
     rTz_current = statusCheck.GetLatestResidualNormSqr();
   } else {
     rTz_current = dot(r, z);
@@ -203,7 +206,7 @@ LinearSolverStatus PCG(
     }
 
     auto const rTz_old = rTz_current;
-    if constexpr (kCheckStatusComputesRTz) {
+    if constexpr (kCanReuseCriterionRTz) {
       rTz_current = statusCheck.GetLatestResidualNormSqr();
     } else {
       rTz_current = dot(r, z);

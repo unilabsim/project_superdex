@@ -18,6 +18,7 @@
 
 #include <mochi_core/linear_algebra/block_sparse_matrix.h>
 #include <mochi_core/linear_algebra/block_view_vector.h>
+#include <mochi_core/linear_algebra/krylov/incomplete_cholesky_prec_completion.h>
 #include <mochi_core/linear_algebra/krylov/preconditioner.h>
 #include <mochi_core/linear_algebra/matrix.h>
 #include <mochi_core/linear_algebra/matrix_operations.h>
@@ -26,14 +27,22 @@
 #include <mochi_core/utils/basic_utils.h>
 #include <mochi_core/utils/debug.h>
 #include <mochi_core/utils/dynamic_array.h>
+#include <mochi_core/utils/graph_views.h>
+#include <mochi_core/utils/span.h>
 #include <mochi_core/utils/sparsity_utils.h>
 
 #include <algorithm>
 #include <concepts>
+#include <cstddef>
 #include <limits>
+#include <memory>
 #include <type_traits>
+#include <utility>
 
 namespace mochi::krylov {
+
+/// @brief Select Cholesky completion without dropped fill in natural elimination order.
+struct NaturalOrderCompletion {};
 
 /// @brief Empty definition of incomplete Cholesky for non-supported input matrix.
 template <typename MatrixType>
@@ -41,9 +50,11 @@ struct IncompleteCholeskyPrec {
   IncompleteCholeskyPrec() = delete;
 };
 
-/// @brief Incomplete Cholesky preconditioner for @ref BlockSparseMatrix input.
+/// @brief Incomplete or natural-order-completed Cholesky preconditioner for
+/// @ref BlockSparseMatrix input.
 ///
 /// @pre The input matrix must be symmetric positive definite (SPD).
+///
 /// @warning Factorization breakdown is not reported to the caller. Block pivots must remain finite,
 /// positive definite, and numerically safe to invert.
 template <
@@ -54,6 +65,7 @@ template <
     template <typename, typename...> typename Storage>
 struct IncompleteCholeskyPrec<BlockSparseMatrix<Scalar, kBlockSize, CRIdx, Ptr, Storage>>
     : Preconditioner<std::remove_const_t<Scalar>> {
+  using MatrixType = BlockSparseMatrix<Scalar, kBlockSize, CRIdx, Ptr, Storage>;
   using NonConstScalar = std::remove_const_t<Scalar>;
   using NonConstIdx = std::remove_const_t<CRIdx>;
   using NonConstPtr = std::remove_const_t<Ptr>;
@@ -65,11 +77,34 @@ struct IncompleteCholeskyPrec<BlockSparseMatrix<Scalar, kBlockSize, CRIdx, Ptr, 
   /// @param[in] level Level of fill-in
   /// @param[in] alphaShift Scaling factor for the shift
   ///
+  /// @pre @p alphaShift must be nonnegative.
+  ///
   /// @note When shifting the input matrix, the incomplete factor is the one for A + alphaShift *
   /// (trace(A) / N) * I where N is the dimension of A.
+  explicit IncompleteCholeskyPrec(MatrixType const& A, int level, Scalar alphaShift);
+
+  /**
+   * @brief Construct a Cholesky preconditioner using natural-order symbolic completion.
+   *
+   * @param[in] A Input block sparse matrix.
+   * @param[in] completion Selects symbolic completion without dropped fill.
+   * @param[in] alphaShift Scaling factor for the diagonal shift.
+   *
+   * @pre The block sparsity is square and structurally symmetric, with sorted unique rows and a
+   * diagonal block in every row.
+   * @pre @p alphaShift must be nonnegative.
+   *
+   * @note Only the diagonal and upper-triangular numerical blocks are used.
+   * @note Completion currently requires `int` block indices and pointers.
+   * @note In exact arithmetic, the preconditioner exactly factors the shifted matrix A +
+   * alphaShift * (trace(A) / N) * I, where N is the dimension of A.
+   *
+   * @warning Worst-case storage is O(n^2) factor blocks and O(n^3) cached product indices, where n
+   * is the number of block rows. Callers must bound n accordingly.
+   */
   explicit IncompleteCholeskyPrec(
-      BlockSparseMatrix<Scalar, kBlockSize, CRIdx, Ptr, Storage> const& A,
-      int level,
+      MatrixType const& A,
+      NaturalOrderCompletion completion,
       Scalar alphaShift);
 
   /// @brief Apply the preconditioner to a column vector (or a set of column vectors).
@@ -95,13 +130,16 @@ struct IncompleteCholeskyPrec<BlockSparseMatrix<Scalar, kBlockSize, CRIdx, Ptr, 
   }
 
   constexpr PreconditionerType GetType() const override {
-    MOCHI_ASSERT(_level == 0, "IncompleteCholeskyPrec::GetType assumes IC0.");
+    MOCHI_ASSERT(
+        _level == 0 || _level == kNaturalOrderCompletionLevel,
+        "IncompleteCholeskyPrec::GetType assumes IC0 or exact completion.");
     return kType;
   }
 
   /// @brief Update the preconditioner from a block sparse matrix with the same sparsity pattern.
   /// @param[in] A Input block sparse matrix.
-  /// @note The sparsity of the fill level is NOT recomputed. Only the values are updated.
+  /// @note The factor sparsity is not recomputed. Natural-order completion requires the same source
+  /// sparsity used at construction.
   template <
       typename ScalarA,
       typename CRIdxA,
@@ -109,8 +147,32 @@ struct IncompleteCholeskyPrec<BlockSparseMatrix<Scalar, kBlockSize, CRIdx, Ptr, 
       template <typename, typename...> typename StorageA>
   void Update(BlockSparseMatrix<ScalarA, kBlockSize, CRIdxA, PtrA, StorageA> const& A);
 
- protected:
+ private:
+  static constexpr int kNaturalOrderCompletionLevel = -1;
   static constexpr auto kInvalidPosition = static_cast<NonConstPtr>(-1);
+
+  struct NaturalOrderData {
+    /// Global block positions in the completed factor.
+    DynamicArray<NonConstPtr> upperFillPositions;
+    /// Row-local source offsets for transposed factor blocks.
+    DynamicArray<NonConstPtr> transposeOffsets;
+    /// Row-local target offsets for Schur products.
+    DynamicArray<NonConstPtr> productTargets;
+  };
+
+  void InitializeNaturalOrderData(MatrixType const& A);
+
+  template <
+      typename ScalarA,
+      typename CRIdxA,
+      typename PtrA,
+      template <typename, typename...> typename StorageA>
+  void UpdateNaturalOrder(BlockSparseMatrix<ScalarA, kBlockSize, CRIdxA, PtrA, StorageA> const& A);
+
+  void FactorizeNaturalOrder(
+      NonConstScalar alpha,
+      Span<NonConstPtr const> transposeOffsets,
+      Span<NonConstPtr const> productTargets);
 
   /// @brief Cache data that depends only on the factor sparsity pattern.
   void InitializeFactorData();
@@ -132,14 +194,18 @@ struct IncompleteCholeskyPrec<BlockSparseMatrix<Scalar, kBlockSize, CRIdx, Ptr, 
   /// @brief Start of the upper part, including the diagonal, as a global block index.
   DynamicArray<NonConstPtr> _uStart;
 
-  /// @brief Scratch map from block column to its local position in the current row.
-  DynamicArray<NonConstPtr> _columnToLocal;
+  /// @brief Column map for ordinary factorization, or source-to-factor map for natural-order
+  /// completion.
+  DynamicArray<NonConstPtr> _factorizationWorkspace;
 
   /// @brief Original shift factor passed to the constructor.
   NonConstScalar _alphaShift;
 
-  /// @brief Fill-in level.
+  /// @brief Nonnegative fill level, or @ref kNaturalOrderCompletionLevel.
   int _level = 0;
+
+  /// @brief Immutable symbolic schedules allocated only for natural-order completion.
+  std::shared_ptr<NaturalOrderData> _naturalOrderData;
 };
 
 /// @brief Implementation of incomplete Cholesky for Matrix input.
@@ -367,12 +433,44 @@ IncompleteCholeskyPrec<BlockSparseMatrix<Scalar, kBlockSize, CRIdx, Ptr, Storage
       "IncompleteCholeskyPrec requires signed matrix indices representable as int.");
   MOCHI_ASSERT_VERBOSE(A.Rows() == A.Cols(), "Input matrix must be square.");
   MOCHI_ASSERT_VERBOSE(_level >= 0, "Fill-in level must not be negative.");
-  MOCHI_ASSERT_VERBOSE(_alphaShift >= Scalar{0}, "Out-of-range shifting factor.")
+  MOCHI_ASSERT_VERBOSE(_alphaShift >= Scalar{0}, "Out-of-range shifting factor.");
   mochi::details::ConvertToFillLevel(_level, A, _factorization);
   InitializeFactorData();
   auto const alpha = _alphaShift > Scalar{0} && A.Rows() > 0 ? _alphaShift * (Trace(A) / A.Rows())
                                                              : NonConstScalar{0};
   Factorize(alpha);
+}
+
+template <
+    typename Scalar,
+    int kBlockSize,
+    typename CRIdx,
+    typename Ptr,
+    template <typename, typename...> typename Storage>
+IncompleteCholeskyPrec<BlockSparseMatrix<Scalar, kBlockSize, CRIdx, Ptr, Storage>>::
+    IncompleteCholeskyPrec(MatrixType const& A, NaturalOrderCompletion, Scalar alphaShift)
+    : _alphaShift(alphaShift),
+      _level(kNaturalOrderCompletionLevel),
+      _naturalOrderData(std::make_shared<NaturalOrderData>()) {
+  MOCHI_ASSERT_VERBOSE(A.Rows() == A.Cols(), "Input matrix must be square.");
+  MOCHI_ASSERT_VERBOSE(_alphaShift >= Scalar{0}, "Out-of-range shifting factor.");
+  auto factorPattern = details::CompleteCholeskyPatternNaturalOrder(AsGraphView(A));
+  DynamicArray<NonConstScalar> factorValues;
+  auto const valueCount = static_cast<size_t>(kBlockSize) * kBlockSize * factorPattern.NumTargets();
+  if constexpr (kIsResizeNoInitSafe<NonConstScalar>) {
+    factorValues.resize_noinit(valueCount);
+  } else {
+    factorValues.resize(valueCount);
+  }
+  _factorization.Reset(
+      A.BlockCols(),
+      std::move(factorPattern.GetMovablePointers()),
+      std::move(factorPattern.GetMovableTargets()),
+      std::move(factorValues));
+  _factorizationWorkspace.reserve(static_cast<size_t>(A.NumNonZeroBlocks()));
+  InitializeFactorData();
+  InitializeNaturalOrderData(A);
+  UpdateNaturalOrder(A);
 }
 
 template <
@@ -400,7 +498,11 @@ void IncompleteCholeskyPrec<BlockSparseMatrix<Scalar, kBlockSize, CRIdx, Ptr, St
     MOCHI_ASSERT_VERBOSE(_factorization.Pointers() == A.Pointers(), "Sparsity pattern mismatch.");
     MOCHI_ASSERT_VERBOSE(_factorization.Indices() == A.Indices(), "Sparsity pattern mismatch.");
     std::copy(srcValues.begin(), srcValues.end(), dstValues.begin());
+  } else if (_level == kNaturalOrderCompletionLevel) {
+    UpdateNaturalOrder(A);
+    return;
   } else {
+    MOCHI_ASSERT_VERBOSE(_level > 0, "Invalid fill-in level.");
     _factorization.SetZero();
     _factorization += A;
   }
@@ -415,12 +517,206 @@ template <
     typename CRIdx,
     typename Ptr,
     template <typename, typename...> typename Storage>
+void IncompleteCholeskyPrec<BlockSparseMatrix<Scalar, kBlockSize, CRIdx, Ptr, Storage>>::
+    InitializeNaturalOrderData(MatrixType const& A) {
+  auto const sourceCount = static_cast<size_t>(A.NumNonZeroBlocks());
+  auto const factorCount = static_cast<size_t>(_factorization.NumNonZeroBlocks());
+  auto const rowCount = static_cast<size_t>(_factorization.BlockRows());
+  MOCHI_ASSERT_VERBOSE(
+      factorCount >= sourceCount && (factorCount - sourceCount) % 2 == 0,
+      "Invalid source and completed factor patterns.");
+  MOCHI_ASSERT_VERBOSE(
+      factorCount >= rowCount && (factorCount - rowCount) % 2 == 0,
+      "Invalid completed factor pattern.");
+  MOCHI_ASSERT_VERBOSE(_naturalOrderData != nullptr, "Missing natural-order data.");
+
+  auto& data = *_naturalOrderData;
+  _factorizationWorkspace.resize_noinit(sourceCount);
+  data.upperFillPositions.reserve((factorCount - sourceCount) / 2);
+  data.transposeOffsets.reserve((factorCount - rowCount) / 2);
+
+  auto const srcPtr = A.Pointers();
+  auto const srcIdx = A.Indices();
+  auto const dstPtr = _factorization.Pointers();
+  auto const dstIdx = _factorization.Indices();
+  size_t productCount = 0;
+  for (NonConstIdx row = 0; row < A.BlockRows(); ++row) {
+    NonConstPtr source = srcPtr[row];
+    for (NonConstPtr target = dstPtr[row]; target < dstPtr[row + 1]; ++target) {
+      if (source < srcPtr[row + 1] && srcIdx[source] == dstIdx[target]) {
+        _factorizationWorkspace[source++] = target;
+      } else {
+        MOCHI_ASSERT_VERBOSE(
+            source == srcPtr[row + 1] || dstIdx[target] < srcIdx[source],
+            "Completed factor pattern misses a source block.");
+        if (dstIdx[target] >= row) {
+          data.upperFillPositions.push_back(target);
+        }
+      }
+    }
+    MOCHI_ASSERT_VERBOSE(
+        source == srcPtr[row + 1], "Completed factor pattern misses source blocks.");
+    auto const upperCount = static_cast<size_t>(dstPtr[row + 1] - _uStart[row] - 1);
+    productCount += upperCount * (upperCount + 1) / 2;
+  }
+  MOCHI_ASSERT_VERBOSE(
+      data.upperFillPositions.size() == (factorCount - sourceCount) / 2,
+      "Incomplete upper-fill positions.");
+  data.productTargets.reserve(productCount);
+
+  // Flatten transpose and product positions in (i, k, j) left-looking LDLT order:
+  // L_ik = W_ki^T D_k^-1 and S_ij -= L_ik W_kj.
+  for (NonConstIdx row = 0; row < _factorization.BlockRows(); ++row) {
+    auto const rowIndices = _factorization.Indices(row);
+    auto const localDiag = _uStart[row] - dstPtr[row];
+    for (NonConstPtr p = 0; p < localDiag; ++p) {
+      auto const sourceRow = rowIndices[p];
+      auto const sourceIndices = _factorization.Indices(sourceRow);
+      auto const sourceDiag = _uStart[sourceRow] - dstPtr[sourceRow];
+      auto source =
+          std::lower_bound(sourceIndices.begin() + sourceDiag + 1, sourceIndices.end(), row);
+      MOCHI_ASSERT_VERBOSE(
+          source != sourceIndices.end() && *source == row,
+          "Completed factor pattern must be symmetric.");
+      data.transposeOffsets.push_back(static_cast<NonConstPtr>(source - sourceIndices.begin()));
+
+      auto target = rowIndices.begin() + localDiag;
+      for (; source != sourceIndices.end(); ++source) {
+        target = std::lower_bound(target, rowIndices.end(), *source);
+        MOCHI_ASSERT_VERBOSE(
+            target != rowIndices.end() && *target == *source,
+            "Completed factor pattern is not closed under left-looking updates.");
+        data.productTargets.push_back(static_cast<NonConstPtr>(target - rowIndices.begin()));
+        ++target;
+      }
+    }
+  }
+  MOCHI_ASSERT_VERBOSE(
+      data.transposeOffsets.size() == (factorCount - rowCount) / 2,
+      "Incomplete transpose offsets.");
+}
+
+template <
+    typename Scalar,
+    int kBlockSize,
+    typename CRIdx,
+    typename Ptr,
+    template <typename, typename...> typename Storage>
+template <
+    typename ScalarA,
+    typename CRIdxA,
+    typename PtrA,
+    template <typename, typename...> typename StorageA>
+void IncompleteCholeskyPrec<BlockSparseMatrix<Scalar, kBlockSize, CRIdx, Ptr, Storage>>::
+    UpdateNaturalOrder(BlockSparseMatrix<ScalarA, kBlockSize, CRIdxA, PtrA, StorageA> const& A) {
+  MOCHI_ASSERT_VERBOSE(_naturalOrderData != nullptr, "Missing natural-order data.");
+  auto const& data = *_naturalOrderData;
+  MOCHI_ASSERT_VERBOSE(
+      static_cast<size_t>(A.NumNonZeroBlocks()) == _factorizationWorkspace.size(),
+      "Sparsity pattern mismatch.");
+  auto const srcPtr = A.Pointers();
+  auto const srcIdx = A.Indices();
+  auto const dstPtr = _factorization.Pointers();
+  [[maybe_unused]] auto const dstIdx = _factorization.Indices();
+
+  auto fill = data.upperFillPositions.begin();
+  for (NonConstIdx row = 0; row < A.BlockRows(); ++row) {
+    auto dstValues = _factorization.Values(row);
+    while (fill != data.upperFillPositions.end() && *fill < dstPtr[row + 1]) {
+      MOCHI_ASSERT_VERBOSE(*fill >= dstPtr[row], "Invalid fill position.");
+      dstValues[*fill - dstPtr[row]].SetZero();
+      ++fill;
+    }
+    auto const srcValues = A.Values(row);
+
+    // Copy only source blocks on or above the diagonal. FactorizeNaturalOrder overwrites every
+    // strict-lower factor block before use.
+    for (NonConstPtr p = srcPtr[row]; p < srcPtr[row + 1]; ++p) {
+      auto const target = _factorizationWorkspace[p];
+      MOCHI_ASSERT_VERBOSE(
+          target >= dstPtr[row] && target < dstPtr[row + 1] && srcIdx[p] == dstIdx[target],
+          "Sparsity pattern mismatch.");
+      if (srcIdx[p] >= row) {
+        dstValues[target - dstPtr[row]] = srcValues[p - srcPtr[row]];
+      }
+    }
+  }
+  MOCHI_ASSERT_VERBOSE(fill == data.upperFillPositions.end(), "Invalid fill position.");
+
+  auto const alpha =
+      _alphaShift > Scalar{0} && A.Rows() > 0 ? _alphaShift * (Trace(A) / A.Rows()) : Scalar{0};
+  FactorizeNaturalOrder(
+      alpha, MakeConstSpan(data.transposeOffsets), MakeConstSpan(data.productTargets));
+}
+
+template <
+    typename Scalar,
+    int kBlockSize,
+    typename CRIdx,
+    typename Ptr,
+    template <typename, typename...> typename Storage>
+void IncompleteCholeskyPrec<BlockSparseMatrix<Scalar, kBlockSize, CRIdx, Ptr, Storage>>::
+    FactorizeNaturalOrder(
+        NonConstScalar alpha,
+        Span<NonConstPtr const> transposeOffsets,
+        Span<NonConstPtr const> productTargets) {
+  auto const pointers = _factorization.Pointers();
+  if (alpha > Scalar{0}) {
+    for (NonConstIdx row = 0; row < _factorization.BlockRows(); ++row) {
+      auto diagonal = _factorization.Values(row)[_uStart[row] - pointers[row]];
+      for (int j = 0; j < kBlockSize; ++j) {
+        diagonal(j, j) += alpha;
+      }
+    }
+  }
+
+  size_t scheduleIndex = 0;
+  size_t productIndex = 0;
+  for (NonConstIdx row = 0; row < _factorization.BlockRows(); ++row) {
+    auto const rowIndices = _factorization.Indices(row);
+    auto values = _factorization.Values(row);
+    auto const localDiag = _uStart[row] - pointers[row];
+    for (NonConstPtr p = 0; p < localDiag; ++p, ++scheduleIndex) {
+      auto const sourceRow = rowIndices[p];
+      auto const sourceValues = _factorization.Values(sourceRow);
+      MOCHI_ASSERT_VERBOSE(scheduleIndex < transposeOffsets.size(), "Invalid transpose schedule.");
+      auto const sourceOffset = transposeOffsets[scheduleIndex];
+      RowMatrix<NonConstScalar, kBlockSize, kBlockSize> const left =
+          sourceValues[sourceOffset].Transpose() * _inverseDiagBlocks[sourceRow];
+      values[p] = left;
+      for (NonConstPtr source = sourceOffset; source < sourceValues.NumBlocks(); ++source) {
+        MOCHI_ASSERT_VERBOSE(productIndex < productTargets.size(), "Invalid product schedule.");
+        if constexpr (kBlockSize <= 4) {
+          // Materialize products to avoid redundant source reloads: the compiler cannot prove that
+          // these disjoint views into one allocation do not alias. Larger products may spill,
+          // making fused evaluation faster.
+          RowMatrix<NonConstScalar, kBlockSize, kBlockSize> const product =
+              left * sourceValues[source];
+          values[productTargets[productIndex]] -= product;
+        } else {
+          values[productTargets[productIndex]] -= left * sourceValues[source];
+        }
+        ++productIndex;
+      }
+    }
+    _inverseDiagBlocks[row] = SymInverse(values[localDiag]);
+  }
+  MOCHI_ASSERT_VERBOSE(productIndex == productTargets.size(), "Incomplete product schedule.");
+  MOCHI_ASSERT_VERBOSE(scheduleIndex == transposeOffsets.size(), "Incomplete transpose schedule.");
+}
+
+template <
+    typename Scalar,
+    int kBlockSize,
+    typename CRIdx,
+    typename Ptr,
+    template <typename, typename...> typename Storage>
 void IncompleteCholeskyPrec<
     BlockSparseMatrix<Scalar, kBlockSize, CRIdx, Ptr, Storage>>::InitializeFactorData() {
   auto const rPtr = _factorization.Pointers();
   _uStart.resize_noinit(_factorization.BlockRows());
-  _columnToLocal.clear();
-  _columnToLocal.resize(_factorization.BlockRows(), kInvalidPosition);
+  _factorizationWorkspace.clear();
+  _factorizationWorkspace.resize(_factorization.BlockRows(), kInvalidPosition);
   _inverseDiagBlocks.resize(_factorization.BlockRows());
   for (NonConstIdx i = 0; i < _factorization.BlockRows(); ++i) {
     auto const cIdx = _factorization.Indices(i);
@@ -440,10 +736,11 @@ template <
     template <typename, typename...> typename Storage>
 void IncompleteCholeskyPrec<BlockSparseMatrix<Scalar, kBlockSize, CRIdx, Ptr, Storage>>::Factorize(
     NonConstScalar alpha) {
-  auto* const columnToLocal = _columnToLocal.data();
+  auto* const columnToLocal = _factorizationWorkspace.data();
   MOCHI_ASSERT_VERBOSE(
       std::ranges::all_of(
-          _columnToLocal, [](NonConstPtr position) { return position == kInvalidPosition; }),
+          _factorizationWorkspace,
+          [](NonConstPtr position) { return position == kInvalidPosition; }),
       "Factorization workspace is not clear.");
   auto const rPtr = _factorization.Pointers();
   RowMatrix<NonConstScalar, kBlockSize, kBlockSize> scaling;
@@ -488,7 +785,8 @@ void IncompleteCholeskyPrec<BlockSparseMatrix<Scalar, kBlockSize, CRIdx, Ptr, St
   }
   MOCHI_ASSERT_VERBOSE(
       std::ranges::all_of(
-          _columnToLocal, [](NonConstPtr position) { return position == kInvalidPosition; }),
+          _factorizationWorkspace,
+          [](NonConstPtr position) { return position == kInvalidPosition; }),
       "Factorization workspace was not restored.");
 }
 

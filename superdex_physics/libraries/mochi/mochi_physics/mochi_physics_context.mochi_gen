@@ -580,7 +580,7 @@ class Context [no_init, no_destruct, singleton] {
   //
   // @see ShapeHandle, ReleaseShape
   fn CreateTetMeshShape(
-    Span<real const> coordinates [units(m)],
+    Span<real const> coordinates [units("m")],
     Span<int const> connectivity
   ) -> ShapeHandle [pure, virtual, mochi_error];
 
@@ -599,7 +599,7 @@ class Context [no_init, no_destruct, singleton] {
   //
   // @see ShapeHandle, ReleaseShape
   fn CreateTriMeshShape(
-    Span<real const> coordinates [units(m)],
+    Span<real const> coordinates [units("m")],
     Span<int const> connectivity,
   )  -> ShapeHandle [pure, virtual, mochi_error];
   // @brief Create an implicit sphere shape.
@@ -615,7 +615,7 @@ class Context [no_init, no_destruct, singleton] {
   // @note Call on any thread.
   //
   // @see ShapeHandle, ReleaseShape
-  fn CreateSphereShape(Real3 const& center, real radius [units(m)]) -> ShapeHandle [pure, virtual, mochi_error];
+  fn CreateSphereShape(Real3 const& center, real radius [units("m")]) -> ShapeHandle [pure, virtual, mochi_error];
 
   // @brief Create an implicit plane with infinite extents.
   //
@@ -632,7 +632,7 @@ class Context [no_init, no_destruct, singleton] {
   // @note Call on any thread.
   //
   // @see ShapeHandle, ReleaseShape
-  fn CreatePlaneShape(Real3 const& normal, real distance [units(m)]) -> ShapeHandle [pure, virtual, mochi_error];
+  fn CreatePlaneShape(Real3 const& normal, real distance [units("m")]) -> ShapeHandle [pure, virtual, mochi_error];
 
   // @brief Get a view of the shape's main mesh data.
   //
@@ -656,8 +656,9 @@ class Context [no_init, no_destruct, singleton] {
   // @details Returns a triangle mesh (3 nodes per element) representing the shape's surface.
   // The coordinate array contains exactly the surface nodes referenced by the returned connectivity;
   // nodes present in the underlying main mesh but not referenced by any surface triangle are omitted.
-  // Connectivity values are indices into this returned coordinate array. For shapes without a
-  // surface mesh, returns an empty view.
+  // Connectivity values are indices into this returned coordinate array. For polyline shapes with
+  // an authored contact skin, returns that skin. For shapes without a surface mesh, returns an
+  // empty view.
   //
   // @note For triangular mesh shapes, this may differ from @ref GetShapeMesh if the main mesh
   // contains unreferenced nodes. For tetrahedral mesh shapes, this is the boundary surface of the

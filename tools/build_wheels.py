@@ -158,7 +158,7 @@ MESH_CLI_DEFINE_VARIABLE = "SKBUILD_CMAKE_DEFINE"
 # scikit-build-core adds these at `get_requires_for_build_wheel` time when the environment has
 # no new-enough cmake or ninja, as in the manylinux images. They are computed rather than
 # declared, so they cannot be read out of `[build-system].requires`.
-DYNAMIC_BUILD_REQUIREMENTS = ("cmake>=3.25", "ninja>=1.5")
+DYNAMIC_BUILD_REQUIREMENTS = ("cmake>=3.26", "ninja>=1.5")
 
 # What `--host` exports before invoking the backend, reproducing cibuildwheel's `setup_python`.
 # On macOS cibuildwheel computes these from the build identifier and never from the interpreter,

@@ -12,39 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""This scripts demonstrates the application of the RLlib library to train a policy for
-the sample environments. For this, we rely on the tune.run and experiments API to define
-and train simultaneously multiple environments.
+"""Train explicit canonical Gymnasium IDs with manifest-owned RLlib recipes.
 
-The set of trainable environments is discovered automatically: any environment (base or
-config variant) that ships a ``<env_module>[_<variant>].train.json`` recipe next to its
-module is trainable, and its RLlib configuration is built from that file. There is no
-hard-coded list of environments, so environments absent from a build are simply not
-trainable -- no per-environment gating is required.
+Recipe manifests map exact environment IDs to filesystem-safe output slugs and explicit
+JSON payloads. Recipe association is never inferred from implementation modules, classes,
+variant filenames, or related IDs, and a variant has no recipe unless its own canonical
+ID appears in a manifest.
 
-A recipe holds only training settings. Environment configuration belongs in a gym config
-variant (``<env_module>_<variant>.json``), so that every configuration that gets trained
-is also a nameable, runnable environment rather than a setup that exists only inside a
-recipe.
-
-Recipes are written against RLlib's new API stack, so settings are expressed as their
-new-stack equivalents: observation normalization is requested with
+Recipes use RLlib's new API stack. Observation normalization is requested with
 ``normalize_observations``, which installs a ``MeanStdFilter`` connector.
 
 PPO is the recommended workflow. SAC is available as an experimental RLlib baseline.
 Its bundled settings and stopping thresholds have not been tuned or validated for the
-included environments, and per-environment ``ppo`` overrides are ignored.
+included environments, and per-environment ``ppo`` overrides are ignored under SAC.
 """
 
 import argparse
 import fnmatch
 import pathlib
 import warnings
+from collections.abc import Sequence
 from typing import Any
 
+import gymnasium as gym
 import ray
 import ray.tune
-from callbacks import CheckpointVideoGeneratorCallback, LogRewardAndInfoCallbacks
 from ray.rllib.algorithms.callbacks import DefaultCallbacks
 from ray.rllib.algorithms.ppo.ppo import PPOConfig
 from ray.rllib.algorithms.sac.sac import SACConfig
@@ -57,47 +49,42 @@ from ray.rllib.utils.metrics import (
 from ray.train import CheckpointConfig
 from ray.tune.experiment import Experiment, Trial
 from ray.tune.utils.log import Verbosity
-from superdex.lab.gym.utils.env_discovery import (
-    EnvEntry,
-    get_env_entries,
-    load_entry_config,
-)
 from superdex.lab.gym.utils.train_cfg import TrainCfg
 from superdex.physics.viewer import VIEWER_AVAILABLE
-from utils import register_envs
+
+try:
+    from .callbacks import CheckpointVideoGeneratorCallback, LogRewardAndInfoCallbacks
+    from .recipe_manifest import load_recipes, PUBLIC_RECIPE_MANIFEST, Recipe
+    from .utils import register_envs
+except ImportError:
+    from callbacks import CheckpointVideoGeneratorCallback, LogRewardAndInfoCallbacks
+    from recipe_manifest import load_recipes, PUBLIC_RECIPE_MANIFEST, Recipe
+    from utils import register_envs
 
 ########################################################################################
 
-# Filename ``kind`` of the per-env training recipe (``<env_module>[_<variant>].train.json``).
-TRAIN_CONFIG_KIND = "train"
 
-
-def discover_trainable_envs() -> dict[str, tuple[EnvEntry, dict[str, Any]]]:
-    """Discover environments that ship a ``.train.json`` recipe.
-
-    Returns a mapping of env short name -> (entry, parsed train recipe). Config variants
-    are trainable too, each from its own ``<module>_<variant>.train.json``; environments
-    without a recipe are not trainable. Test-only variants are excluded: they are
-    degenerate configurations kept as crash checks, not tasks.
-    """
-    trainable: dict[str, tuple[EnvEntry, dict[str, Any]]] = {}
-    for entry in get_env_entries():
-        if entry.test_only:
-            continue
-        recipe = load_entry_config(entry, TRAIN_CONFIG_KIND)
-        if recipe:
-            trainable[entry.short_name] = (entry, recipe)
+def discover_trainable_envs(
+    manifest_paths: tuple[pathlib.Path, ...] = (PUBLIC_RECIPE_MANIFEST,),
+) -> dict[str, Recipe]:
+    """Load explicit training recipes and validate every canonical environment ID."""
+    trainable = load_recipes("train", manifest_paths)
+    for env_id in trainable:
+        gym.spec(env_id)
     return trainable
 
 
-def train_samples(train_cfg: TrainCfg):
+def train_samples(
+    train_cfg: TrainCfg,
+    manifest_paths: tuple[pathlib.Path, ...] = (PUBLIC_RECIPE_MANIFEST,),
+) -> None:
     """
     Entrypoint to the sample training script. Selects, generates and runs the samples
     according to the supplied training configuration.
     """
 
     # Register environments (both with Gymnasium and the Ray Tune registry).
-    register_envs(import_sample_envs=True)
+    register_envs()
 
     # Validate configuration.
     # Limit the number of environment runners to the number of available CPUs.
@@ -125,14 +112,18 @@ def train_samples(train_cfg: TrainCfg):
         )
         train_cfg.num_env_runners = capped_num_env_runners
 
-    # Discover trainable environments from their train.json recipes.
-    trainable = discover_trainable_envs()
+    # Resolve trainable environments from exact canonical-ID manifests.
+    trainable = discover_trainable_envs(manifest_paths)
 
-    # Determine samples to run.
-    train_names = fnmatch.filter(trainable.keys(), train_cfg.pattern)
-    if len(train_names) == 0:
-        print("No samples to train, exitting...")
-        exit(-1)
+    # Determine samples to run. Patterns match canonical Gymnasium IDs; recipe slugs are
+    # filesystem-safe output labels only and never become a second environment identity.
+    train_ids = fnmatch.filter(trainable, train_cfg.pattern)
+    if len(train_ids) == 0:
+        available = ", ".join(trainable)
+        raise ValueError(
+            f"Pattern {train_cfg.pattern!r} matched no canonical environment IDs. "
+            f"Trainable IDs: {available}"
+        )
 
     # Generate Tune callbacks.
     callbacks = []
@@ -149,7 +140,7 @@ def train_samples(train_cfg: TrainCfg):
 
     # Run training for the selected samples.
     train_experiments = [
-        build_experiment(train_cfg, *trainable[name]) for name in train_names
+        build_experiment(train_cfg, trainable[env_id]) for env_id in train_ids
     ]
     ray.tune.run(
         train_experiments,
@@ -159,34 +150,32 @@ def train_samples(train_cfg: TrainCfg):
 
 
 ########################################################################################
-# Experiment construction from train.json recipes
+# Experiment construction from explicit recipes
 ########################################################################################
 
 
-def build_experiment(
-    train_cfg: TrainCfg, entry: EnvEntry, recipe: dict[str, Any]
-) -> Experiment:
-    """Build an RLlib experiment for ``entry`` from its ``train.json`` recipe."""
+def build_experiment(train_cfg: TrainCfg, recipe: Recipe) -> Experiment:
+    """Build an RLlib experiment from a canonical-ID recipe record."""
+    recipe_config = recipe.config
 
-    if "env_config" in recipe:
+    if "env_config" in recipe_config:
         # Env configuration is a property of the environment, not of a training run: a
         # recipe-only override silently trains a configuration that is not discoverable,
         # runnable, or smoke-tested anywhere else.
         raise ValueError(
-            f"Training recipe for '{entry.short_name}' contains an 'env_config' section. "
-            "Environment configuration must live in a gym config variant "
-            "('<env_module>_<variant>.json'); point the recipe at that variant by naming "
-            "it '<env_module>_<variant>.train.json' instead."
+            f"Training recipe for {recipe.env_id!r} contains an 'env_config' section. "
+            "Environment configuration must live in the registered Gymnasium EnvSpec; "
+            "select that exact canonical variant ID in the recipe manifest instead."
         )
 
     supported_keys = {"description", "normalize_observations", "stop_criteria", "ppo"}
-    unknown_keys = set(recipe) - supported_keys
+    unknown_keys = set(recipe_config) - supported_keys
     if unknown_keys:
         # Raise rather than ignore, matching the section guards below: a misspelled
         # 'stop_criteria' would otherwise leave the recipe trainable with no stop
         # condition, which only shows up as a run that never ends.
         raise ValueError(
-            f"Unknown keys in the training recipe for '{entry.short_name}': "
+            f"Unknown keys in the training recipe for {recipe.env_id!r}: "
             f"{', '.join(sorted(unknown_keys))}. "
             f"Supported keys: {', '.join(sorted(supported_keys))}."
         )
@@ -198,29 +187,29 @@ def build_experiment(
     # algorithm-specific overrides below. RLlib calls the factory as
     # ``(env, spaces, device)`` and builds it once per EnvRunner, so each runner owns one
     # filter whose running statistics are checkpointed with that runner's state.
-    if recipe.get("normalize_observations", False):
+    if recipe_config.get("normalize_observations", False):
         cfg.env_runners(
             env_to_module_connector=lambda env, spaces, device: MeanStdFilter()
         )
 
     # Apply PPO-specific overrides (if any). SAC uses the defaults for every env.
     if train_cfg.algorithm == "PPO":
-        _apply_ppo_overrides(cfg, recipe.get("ppo", {}), train_cfg)
+        _apply_ppo_overrides(cfg, recipe_config.get("ppo", {}), train_cfg)
 
-    # The env config comes from the entry's config variant, spelled out explicitly rather
-    # than left to the registered spec defaults: `run_inference.py` rebuilds the env from
-    # the `env_config` recorded in the checkpoint's params.json, and it replaces the spec's
-    # own `cfg` when doing so. Profiling is a runtime toggle rather than task
-    # configuration, so it is injected from the train config; it lives in the base
-    # MochiEnv, so it applies to every environment.
+    # Registered task defaults are merged by the Ray creator. Only runtime overrides are
+    # serialized in env_config, and explicit values still win during training/inference.
     env_config = {
-        **entry.cfg_kwargs,
         "profile": train_cfg.profile,
         "dump_timings_to_info": train_cfg.profile,
     }
-    cfg.environment(entry.env_id, env_config=env_config)
+    cfg.environment(recipe.env_id, env_config=env_config)
 
-    return make_experiment(train_cfg, entry.short_name, cfg, _stop_criteria(recipe))
+    return make_experiment(
+        train_cfg,
+        recipe.slug,
+        cfg,
+        _stop_criteria(recipe_config),
+    )
 
 
 def _apply_ppo_overrides(
@@ -450,7 +439,11 @@ def default_sac_config(train_cfg: TrainCfg) -> SACConfig:
 
 ########################################################################################
 
-if __name__ == "__main__":
+
+def main(
+    manifest_paths: tuple[pathlib.Path, ...] = (PUBLIC_RECIPE_MANIFEST,),
+    argv: Sequence[str] | None = None,
+) -> None:
     # Parse command line arguments.
     parser = argparse.ArgumentParser(
         description="Train SuperDex Gym sample environments with RLlib. PPO is the "
@@ -492,7 +485,7 @@ if __name__ == "__main__":
         "--pattern",
         type=str,
         default="*",
-        help="Pattern to select which samples to train (use '*' for all)",
+        help="Pattern matching canonical Gymnasium IDs (use '*' for all)",
     )
     parser.add_argument(
         "-o",
@@ -521,7 +514,7 @@ if __name__ == "__main__":
         default=0,
         help="Maximum number of training iterations per experiment (<=0 means no limit)",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     ray.init()
 
@@ -537,4 +530,8 @@ if __name__ == "__main__":
         profile=args.profile,
         max_iterations=args.max_iterations,
     )
-    train_samples(train_cfg)
+    train_samples(train_cfg, manifest_paths)
+
+
+if __name__ == "__main__":
+    main()

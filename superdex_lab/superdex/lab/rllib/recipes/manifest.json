@@ -1,0 +1,20 @@
+{
+    "superdex_gym/AntNoContact-v0": {
+        "slug": "ant_no_contact",
+        "recipes": {
+            "train": "ant_no_contact/train.json"
+        }
+    },
+    "superdex_gym/CartPole-v0": {
+        "slug": "cart_pole",
+        "recipes": {
+            "train": "cart_pole/train.json"
+        }
+    },
+    "superdex_gym/HalfCheetah-v0": {
+        "slug": "half_cheetah",
+        "recipes": {
+            "train": "half_cheetah/train.json"
+        }
+    }
+}

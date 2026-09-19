@@ -15,7 +15,11 @@
 # CMake target is `superdex_robotics_pybind` (with `_pybind` suffix) so it does not collide
 # with the `superdex_robotics` C++ library target; the extension file is named via
 # OUTPUT_NAME below so it imports as `superdex_robotics` (or `superdex_robotics_double`).
-pybind11_add_module(superdex_robotics_pybind)
+if (SKBUILD_SABI_VERSION)
+    nanobind_add_module(superdex_robotics_pybind STABLE_ABI NB_DOMAIN mochi)
+else ()
+    nanobind_add_module(superdex_robotics_pybind NB_DOMAIN mochi)
+endif ()
 file(GLOB_RECURSE superdex_robotics_pybind_srcs src/*.cpp)
 list(FILTER superdex_robotics_pybind_srcs EXCLUDE REGEX "/internal/")
 target_sources(superdex_robotics_pybind PRIVATE ${superdex_robotics_pybind_srcs})
@@ -38,9 +42,10 @@ mochi_set_output_directories(superdex_robotics_pybind)
 mochi_set_pybind_rpath(superdex_robotics_pybind)
 target_compile_definitions(superdex_robotics_pybind PRIVATE "MOCHI_USE_REFLECTION=1")
 
-# Output as superdex_robotics.so (Linux/Mac) or superdex_robotics.pyd (Windows). The output
-# name must match the PyInit_ symbol selected by SUPERDEX_ROBOTICS_MODULE_NAME in
-# pybind_include.h, which is superdex_robotics_double for double-precision builds.
+# Output as superdex_robotics.abi3.so (Linux/Mac stable ABI), superdex_robotics.so
+# (Linux/Mac regular ABI), or superdex_robotics.pyd (Windows). The output name must match the
+# PyInit_ symbol selected by SUPERDEX_ROBOTICS_MODULE_NAME in pybind_include.h, which is
+# superdex_robotics_double for double-precision builds.
 if (MOCHI_USE_DOUBLE_PRECISION)
     set(superdex_robotics_pybind_output_name "superdex_robotics_double")
 else ()
@@ -54,11 +59,11 @@ set_target_properties(superdex_robotics_pybind PROPERTIES
     # superdex_robotics.pdb and one would overwrite the other.
     PDB_NAME "${superdex_robotics_pybind_output_name}.pyd"
 )
-if(WIN32)
+if (WIN32)
     set_target_properties(superdex_robotics_pybind PROPERTIES SUFFIX ".pyd")
-else()
+elseif (NOT SKBUILD_SABI_VERSION)
     set_target_properties(superdex_robotics_pybind PROPERTIES SUFFIX ".so")
-endif()
+endif ()
 
 install(TARGETS superdex_robotics_pybind DESTINATION . COMPONENT superdex_robotics_pybind)
 

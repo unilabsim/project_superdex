@@ -19,7 +19,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "superdex"
 version = "1.0.0"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12"
 authors = [{name = "SuperDex Team"}]
 description = "Umbrella package for the public SuperDex Python distributions"
 readme = "README.md"
@@ -39,6 +39,8 @@ classifiers = [
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering",
 ]
 

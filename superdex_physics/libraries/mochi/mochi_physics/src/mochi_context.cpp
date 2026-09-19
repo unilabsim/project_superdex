@@ -848,6 +848,56 @@ OnAssertFn Context::GetAssertionFailureCallback() {
   return mochi::GetAssertionFailureCallback();
 }
 
+namespace {
+
+struct AuxiliaryMeshData {
+  std::unique_ptr<TriangularMesh> mesh;
+  std::unique_ptr<LinearMeshEmbedding> embedding;
+};
+
+AuxiliaryMeshData CreateAuxiliaryMeshData(std::optional<MeshData> const& data) {
+  if (!data) {
+    return {};
+  }
+  auto mesh = std::make_unique<TriangularMesh>(
+      Unflatten<Real3 const>(MakeConstSpan(data->coordinates)),
+      Unflatten<Int3 const>(MakeConstSpan(data->connectivity)));
+  if (!data->skinning) {
+    return {std::move(mesh), {}};
+  }
+  auto embedding = std::make_unique<LinearMeshEmbedding>(
+      data->skinning->weightsPerNode,
+      MakeConstSpan(data->skinning->indices),
+      MakeConstSpan(data->skinning->weights));
+  return {std::move(mesh), std::move(embedding)};
+}
+
+struct RodSurfaceData {
+  std::shared_ptr<TriangularMesh const> mesh;
+  std::shared_ptr<RodSurfaceEmbeddingData const> embedding;
+};
+
+RodSurfaceData CreateRodSurfaceData(
+    std::optional<MeshData>& data,
+    Span<Real3 const> rodNodes,
+    Span<Real3 const> elementFrameAxes,
+    bool isClosedLoop) {
+  if (!data) {
+    return {};
+  }
+  auto mesh = std::make_shared<TriangularMesh const>(
+      DynamicArray<Real3>{Unflatten<Real3>(data->coordinates)},
+      DynamicArray<Int3>{Unflatten<Int3>(data->connectivity)});
+  if (!data->skinning) {
+    return {std::move(mesh), {}};
+  }
+  auto embedding = std::make_shared<RodSurfaceEmbeddingData const>(ComputeRodSurfaceEmbedding(
+      rodNodes, elementFrameAxes, *mesh, std::move(*data->skinning), isClosedLoop));
+  return {std::move(mesh), std::move(embedding)};
+}
+
+} // namespace
+
 // Static API Method
 void Context::SetAssertionFailureCallbackInternal(OnAssertFn callback) {
   mochi::SetAssertionFailureCallback(callback);
@@ -890,14 +940,6 @@ ShapePtr ContextImpl::CreateShapeFromModelData(
         std::make_unique<ConstrainedNodesData>(std::move(*model.constrainedNodes));
   }
 
-  std::unique_ptr<TriangularMesh> visMesh;
-  if (model.visualMesh) {
-    // TODO: Move data instead of copying
-    visMesh = std::make_unique<TriangularMesh>(
-        Unflatten<Real3 const>(MakeConstSpan(model.visualMesh->coordinates)),
-        Unflatten<Int3 const>(MakeConstSpan(model.visualMesh->connectivity)));
-  }
-
   std::shared_ptr<GridSdf> gridSdf;
   if (model.sdf) {
     gridSdf = std::make_shared<GridSdf>(GridSdf::Create(std::move(*model.sdf)));
@@ -918,17 +960,11 @@ ShapePtr ContextImpl::CreateShapeFromModelData(
 
   if (model.mesh->nodesPerElement == 4) {
     // TODO: Move data instead of copying
+    auto visualSurface = CreateAuxiliaryMeshData(model.visualMesh);
+    auto contactSurface = CreateAuxiliaryMeshData(model.contactSkinMesh);
     auto tetMesh = std::make_unique<TetrahedralMesh>(
         Unflatten<Real3 const>(MakeConstSpan(model.mesh->coordinates)),
         Unflatten<Int4 const>(MakeConstSpan(model.mesh->connectivity)));
-
-    std::unique_ptr<LinearMeshEmbedding> visEmbedding;
-    if (model.visualMesh && model.visualMesh->skinning) {
-      visEmbedding = std::make_unique<LinearMeshEmbedding>(
-          model.visualMesh->skinning->weightsPerNode,
-          MakeConstSpan(model.visualMesh->skinning->indices),
-          MakeConstSpan(model.visualMesh->skinning->weights));
-    }
 
     std::unique_ptr<PerElementSoftMaterialData> material;
     if (model.material) {
@@ -940,8 +976,10 @@ ShapePtr ContextImpl::CreateShapeFromModelData(
         std::move(skinning),
         std::move(constrainedNodesData),
         std::move(shapeBlending),
-        std::move(visMesh),
-        std::move(visEmbedding),
+        std::move(visualSurface.mesh),
+        std::move(visualSurface.embedding),
+        std::move(contactSurface.mesh),
+        std::move(contactSurface.embedding),
         std::move(gridSdf),
         std::move(experimental.romData),
         std::move(experimental.sampleMeshes),
@@ -949,27 +987,22 @@ ShapePtr ContextImpl::CreateShapeFromModelData(
         std::move(material));
   } else if (model.mesh->nodesPerElement == 3) {
     // TODO: Move data instead of copying
+    auto visualSurface = CreateAuxiliaryMeshData(model.visualMesh);
+    auto contactSurface = CreateAuxiliaryMeshData(model.contactSkinMesh);
     auto triMesh = std::make_unique<TriangularMesh>(
         Unflatten<Real3 const>(MakeConstSpan(model.mesh->coordinates)),
         Unflatten<Int3 const>(MakeConstSpan(model.mesh->connectivity)));
-
-    std::unique_ptr<LinearMeshEmbedding> visEmbedding;
-    if (model.visualMesh && model.visualMesh->skinning) {
-      visEmbedding = std::make_unique<LinearMeshEmbedding>(
-          model.visualMesh->skinning->weightsPerNode,
-          MakeConstSpan(model.visualMesh->skinning->indices),
-          MakeConstSpan(model.visualMesh->skinning->weights));
-    }
 
     return std::make_shared<TriangularMeshShape>(
         std::move(triMesh),
         std::move(skinning),
         std::move(constrainedNodesData),
         std::move(shapeBlending),
-        std::move(visMesh),
-        std::move(visEmbedding),
+        std::move(visualSurface.mesh),
+        std::move(visualSurface.embedding),
+        std::move(contactSurface.mesh),
+        std::move(contactSurface.embedding),
         std::move(gridSdf));
-
   } else if (model.mesh->nodesPerElement == 2) {
     // TODO: Move data instead of copying
     auto nodes = DynamicArray<Real3>{Unflatten<Real3>(model.mesh->coordinates)};
@@ -978,33 +1011,23 @@ ShapePtr ContextImpl::CreateShapeFromModelData(
         ? DynamicArray<Real3>{Unflatten<Real3>(*model.elementFrameAxes)}
         : mochi::GenerateDiscreteBishopFrame(nodes, isClosedLoop);
 
-    std::shared_ptr<TriangularMesh const> visualSurfaceMesh;
-    std::shared_ptr<RodSurfaceEmbeddingData const> visualSurfaceEmbedding;
-
-    if (model.visualMesh) {
-      visualSurfaceMesh = std::make_shared<TriangularMesh const>(
-          DynamicArray<Real3>{Unflatten<Real3>(model.visualMesh->coordinates)},
-          DynamicArray<Int3>{Unflatten<Int3>(model.visualMesh->connectivity)});
-      if (model.visualMesh->skinning) {
-        visualSurfaceEmbedding =
-            std::make_shared<RodSurfaceEmbeddingData const>(ComputeRodSurfaceEmbedding(
-                nodes,
-                frameAxes,
-                *visualSurfaceMesh,
-                std::move(*model.visualMesh->skinning),
-                isClosedLoop));
-      }
-    }
+    auto visualSurface = CreateRodSurfaceData(
+        model.visualMesh, MakeConstSpan(nodes), MakeConstSpan(frameAxes), isClosedLoop);
+    auto contactSurface = CreateRodSurfaceData(
+        model.contactSkinMesh, MakeConstSpan(nodes), MakeConstSpan(frameAxes), isClosedLoop);
 
     return std::make_shared<PolylineShape>(
         std::move(nodes),
         std::move(frameAxes),
-        std::move(visualSurfaceMesh),
-        std::move(visualSurfaceEmbedding),
+        std::move(visualSurface.mesh),
+        std::move(visualSurface.embedding),
+        std::move(contactSurface.mesh),
+        std::move(contactSurface.embedding),
         isClosedLoop);
   } else {
     MOCHI_ERROR_SET(
-        error, "Mesh element size must be 3 for triangle mesh or 4 for tetrahedral mesh.");
+        error,
+        "Mesh element size must be 2 for polyline, 3 for triangle, or 4 for tetrahedral mesh.");
     return {};
   }
 }

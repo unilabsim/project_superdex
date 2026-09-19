@@ -18,6 +18,7 @@
 
 #include <mochi_core/contact/contact_utils.h>
 #include <mochi_core/geometry/model_data.h>
+#include <mochi_core/utils/batch_types.h>
 #include <mochi_core/utils/matrix_utils.h>
 #include <mochi_core/utils/nd_array_utils.h>
 #include <mochi_core/utils/profile.h>
@@ -29,6 +30,13 @@
 #include <vector>
 
 namespace mochi {
+
+// Forced inlining causes pathological MSVC compile times. Let MSVC decide.
+#if MOCHI_COMPILER_MSVC
+#define MOCHI_FLUSH_INLINE_LAMBDA
+#else
+#define MOCHI_FLUSH_INLINE_LAMBDA MOCHI_FORCE_INLINE_LAMBDA
+#endif
 
 static Real3
 ComputeAxisBasedResolution(TriangularMesh const* mesh, GridSdfParams const& params, Error& error) {
@@ -318,7 +326,7 @@ bool GridSdf::InitializeBruteForce(
   return meshCollider.IsMeshClosed();
 }
 
-template <class SamplerT>
+template <GridExtrapolation kExtrapolationType>
 void GridSdf::FindPointContactsImpl(
     Span<Real3 const> points,
     TransformRT const& pointsFromActor,
@@ -326,16 +334,28 @@ void GridSdf::FindPointContactsImpl(
     DynamicArray<int>& outIndices,
     DynamicArray<Real3>& outContacts,
     SdfInfo& outSdf) const {
+  // Coordinate spaces:
+  // - Point-space is the coordinate space of the input points.
+  // - Actor-space is the collider's local space. pointsFromActor maps actor-space to point-space.
+  // - Grid-space is the local space in which the DenseGrid3D was computed. This may be different
+  //   from actor-space if the SDF was computed offline and a transform was applied on load. In
+  //   that case, the GridSdf will store transformation matrices to convert between actor-space and
+  //   grid-space.
   //
-  // About coordinate spaces:
-  //  - Point-space is what we call the coordinate space of the input points.
-  //  - Actor-space is the local space of the owning actor (called the collider).
-  //      The caller provides a TransformRT to convert between point-space and actor-space.
-  //  - Grid-space is the local space in which the DenseGrid3D was computed. This may be different
-  //      from actor-space if the SDF was computed offline and a transform was applied on load. In
-  //      that case, the GridSdf will store transformation matrices to convert between actor-space
-  //      and grid-space.
+  // The algorithm uses these coordinate spaces in a three-stage pipeline:
+  // 1. Cull against the point- and grid-space AABBs, compacting candidates into a distance queue.
+  // 2. Evaluate GridSDF distances and gradients together, compacting accepted contacts into an
+  // output queue.
+  // 3. Transform contacts to actor-space and append them to the outputs.
+  // Compaction preserves input order between stages.
   //
+  // NOTE: Potential performance improvements:
+  // - Completed contacts are buffered and copied instead of written directly to pre-sized outputs.
+  // - Inputs smaller than kDistanceBatchSize still pay the SIMD setup and tail-handling costs.
+  // - AABB culling processes one batch at a time, limiting opportunities to hide instruction
+  //   latency by interleaving independent batches.
+  // - Calls already culled by a BSH may benefit from skipping the point-space AABB culling.
+
   MOCHI_ASSERT_VERBOSE(outIndices.empty(), "Expected empty contact detection result.");
   MOCHI_ASSERT_VERBOSE(outContacts.empty(), "Expected empty contact detection result.");
   MOCHI_ASSERT_VERBOSE(outSdf.empty(), "Expected empty contact detection result.");
@@ -360,119 +380,291 @@ void GridSdf::FindPointContactsImpl(
     boundsInPointSpace = TransformShape_Transposed(pointsFromGridT, boundsInGridSpace);
   }
 
-  static constexpr int kMaxBatchSize = 64 * Simd<real>::kSize;
+  constexpr int kOutputBatchSize = Simd<real>::kSize;
+  constexpr int kDistanceBatchSize = Max(4, kOutputBatchSize); // BatchInt<2> is unsupported.
+  constexpr int kQueueFlushThreshold = 64 * kOutputBatchSize;
+  static_assert(kQueueFlushThreshold % kDistanceBatchSize == 0);
 
-  // We will perform a batch of signed distance calculations when this fills up
-  int sdBatchSize = 0;
-  Real3 sdPoints[kMaxBatchSize + 1] MOCHI_NO_INIT; // +1 for SIMD padding
-  real distances[kMaxBatchSize] MOCHI_NO_INIT;
-  int sdIndices[kMaxBatchSize] MOCHI_NO_INIT;
+  // The queue is flushed after insertion, so StoreSelected may start at
+  // kQueueFlushThreshold - 1 and write a full SIMD batch.
+  constexpr int kQueueCapacity = kQueueFlushThreshold + kDistanceBatchSize - 1;
 
-  // We will perform a batch of gradient calculations when this fills up
-  int gradBatchSize = 0;
-  Real3 gradPoints[kMaxBatchSize + 1] MOCHI_NO_INIT; // +1 for SIMD padding
-  real gradDistances[kMaxBatchSize] MOCHI_NO_INIT;
-  int gradIndices[kMaxBatchSize] MOCHI_NO_INIT;
+  using DistanceV = BatchReal<kDistanceBatchSize>;
+  using DistanceV3 = BatchReal3<kDistanceBatchSize>;
+  using DistanceIndexV = BatchInt<kDistanceBatchSize>;
+  using DistanceMaskV = Simd<DenseGrid3D<real>::IType, kDistanceBatchSize>;
+  using OutputV = BatchReal<kOutputBatchSize>;
+  using OutputV3 = BatchReal3<kOutputBatchSize>;
+  static_assert(
+      DistanceV::kIsSupported && DistanceIndexV::kIsSupported && DistanceMaskV::kIsSupported);
 
-  SamplerT sampler;
+  // Points that passed both AABB tests and await GridSDF sampling, stored in SoA layout.
+  struct DistanceQueue {
+    int size;
+    alignas(DistanceV) real pointsInGridSpace[3][kQueueCapacity];
+    alignas(DistanceIndexV) int pointIndices[kQueueCapacity];
+  };
 
-  auto flushGradBatch = [&]() {
+  // Contacts that passed the distance test and await actor-space transformation, stored in SoA
+  // layout.
+  struct OutputQueue {
+    int size;
+    alignas(DistanceV) real pointsInGridSpace[3][kQueueCapacity];
+    alignas(DistanceV) real gradientsInGridSpace[3][kQueueCapacity];
+    alignas(DistanceV) real distancesInGridSpace[kQueueCapacity];
+    alignas(DistanceIndexV) int pointIndices[kQueueCapacity];
+  };
+
+  DistanceQueue distanceQueue MOCHI_NO_INIT;
+  distanceQueue.size = 0;
+
+  OutputQueue outputQueue MOCHI_NO_INIT;
+  outputQueue.size = 0;
+
+  auto flushOutputQueue = [&]() MOCHI_FLUSH_INLINE_LAMBDA {
+    MOCHI_ASSERT_VERBOSE(outputQueue.size > 0, "Cannot flush an empty output queue.");
+    int const flushSize = outputQueue.size;
     if (!hasReserved) {
       // Reserve memory the first time we know we have points to add.
       // Reserve the max size so we don't have to allocate again.
       outIndices.reserve(numPoints);
-      outContacts.reserve(numPoints);
-      outSdf.reserve(numPoints);
+      int const paddedOutputSize = numPoints + kOutputBatchSize - 1;
+      outContacts.reserve(paddedOutputSize);
+      outSdf.reserve(paddedOutputSize);
       hasReserved = true;
     }
-    Real3 gradients[kMaxBatchSize + 1] MOCHI_NO_INIT; // +1 for SIMD padding
-    sampler.Gradient(
-        *_distanceGrid, Span{&gradPoints[0], gradBatchSize}, Span{&gradients[0], gradBatchSize});
-    for (int i = 0; i < gradBatchSize; ++i) {
-      int pointIndex = gradIndices[i];
+    int const outputOffset = isize(outIndices);
+    int const newOutputSize = outputOffset + flushSize;
+    int const paddedOutputSize = outputOffset + RoundUp(flushSize, kOutputBatchSize);
+    outIndices.resize_noinit(newOutputSize);
+    outContacts.resize_noinit(paddedOutputSize);
+    outSdf.resize_noinit(paddedOutputSize);
+    std::copy_n(&outputQueue.pointIndices[0], flushSize, &outIndices[outputOffset]);
+
+    auto const actorFromGridLinearBatchT = Broadcast3x3<OutputV>(_actorFromGridMatT);
+    auto const actorFromGridTranslationBatch = Broadcast3<OutputV>(_actorFromGridMatT[3]);
+    auto const actorFromGridRotBatchT = Broadcast3x3<OutputV>(actorFromGridRotT);
+
+    int i = 0;
+    for (; i + kOutputBatchSize <= flushSize; i += kOutputBatchSize) {
+      OutputV3 pointsInGridSpace{
+          Load<OutputV>(&outputQueue.pointsInGridSpace[0][i]),
+          Load<OutputV>(&outputQueue.pointsInGridSpace[1][i]),
+          Load<OutputV>(&outputQueue.pointsInGridSpace[2][i])};
+
+      OutputV3 gradientsInGridSpace{
+          Load<OutputV>(&outputQueue.gradientsInGridSpace[0][i]),
+          Load<OutputV>(&outputQueue.gradientsInGridSpace[1][i]),
+          Load<OutputV>(&outputQueue.gradientsInGridSpace[2][i])};
+
       // The caller expects results in actor-space.
-      Vec4r point = DotVecMat4x4(ToSimd(gradPoints[i], 1_r), _actorFromGridMatT);
-      // Rotate the gradient vector into actor-space using DotVecMat3x3 with the transpose of the
-      // rotation matrix on the right (the transpose is the inverse in this case).
-      Vec4r grad = DotVecMat3x3(Load<Vec4r>(gradients[i].data()), actorFromGridRotT);
-      real sd = gradDistances[i] * _actorFromGridScale;
+      auto const pointsInActorSpace =
+          DotVecMat(pointsInGridSpace, actorFromGridLinearBatchT) + actorFromGridTranslationBatch;
 
-      // Output the result
-      outIndices.push_back(pointIndex);
-      outContacts.push_back(ToReal3(point));
-      outSdf.push_back(sd, ToReal3(grad));
+      // Rotate gradients using the transpose of the rotation matrix on the right (the transpose is
+      // the inverse in this case).
+      auto const gradientsInActorSpace = DotVecMat(gradientsInGridSpace, actorFromGridRotBatchT);
+      OutputV const distances =
+          Load<OutputV>(&outputQueue.distancesInGridSpace[i]) * _actorFromGridScale;
+
+      StoreTransposed(&outContacts[outputOffset + i][0], pointsInActorSpace);
+      Store(&outSdf.val[outputOffset + i], distances);
+      StoreTransposed(&outSdf.grad[outputOffset + i][0], gradientsInActorSpace);
     }
-    gradBatchSize = 0;
+
+    // Avoid reading unspecified StoreSelected padding, then use the reserved output padding
+    // for full-width stores.
+    if (i < flushSize) {
+      int const tailSize = flushSize - i;
+      OutputV3 pointsInGridSpace{
+          Load<OutputV>(&outputQueue.pointsInGridSpace[0][i], tailSize),
+          Load<OutputV>(&outputQueue.pointsInGridSpace[1][i], tailSize),
+          Load<OutputV>(&outputQueue.pointsInGridSpace[2][i], tailSize)};
+      OutputV3 gradientsInGridSpace{
+          Load<OutputV>(&outputQueue.gradientsInGridSpace[0][i], tailSize),
+          Load<OutputV>(&outputQueue.gradientsInGridSpace[1][i], tailSize),
+          Load<OutputV>(&outputQueue.gradientsInGridSpace[2][i], tailSize)};
+
+      auto const pointsInActorSpace =
+          DotVecMat(pointsInGridSpace, actorFromGridLinearBatchT) + actorFromGridTranslationBatch;
+      auto const gradientsInActorSpace = DotVecMat(gradientsInGridSpace, actorFromGridRotBatchT);
+      OutputV const distances =
+          Load<OutputV>(&outputQueue.distancesInGridSpace[i], tailSize) * _actorFromGridScale;
+
+      StoreTransposed(&outContacts[outputOffset + i][0], pointsInActorSpace);
+      Store(&outSdf.val[outputOffset + i], distances);
+      StoreTransposed(&outSdf.grad[outputOffset + i][0], gradientsInActorSpace);
+      outContacts.resize_noinit(newOutputSize);
+      outSdf.resize_noinit(newOutputSize);
+    }
+
+    outputQueue.size = 0;
   };
 
-  auto flushSdBatch = [&]() {
-    // Transpose points
-    sampler(*_distanceGrid, Span{&sdPoints[0], sdBatchSize}, Span{&distances[0], sdBatchSize});
-    for (int i = 0; i < sdBatchSize; ++i) {
-      if (distances[i] <= toleranceInGridSpace) {
-        MOCHI_ASSERT_VERBOSE(gradBatchSize < std::size(gradPoints));
-        gradPoints[gradBatchSize] = sdPoints[i];
-        gradIndices[gradBatchSize] = sdIndices[i];
-        gradDistances[gradBatchSize] = distances[i];
-        gradBatchSize++;
-        if (gradBatchSize == kMaxBatchSize)
-          MOCHI_UNLIKELY {
-            flushGradBatch();
-          }
+  auto const laneSequence = Sequence<DistanceMaskV>();
+  auto const pointIndexSequence = Sequence<DistanceIndexV>();
+  auto processDistanceBatch = [&](DistanceV3 const& pointsInGridSpace,
+                                  DistanceIndexV pointIndices,
+                                  auto validLaneMask) MOCHI_FORCE_INLINE_LAMBDA {
+    DistanceV distancesInGridSpace MOCHI_NO_INIT;
+    DistanceV3 gradientsInGridSpace MOCHI_NO_INIT;
+    _distanceGrid->template TrilinearSampleBatch<
+        kDistanceBatchSize,
+        kExtrapolationType,
+        /*kComputeValues*/ true,
+        /*kComputeGradients*/ true>(
+        pointsInGridSpace, &distancesInGridSpace, &gradientsInGridSpace);
+
+    DistanceV hitMask = distancesInGridSpace <= toleranceInGridSpace;
+    if constexpr (IsSimd<decltype(validLaneMask)>) {
+      hitMask &= ReinterpretCast<DistanceV>(validLaneMask);
+    }
+    if (!AnyTrue(hitMask)) {
+      return;
+    }
+
+    MOCHI_ASSERT_VERBOSE(outputQueue.size < kQueueFlushThreshold);
+    int const scratchBegin = outputQueue.size;
+    StoreSelected(&outputQueue.pointsInGridSpace[0][scratchBegin], hitMask, pointsInGridSpace[0]);
+    StoreSelected(&outputQueue.pointsInGridSpace[1][scratchBegin], hitMask, pointsInGridSpace[1]);
+    StoreSelected(&outputQueue.pointsInGridSpace[2][scratchBegin], hitMask, pointsInGridSpace[2]);
+    StoreSelected(
+        &outputQueue.gradientsInGridSpace[0][scratchBegin], hitMask, gradientsInGridSpace[0]);
+    StoreSelected(
+        &outputQueue.gradientsInGridSpace[1][scratchBegin], hitMask, gradientsInGridSpace[1]);
+    StoreSelected(
+        &outputQueue.gradientsInGridSpace[2][scratchBegin], hitMask, gradientsInGridSpace[2]);
+    StoreSelected(&outputQueue.pointIndices[scratchBegin], hitMask, pointIndices);
+    outputQueue.size += StoreSelected(
+        &outputQueue.distancesInGridSpace[scratchBegin], hitMask, distancesInGridSpace);
+
+    if (outputQueue.size >= kQueueFlushThreshold)
+      MOCHI_UNLIKELY {
+        flushOutputQueue();
       }
-    }
-    sdBatchSize = 0;
   };
 
-  auto processPoint = [&](Vec4r pt, int index) {
-    Vec4r ptInGridSpace = DotVecMat4x4(ToSimdPoint(pt), gridFromPointsMatT);
-    if (ContainsPoint(boundsInGridSpace, ptInGridSpace)) {
-      Store(sdPoints[sdBatchSize].data(), ptInGridSpace);
-      sdIndices[sdBatchSize] = index;
-      sdBatchSize++;
-      if (sdBatchSize == kMaxBatchSize)
-        MOCHI_UNLIKELY {
-          flushSdBatch();
-        }
+  auto flushDistanceQueue = [&](int flushSize) MOCHI_FORCE_INLINE_LAMBDA {
+    MOCHI_ASSERT_VERBOSE(
+        flushSize > 0 && flushSize <= distanceQueue.size, "Invalid distance queue flush size.");
+    int i = 0;
+    for (; i + kDistanceBatchSize <= flushSize; i += kDistanceBatchSize) {
+      DistanceV3 pointsInGridSpace{
+          Load<DistanceV>(&distanceQueue.pointsInGridSpace[0][i]),
+          Load<DistanceV>(&distanceQueue.pointsInGridSpace[1][i]),
+          Load<DistanceV>(&distanceQueue.pointsInGridSpace[2][i])};
+      processDistanceBatch(
+          pointsInGridSpace, Load<DistanceIndexV>(&distanceQueue.pointIndices[i]), false);
     }
+
+    int const tailSize = flushSize - i;
+    if (tailSize > 0) {
+      MOCHI_ASSERT_VERBOSE(
+          flushSize == distanceQueue.size,
+          "A partial distance queue cannot precede carried values.");
+      for (int axis = 0; axis < 3; ++axis) {
+        std::fill_n(
+            &distanceQueue.pointsInGridSpace[axis][i + tailSize],
+            kDistanceBatchSize - tailSize,
+            distanceQueue.pointsInGridSpace[axis][i]);
+      }
+      DistanceV3 pointsInGridSpace{
+          Load<DistanceV>(&distanceQueue.pointsInGridSpace[0][i]),
+          Load<DistanceV>(&distanceQueue.pointsInGridSpace[1][i]),
+          Load<DistanceV>(&distanceQueue.pointsInGridSpace[2][i])};
+      auto const validLaneMask = laneSequence < tailSize;
+      processDistanceBatch(
+          pointsInGridSpace,
+          Load<DistanceIndexV>(&distanceQueue.pointIndices[i], tailSize),
+          validLaneMask);
+    }
+
+    int const carrySize = distanceQueue.size - flushSize;
+    for (int axis = 0; axis < 3; ++axis) {
+      std::copy_n(
+          &distanceQueue.pointsInGridSpace[axis][flushSize],
+          carrySize,
+          &distanceQueue.pointsInGridSpace[axis][0]);
+    }
+    std::copy_n(&distanceQueue.pointIndices[flushSize], carrySize, &distanceQueue.pointIndices[0]);
+    distanceQueue.size = carrySize;
   };
 
-  // Iterate 3 points at a time. Stop before the last point so we can use full-size SIMD loads.
-  // Cull points using boundsInPointSpace first (faster than transforming them to SDF-space).
+  auto const boundsInPointSpaceMin = Broadcast3<DistanceV>(boundsInPointSpace.VGetMin());
+  auto const boundsInPointSpaceMax = Broadcast3<DistanceV>(boundsInPointSpace.VGetMax());
+  auto const boundsInGridSpaceMin = Broadcast3<DistanceV>(boundsInGridSpace.VGetMin());
+  auto const boundsInGridSpaceMax = Broadcast3<DistanceV>(boundsInGridSpace.VGetMax());
+  auto const gridFromPointsLinearBatchT = Broadcast3x3<DistanceV>(gridFromPointsMatT);
+  auto const gridFromPointsTranslationBatch = Broadcast3<DistanceV>(gridFromPointsMatT[3]);
+
+  auto processPointBatch = [&](DistanceV3 const& pointsInPointSpace,
+                               DistanceIndexV pointIndices,
+                               auto validLaneMask) MOCHI_FORCE_INLINE_LAMBDA {
+    // AABB culling in point space.
+    DistanceV pointSpaceMask = (pointsInPointSpace[0] >= boundsInPointSpaceMin[0]) &
+        (pointsInPointSpace[0] <= boundsInPointSpaceMax[0]) &
+        (pointsInPointSpace[1] >= boundsInPointSpaceMin[1]) &
+        (pointsInPointSpace[1] <= boundsInPointSpaceMax[1]) &
+        (pointsInPointSpace[2] >= boundsInPointSpaceMin[2]) &
+        (pointsInPointSpace[2] <= boundsInPointSpaceMax[2]);
+    if constexpr (IsSimd<decltype(validLaneMask)>) {
+      pointSpaceMask &= ReinterpretCast<DistanceV>(validLaneMask);
+    }
+    if (!AnyTrue(pointSpaceMask)) {
+      return;
+    }
+
+    // AABB culling in grid space.
+    DistanceV3 const pointsInGridSpace =
+        DotVecMat(pointsInPointSpace, gridFromPointsLinearBatchT) + gridFromPointsTranslationBatch;
+    DistanceV const gridSpaceMask = (pointsInGridSpace[0] >= boundsInGridSpaceMin[0]) &
+        (pointsInGridSpace[0] <= boundsInGridSpaceMax[0]) &
+        (pointsInGridSpace[1] >= boundsInGridSpaceMin[1]) &
+        (pointsInGridSpace[1] <= boundsInGridSpaceMax[1]) &
+        (pointsInGridSpace[2] >= boundsInGridSpaceMin[2]) &
+        (pointsInGridSpace[2] <= boundsInGridSpaceMax[2]);
+    DistanceV const hitMask = pointSpaceMask & gridSpaceMask;
+    if (!AnyTrue(hitMask)) {
+      return;
+    }
+
+    MOCHI_ASSERT_VERBOSE(distanceQueue.size < kQueueFlushThreshold);
+    int const scratchBegin = distanceQueue.size;
+    StoreSelected(&distanceQueue.pointsInGridSpace[0][scratchBegin], hitMask, pointsInGridSpace[0]);
+    StoreSelected(&distanceQueue.pointsInGridSpace[1][scratchBegin], hitMask, pointsInGridSpace[1]);
+    StoreSelected(&distanceQueue.pointsInGridSpace[2][scratchBegin], hitMask, pointsInGridSpace[2]);
+    distanceQueue.size +=
+        StoreSelected(&distanceQueue.pointIndices[scratchBegin], hitMask, pointIndices);
+
+    if (distanceQueue.size >= kQueueFlushThreshold)
+      MOCHI_UNLIKELY {
+        flushDistanceQueue(kQueueFlushThreshold);
+      }
+  };
+
   int i = 0;
-  for (i = 0; i + 3 < numPoints; i += 3) {
-    auto pt0 = Load<Vec4r>(points[i + 0].data());
-    auto pt1 = Load<Vec4r>(points[i + 1].data());
-    auto pt2 = Load<Vec4r>(points[i + 2].data());
-    auto in0 = VContainsPoint(boundsInPointSpace, pt0);
-    auto in1 = VContainsPoint(boundsInPointSpace, pt1);
-    auto in2 = VContainsPoint(boundsInPointSpace, pt2);
-    if (!AllTrue<3>(in0 | in1 | in2)) {
-      continue; // All of these points are outside
-    }
-    if (AllTrue<3>(in0)) {
-      processPoint(pt0, i + 0);
-    }
-    if (AllTrue<3>(in1)) {
-      processPoint(pt1, i + 1);
-    }
-    if (AllTrue<3>(in2)) {
-      processPoint(pt2, i + 2);
-    }
-  }
-  for (; i < numPoints; ++i) {
-    auto pt = Load<3, Vec4r>(points[i].data());
-    if (ContainsPoint(boundsInPointSpace, pt)) {
-      processPoint(pt, i);
-    }
+  for (; i + kDistanceBatchSize <= numPoints; i += kDistanceBatchSize) {
+    DistanceV3 pointsInPointSpace MOCHI_NO_INIT;
+    LoadTransposed(&points[i][0], pointsInPointSpace);
+    processPointBatch(pointsInPointSpace, pointIndexSequence + i, false);
   }
 
-  if (sdBatchSize > 0) {
-    flushSdBatch();
+  int const tailSize = numPoints - i;
+  if (tailSize > 0) {
+    Real3 tailPoints[kDistanceBatchSize] MOCHI_NO_INIT;
+    std::copy_n(&points[i], tailSize, &tailPoints[0]);
+    std::fill_n(&tailPoints[tailSize], kDistanceBatchSize - tailSize, tailPoints[tailSize - 1]);
+    DistanceV3 pointsInPointSpace MOCHI_NO_INIT;
+    LoadTransposed(&tailPoints[0][0], pointsInPointSpace);
+    processPointBatch(pointsInPointSpace, pointIndexSequence + i, laneSequence < tailSize);
   }
 
-  if (gradBatchSize > 0) {
-    flushGradBatch();
+  if (distanceQueue.size > 0) {
+    flushDistanceQueue(distanceQueue.size);
+  }
+
+  if (outputQueue.size > 0) {
+    flushOutputQueue();
   }
 }
 
@@ -500,10 +692,10 @@ void GridSdf::FindPointContacts(
       "Grid SDF negative-value bounds must be finite and contained within grid bounds.");
   real const toleranceInGridSpace = params.tolerance / _actorFromGridScale;
   if (minGridPadding >= toleranceInGridSpace) {
-    FindPointContactsImpl<TrilinearSdfGridInteriorSampler<real>>(
+    FindPointContactsImpl<GridExtrapolation::Unsupported>(
         points, pointsFromActor, params, outIndices, outContacts, outSdf);
   } else {
-    FindPointContactsImpl<TrilinearSdfGridUpperBoundSampler<real>>(
+    FindPointContactsImpl<GridExtrapolation::UpperBound>(
         points, pointsFromActor, params, outIndices, outContacts, outSdf);
   }
 }

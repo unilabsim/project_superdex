@@ -136,7 +136,7 @@ class Actor [no_init, no_destruct, use_scene] {
   // @note Only supported for dynamic rigid actors (including articulated links) and soft actors.
   //
   // @see GetRootTransform
-  fn GetRigidCenterOfMassLocal() -> Real3 [pure, virtual, const, mochi_error, units(m), batchable];
+  fn GetRigidCenterOfMassLocal() -> Real3 [pure, virtual, const, mochi_error, units("m"), batchable];
 
   // @brief Get the world-space transform of the actor expressed at the center of mass.
   //
@@ -174,7 +174,7 @@ class Actor [no_init, no_destruct, use_scene] {
   // @return Upper-right triangle in the form [ixx, ixy, ixz, iyy, iyz, izz]. Units: kg·m².
   //
   // @note Only supported for dynamic rigid actors.
-  fn GetRigidMomentOfInertiaLocal() -> Real6 [pure, virtual, const, mochi_error, units(kg*m^2), batchable];
+  fn GetRigidMomentOfInertiaLocal() -> Real6 [pure, virtual, const, mochi_error, units("kg*m^2"), batchable];
 
   // @brief Set the world-frame linear and angular velocity of the actor at the center of mass.
   //
@@ -186,7 +186,7 @@ class Actor [no_init, no_destruct, use_scene] {
   // @note For standalone soft actors, the angular velocity must be zero.
   // @note Resets multi-step time integrators, e.g. BDF2 falls back to backward Euler in the first
   // time step after this method is called.
-  fn SetVelocity(Real3 const& linearVel [units(m/s)], Real3 const& angularVel [units(rad/s)]) -> void [pure, virtual, mochi_error, batchable];
+  fn SetVelocity(Real3 const& linearVel [units("m/s")], Real3 const& angularVel [units("rad/s")]) -> void [pure, virtual, mochi_error, batchable];
 
   // @brief Get the linear velocity of the actor in world frame.
   //
@@ -197,7 +197,7 @@ class Actor [no_init, no_destruct, use_scene] {
   // @note For soft actors, it returns an estimate of the linear velocity of the root transform.
   // Requires recentering to be enabled for accurate results.
   // @note Not supported for ROM actors.
-  fn GetLinearVelocity() -> Real3 [pure, virtual, const, mochi_error, units(m/s), batchable];
+  fn GetLinearVelocity() -> Real3 [pure, virtual, const, mochi_error, units("m/s"), batchable];
 
   // @brief Get the angular velocity of the actor in world frame.
   //
@@ -208,14 +208,14 @@ class Actor [no_init, no_destruct, use_scene] {
   // @note For soft actors, it returns an estimate of the angular velocity of the root transform.
   // Requires recentering to be enabled for accurate results.
   // @note Not supported for ROM actors.
-  fn GetAngularVelocity() -> Real3 [pure, virtual, const, mochi_error, units(rad/s), batchable];
+  fn GetAngularVelocity() -> Real3 [pure, virtual, const, mochi_error, units("rad/s"), batchable];
 
   // @brief Get the total mass of the actor.
   //
   // @return Mass [kg] of the actor.
   //
   // @note Not supported for static actors.
-  fn GetMass() -> real [pure, virtual, const, mochi_error, units(kg), batchable];
+  fn GetMass() -> real [pure, virtual, const, mochi_error, units("kg"), batchable];
 
   // @brief Get the density of the actor in the undeformed configuration.
   //
@@ -225,7 +225,7 @@ class Actor [no_init, no_destruct, use_scene] {
   // actors.
   //
   // @see SetDensity, GetSoftMaterialParams
-  fn GetDensity() -> real [pure, virtual, const, mochi_error, units(kg/m^3), batchable];
+  fn GetDensity() -> real [pure, virtual, const, mochi_error, units("kg/m^3"), batchable];
 
   // @brief Set the density of the actor in the undeformed configuration.
   //
@@ -237,7 +237,7 @@ class Actor [no_init, no_destruct, use_scene] {
   // The center of mass is left unchanged.
   //
   // @see GetDensity, SetInertiaProperties, SetSoftMaterialParams
-  fn SetDensity(real density [units(kg/m^3)]) -> void [pure, virtual, mochi_error, batchable];
+  fn SetDensity(real density [units("kg/m^3")]) -> void [pure, virtual, mochi_error, batchable];
 
   // @brief Set the mass properties of the actor.
   //
@@ -261,7 +261,7 @@ class Actor [no_init, no_destruct, use_scene] {
   // @note After this call, @ref GetDensity returns bulk density mass / volume.
   //
   // @see GetMass, GetDensity, SetDensity, GetRigidCenterOfMassLocal, GetRigidMomentOfInertiaLocal
-  fn SetInertiaProperties(real mass [units(kg)], Real3 const& centerOfMass [units(m)], Real6 const& momentOfInertia [units(kg*m^2)]) -> void [pure, virtual, mochi_error, batchable];
+  fn SetInertiaProperties(real mass [units("kg")], Real3 const& centerOfMass [units("m")], Real6 const& momentOfInertia [units("kg*m^2")]) -> void [pure, virtual, mochi_error, batchable];
 
   // @brief Get the elastic energy of the actor, measured as the difference with respect to the rest
   // state.
@@ -321,12 +321,13 @@ class Actor [no_init, no_destruct, use_scene] {
   // @note Only supported for standalone soft actors, nested soft actors, and shell actors.
   // @note For nested soft actors, displacements are the elastic deformation component only (before
   // skinning is applied).
-  // @note Does not change node velocities.
+  // @note Does not change the elastic velocity DoFs, but changes the skinned node velocities of
+  // nested soft actors.
   // @note Resets multi-step time integrators, e.g. BDF2 falls back to backward Euler in the first
   // time step after this method is called.
   //
   // @see GetDisplacements, SetNodePositionsLocal
-  fn SetDisplacements(Span<real const> displacements [units(m)]) -> void [pure, virtual, mochi_error, batchable];
+  fn SetDisplacements(Span<real const> displacements [units("m")]) -> void [pure, virtual, mochi_error, batchable];
 
 # Materials
   // @brief Get the material parameters of a soft actor.
@@ -379,8 +380,9 @@ class Actor [no_init, no_destruct, use_scene] {
   // @details Returns a compact triangle mesh for the actor's surface. For volumetric simulation
   // meshes, the surface is the boundary triangles. For triangular simulation meshes, the surface
   // has the same triangle elements as the simulation mesh, but nodes not referenced by any surface
-  // triangle are omitted and remaining nodes may be reindexed. Returns an empty view if the actor
-  // does not have a surface mesh.
+  // triangle are omitted and remaining nodes may be reindexed. For rod actors with an authored
+  // contact skin, returns that skin regardless of the actor's selected collision representation.
+  // Returns an empty view if the actor does not have a surface mesh.
   //
   // @return A non-owning view of the actor's reference surface mesh, or an empty view if the actor
   // has no surface mesh.
@@ -432,10 +434,12 @@ class Actor [no_init, no_destruct, use_scene] {
   // are available after the simulation step completes.
   // @note Requires the actor to support @ref QueryType::SurfaceNodePositions.
   // @note The node ordering corresponds to the mesh connectivity from @ref GetSurfaceMesh.
+  // @note Supported for rod actors whose shape has an authored contact skin, regardless of whether
+  // that skin is selected for collision.
   //
   // @see RegisterQuery, QueryType::SurfaceNodePositions, GetSurfaceMesh,
   // GetSurfaceMeshNodeNormalsLocal
-  fn GetSurfaceMeshNodePositionsLocal() -> Span<real const> [pure, virtual, const, mochi_error, units(m), batchable];
+  fn GetSurfaceMeshNodePositionsLocal() -> Span<real const> [pure, virtual, const, mochi_error, units("m"), batchable];
 
   // @brief Get the normal direction for each node of the surface mesh in the actor's local frame.
   //
@@ -448,6 +452,8 @@ class Actor [no_init, no_destruct, use_scene] {
   // are available after the simulation step completes.
   // @note Requires the actor to support @ref QueryType::SurfaceNodeNormals.
   // @note The node ordering corresponds to the mesh connectivity from @ref GetSurfaceMesh.
+  // @note Supported for rod actors whose shape has an authored contact skin, regardless of whether
+  // that skin is selected for collision.
   //
   // @see RegisterQuery, QueryType::SurfaceNodeNormals, GetSurfaceMesh,
   // GetSurfaceMeshNodePositionsLocal
@@ -572,19 +578,19 @@ class Actor [no_init, no_destruct, use_scene] {
   // bounding box. Outside the bounding box, it is an upper bound based on the triangle inequality.
   // @note This function is not supported for soft actors or for the experimental @ref
   // ColliderType::PointCloud.
-  fn GetPointsDistanceToSurface(Span<Real3 const> pointsWorld [units(m)], Span<real> outDistances [units(m)]) -> void [pure, virtual, const, mochi_error, batchable];
+  fn GetPointsDistanceToSurface(Span<Real3 const> pointsWorld [units("m")], Span<real> outDistances [units("m")]) -> void [pure, virtual, const, mochi_error, batchable];
 
   // @brief Get an axis-aligned bounding box (AABB) that contains the full volume of the actor, in
   // the actor's local frame.
   //
   // @return AABB in the actor's local frame containing the full actor volume.
-  fn GetAabbLocal() -> Aabb [pure, virtual, const, mochi_error, units(m), batchable];
+  fn GetAabbLocal() -> Aabb [pure, virtual, const, mochi_error, units("m"), batchable];
 
   // @brief Get an axis-aligned bounding box (AABB) that contains the full volume of the actor, in
   // world frame.
   //
   // @return AABB in world frame containing the full actor volume.
-  fn GetAabbWorld() -> Aabb [pure, virtual, const, mochi_error, units(m), batchable];
+  fn GetAabbWorld() -> Aabb [pure, virtual, const, mochi_error, units("m"), batchable];
 
   # Soft Deformation
   // @brief Get the current position (reference + displacements) of each node in the actor's local
@@ -597,13 +603,13 @@ class Actor [no_init, no_destruct, use_scene] {
   // @note Requires the actor to support @ref QueryType::NodePositions.
   //
   // @see RegisterQuery, QueryType::NodePositions
-  fn GetNodePositionsLocal() -> Span<real const> [pure, virtual, const, mochi_error, units(m), batchable];
+  fn GetNodePositionsLocal() -> Span<real const> [pure, virtual, const, mochi_error, units("m"), batchable];
 
   // @brief Set all local displacement and velocity DoFs to zero.
   //
   // @note Only supported for standalone soft actors, nested soft actors, shell actors, and rod actors.
-  // @note For nested soft actors, it zeroes the elastic deformation and velocity only. The
-  // skeleton-driven pose is unaffected.
+  // @note For nested soft actors, it zeroes only elastic displacement and velocity.
+  // Skeleton-driven displacement and velocity are preserved.
   // @note For rod actors, it zeroes both the translational displacement DoFs and the twist-angle DoFs.
   // @note Resets multi-step time integrators, e.g. BDF2 falls back to backward Euler in the first
   // time step after this method is called.
@@ -631,7 +637,7 @@ class Actor [no_init, no_destruct, use_scene] {
   // @note Does not change node velocities.
   // @note Resets multi-step time integrators, e.g. BDF2 falls back to backward Euler in the first
   // time step after this method is called.
-  fn SetNodePositionsLocal(Span<real const> positionsLocal [units(m)]) -> void [pure, virtual, mochi_error, batchable];
+  fn SetNodePositionsLocal(Span<real const> positionsLocal [units("m")]) -> void [pure, virtual, mochi_error, batchable];
 
   // @brief Set the current velocity of each node in the actor's local frame.
   //
@@ -659,7 +665,7 @@ class Actor [no_init, no_destruct, use_scene] {
   //
   // @see RegisterQuery, QueryType::VisualNodePositions, GetVisualMesh,
   // GetVisualMeshNodeNormalsLocal
-  fn GetVisualMeshNodePositionsLocal() -> Span<real const> [pure, virtual, const, mochi_error, units(m), batchable];
+  fn GetVisualMeshNodePositionsLocal() -> Span<real const> [pure, virtual, const, mochi_error, units("m"), batchable];
 
   // @brief Get the normal direction to each node of the visual mesh in the actor's local frame.
   //
@@ -801,7 +807,7 @@ class Actor [no_init, no_destruct, use_scene] {
   // @see ClearBoundaryConditions, AddBoundaryConditionDofsWorld,
   // AddBoundaryConditionNodesWorldPermanent, GetBoundaryConditionDofIndices,
   // GetBoundaryConditionDofValuesWorld
-  fn AddBoundaryConditionNodesWorld(Span<int const> nodeIndices, Span<real const> nodePositionsWorld [units(m)]) -> void [pure, virtual, mochi_error, batchable];
+  fn AddBoundaryConditionNodesWorld(Span<int const> nodeIndices, Span<real const> nodePositionsWorld [units("m")]) -> void [pure, virtual, mochi_error, batchable];
 
   // @brief Add permanent world-space boundary conditions for specified nodes.
   //
@@ -821,7 +827,7 @@ class Actor [no_init, no_destruct, use_scene] {
   // later added to the same DoF.
   //
   // @see AddBoundaryConditionNodesWorld, AddBoundaryConditionDofsWorldPermanent
-  fn AddBoundaryConditionNodesWorldPermanent(Span<int const> nodeIndices, Span<real const> nodePositionsWorld [units(m)]) -> void [pure, virtual, mochi_error, batchable];
+  fn AddBoundaryConditionNodesWorldPermanent(Span<int const> nodeIndices, Span<real const> nodePositionsWorld [units("m")]) -> void [pure, virtual, mochi_error, batchable];
 
   // @brief Fix the "constrained nodes" at their world-space reference positions.
   //
@@ -931,7 +937,7 @@ class Actor [no_init, no_destruct, use_scene] {
   // be stale.
   //
   // @see RegisterQuery, ContactPoint, QueryType::ContactPoints
-  fn GetContactPointsWorld() -> Span<ContactPoint const> [pure, virtual, const, mochi_error, units(m), batchable];
+  fn GetContactPointsWorld() -> Span<ContactPoint const> [pure, virtual, const, mochi_error, units("m"), batchable];
 
   // @brief Get contact forces on nodes.
   //
@@ -944,7 +950,7 @@ class Actor [no_init, no_destruct, use_scene] {
   // be stale.
   //
   // @see RegisterQuery, NodeContactForce, QueryType::NodeContactForces
-  fn GetNodeContactForcesWorld() -> Span<NodeContactForce const> [pure, virtual, const, mochi_error, units(N), batchable];
+  fn GetNodeContactForcesWorld() -> Span<NodeContactForce const> [pure, virtual, const, mochi_error, units("N"), batchable];
 
   // @brief Get the total contact force on the actor.
   //
@@ -958,7 +964,7 @@ class Actor [no_init, no_destruct, use_scene] {
   //
   // @see RegisterQuery, GetContactTorqueWorld, GetContactForceFromActorWorld,
   // QueryType::TotalContactForce
-  fn GetContactForceWorld() -> Real3 [pure, virtual, const, mochi_error, units(N), batchable];
+  fn GetContactForceWorld() -> Real3 [pure, virtual, const, mochi_error, units("N"), batchable];
 
   // @brief Get the total contact torque about the center of mass.
   //
@@ -972,7 +978,7 @@ class Actor [no_init, no_destruct, use_scene] {
   // be stale.
   //
   // @see RegisterQuery, GetContactForceWorld, QueryType::TotalContactForce
-  fn GetContactTorqueWorld() -> Real3 [pure, virtual, const, mochi_error, units(Nm), batchable];
+  fn GetContactTorqueWorld() -> Real3 [pure, virtual, const, mochi_error, units("Nm"), batchable];
 
   // @brief Get the total contact force on the actor from another specified actor.
   //
@@ -987,7 +993,7 @@ class Actor [no_init, no_destruct, use_scene] {
   // be stale.
   //
   // @see RegisterQuery, GetContactForceWorld, QueryType::TotalContactForce
-  fn GetContactForceFromActorWorld(Actor const* other) -> Real3 [pure, virtual, const, mochi_error, units(N), batchable];
+  fn GetContactForceFromActorWorld(Actor const* other) -> Real3 [pure, virtual, const, mochi_error, units("N"), batchable];
 
   // @brief Get SDF distances for contact sample points.
   //
@@ -1000,7 +1006,7 @@ class Actor [no_init, no_destruct, use_scene] {
   // be stale.
   //
   // @see RegisterQuery, SdfDistances, QueryType::SdfDistances
-  fn GetSdfDistances() -> SdfDistances [pure, virtual, const, mochi_error, units(m), batchable];
+  fn GetSdfDistances() -> SdfDistances [pure, virtual, const, mochi_error, units("m"), batchable];
 
   # Queries
   // @brief Register a query to compute data for this actor.
@@ -1289,7 +1295,7 @@ class Actor [no_init, no_destruct, use_scene] {
   // @note Uses joint-specific distance metrics (Euclidean for translation, angle for rotation).
   //
   // @see GetArticulatedPose, AddArticulatedDeltaToPose, ComputeArticulatedPoseDelta
-  fn GetArticulatedPoseDistance(Span<real const> poseA, Span<real const> poseB, Span<real> outTransDistances [units(m)], Span<real> outRotDistances [units(rad)]) -> void [pure, virtual, const, mochi_error, batchable];
+  fn GetArticulatedPoseDistance(Span<real const> poseA, Span<real const> poseB, Span<real> outTransDistances [units("m")], Span<real> outRotDistances [units("rad")]) -> void [pure, virtual, const, mochi_error, batchable];
 
   # Pose Controllers
   // @brief Check if the articulated actor has a pose controller.

@@ -59,6 +59,7 @@ MOCHI_ENUM_END()
 namespace mochi::dbg::protocol {
 
 // Forwards
+struct DebugDrawReply;
 struct PingReply;
 struct SceneStepReply;
 struct SceneSyncReply;
@@ -135,6 +136,29 @@ struct DbgDrawData {
   MOCHI_STRUCT_BEGIN(mochi::dbg::protocol::DbgDrawData)
   MOCHI_FIELD(lineVertices)
   MOCHI_FIELD(spheres)
+  MOCHI_STRUCT_END()
+};
+
+/// @brief One entry in the debug draw feature catalog.
+struct DbgDrawFeature {
+  DynamicString name;
+  DynamicString description;
+  bool enabled = false;
+
+  MOCHI_STRUCT_BEGIN(mochi::dbg::protocol::DbgDrawFeature)
+  MOCHI_FIELD(name)
+  MOCHI_FIELD(description)
+  MOCHI_FIELD(enabled)
+  MOCHI_STRUCT_END()
+};
+
+struct DbgDrawFeatures {
+  bool masterEnabled = false;
+  DynamicArray<DbgDrawFeature> features;
+
+  MOCHI_STRUCT_BEGIN(mochi::dbg::protocol::DbgDrawFeatures)
+  MOCHI_FIELD(masterEnabled)
+  MOCHI_FIELD(features)
   MOCHI_STRUCT_END()
 };
 
@@ -268,6 +292,26 @@ struct SceneAddRemove : net::Message {
   MOCHI_STRUCT_END()
 };
 
+/// @brief [S<--C] Request the scene to apply the client's complete debug draw state.
+struct DebugDrawRequest : SceneRequest {
+  using Reply = DebugDrawReply;
+
+  bool masterEnable = false;
+  DynamicArray<bool> featureEnable;
+
+  MOCHI_STRUCT_BEGIN(mochi::dbg::protocol::DebugDrawRequest)
+  MOCHI_BASE_CLASS(SceneRequest)
+  MOCHI_FIELD(masterEnable)
+  MOCHI_FIELD(featureEnable)
+  MOCHI_STRUCT_END()
+};
+
+/// @brief [S-->C] Reply to @ref DebugDrawRequest.
+struct DebugDrawReply : SceneReply {
+  using SceneReply::SceneReply;
+  MOCHI_STRUCT_WITH_BASE(mochi::dbg::protocol::DebugDrawReply, SceneReply)
+};
+
 /// @brief [S<--C] Request the scene to change its play/pause/step behavior.
 struct SceneStepRequest : SceneRequest {
   using Reply = SceneStepReply;
@@ -367,11 +411,13 @@ struct SceneSyncReply : SceneReply {
 /// @brief [S-->C] First message sent from the server to the client. The client does not consider
 /// themselves to be fully connected until this arrives.
 struct WelcomeMessage : net::Message {
+  DbgDrawFeatures debugDraw; ///< Debug draw feature catalog; enable fields are initially false.
   SceneList scenes; ///< Information about all scenes that already exist.
   CoordinateSpace coordinateSpace = {}; ///< The server's coordinate space convention.
 
   MOCHI_STRUCT_BEGIN(mochi::dbg::protocol::WelcomeMessage)
   MOCHI_BASE_CLASS(net::Message)
+  MOCHI_FIELD(debugDraw)
   MOCHI_FIELD(scenes)
   MOCHI_FIELD(coordinateSpace)
   MOCHI_STRUCT_END()

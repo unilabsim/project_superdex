@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <limits>
 #include <mochi_core/utils/reflection.h>
 #include <mochi_physics/mochi_physics.h>
 

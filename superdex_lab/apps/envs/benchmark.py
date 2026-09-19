@@ -18,8 +18,8 @@ Environment benchmarking script for SuperDex Gym.
 This script provides a flexible benchmarking tool for testing environment performance
 across different worker and environment configurations. It supports configurable
 timing constraints, iteration limits, and flexible argument parsing for comprehensive
-performance testing. The environment to benchmark is selected by its discovered short
-name (see :mod:`superdex.lab.gym.utils.env_discovery`). Benchmarkable environments must accept
+performance testing. The environment to benchmark is selected by its canonical
+Gymnasium ID. Benchmarkable environments must accept
 ``num_worker_threads``, ``use_shared_scenes``, and ``render_mode`` configuration overrides,
 and their config must expose numeric ``simulation_frequency`` and ``control_frequency``
 attributes used to calculate simulation FPS.
@@ -32,8 +32,10 @@ import pathlib
 import sys
 import time
 
+import gymnasium as gym
 import psutil
-from superdex.lab.gym.utils.env_discovery import get_env_short_names, register_all_envs
+from superdex.lab.gym.registration import get_env_specs
+from superdex.lab.gym.utils.registry import unwrap_mochi_env
 from superdex.lab.gym.utils.vector import HybridVectorEnv
 from superdex.physics.utils.profiling import Profiler
 from tqdm import tqdm
@@ -68,6 +70,24 @@ def make_section_name(num_workers: int, num_envs_per_worker: int) -> str:
     return f"{num_workers} workers × {num_envs_per_worker} envs/worker = {num_workers * num_envs_per_worker} envs"
 
 
+def get_frequencies(env, *, vectorized: bool) -> tuple[int, int]:
+    """Read and validate frequencies from an already initialized environment."""
+    if not vectorized:
+        mochi_env = unwrap_mochi_env(env)
+        return (
+            mochi_env.get_simulation_frequency(),
+            mochi_env.get_control_frequency(),
+        )
+
+    frequencies = []
+    for name in ("get_simulation_frequency", "get_control_frequency"):
+        values = env.call(name)
+        if not values or any(value != values[0] for value in values[1:]):
+            raise ValueError(f"Vector environments disagree on {name}.")
+        frequencies.append(values[0])
+    return frequencies[0], frequencies[1]
+
+
 def run_benchmark(
     env_name: str,
     num_envs_and_envs_per_worker: list[tuple[int, int]],
@@ -93,26 +113,19 @@ def run_benchmark(
     output_path = base_path / "output" / output_filename
     output_path.parent.mkdir(exist_ok=True)
 
-    # Resolve the environment to benchmark from the discovery registry.
-    entries = get_env_short_names()
-    if env_name not in entries:
-        available = ", ".join(sorted(entries))
-        raise ValueError(f"Unknown env: {env_name}. Available: {available}")
-    entry = entries[env_name]
+    # Configure environment settings for consistent benchmarking. Registered variant
+    # defaults are retained and these explicit runtime settings win.
+    cfg_overrides = {
+        "num_worker_threads": 0,
+        "use_shared_scenes": True,
+        "render_mode": None,
+    }
 
-    # Configure environment settings for consistent benchmarking.
-    cfg = entry.cfg_cls(
-        **{
-            **entry.cfg_kwargs,
-            "num_worker_threads": 0,
-            "use_shared_scenes": True,
-            "render_mode": None,
-        }
-    )
+    frequencies: tuple[int, int] | None = None
 
     def env_builder():
-        """Factory function to create environment instances."""
-        return entry.env_cls(cfg)
+        """Create an environment instance."""
+        return gym.make(env_name, **cfg_overrides)
 
     # Initialize profiler to track performance metrics.
     profiler = Profiler()
@@ -134,22 +147,26 @@ def run_benchmark(
         else:
             # Use HybridVectorEnv for parallel environment execution.
             env = HybridVectorEnv([env_builder] * num_envs, num_envs_per_worker)
-        action_space = env.action_space
 
-        # Initialize environments and measure setup time/memory.
-        env.reset()
-        initialization_time = time.time() - start_time
-        memory_used = get_used_ram() - start_ram
-        system_wide_memory_used = 100 * get_used_ram() / get_total_ram()
-
-        # Display initialization metrics.
-        print()
-        print(f"Initialization took {initialization_time} s.")
-        print(f"Approx. memory used by the environments: {1e-9 * memory_used:.2f} GB")
-        print(f"System-wide memory usage: {system_wide_memory_used:.2f}%")
-
-        # Execute benchmark with timing and iteration constraints.
+        # Cover reset, frequency inspection, and stepping with the normal close path.
         with env:
+            action_space = env.action_space
+            env.reset()
+            initialization_time = time.time() - start_time
+            if frequencies is None:
+                frequencies = get_frequencies(env, vectorized=num_envs != 1)
+            memory_used = get_used_ram() - start_ram
+            system_wide_memory_used = 100 * get_used_ram() / get_total_ram()
+
+            # Display initialization metrics.
+            print()
+            print(f"Initialization took {initialization_time} s.")
+            print(
+                f"Approx. memory used by the environments: {1e-9 * memory_used:.2f} GB"
+            )
+            print(f"System-wide memory usage: {system_wide_memory_used:.2f}%")
+
+            # Execute benchmark with timing and iteration constraints.
             elapsed_time = 0
             start_time = time.time()
             report_interval = 1  # Report progress every second.
@@ -185,9 +202,11 @@ def run_benchmark(
                 elapsed_time = time.time() - start_time
 
         # Calculate and store performance metrics.
+        assert frequencies is not None
+        simulation_frequency, control_frequency = frequencies
         section = profiler.sections[section_name]
         control_fps = (1000 * num_envs) / section.mean
-        sim_fps = (cfg.simulation_frequency * control_fps) / cfg.control_frequency
+        sim_fps = (simulation_frequency * control_fps) / control_frequency
 
         # Store comprehensive benchmark results.
         section.info["init_time"] = f"{initialization_time:.2f}s"
@@ -230,15 +249,10 @@ def parse_positive_int_args(args: list[str]) -> list[int]:
 
 def main():
     """Main entry point for the benchmark script."""
-    # Discover and register environments so the CLI can list and build them. Test-only
-    # variants are excluded, so they are not offered nor accepted here.
-    register_all_envs()
-    available_envs = sorted(get_env_short_names())
+    available_envs = tuple(spec.id for spec in get_env_specs())
     if not available_envs:
         raise RuntimeError(
-            "No environments were discovered, so there is nothing to benchmark. This "
-            "usually means the env packages failed to import or were excluded from the "
-            "build."
+            "No SuperDex environments are registered, so there is nothing to benchmark."
         )
     parser = argparse.ArgumentParser(
         description="Run environment benchmarks with configurable parameters."
@@ -248,13 +262,14 @@ def main():
     env_selection.add_argument(
         "--env",
         type=str,
-        choices=available_envs,
-        help=(f"Environment to benchmark. One of: {', '.join(available_envs)}"),
+        help=(
+            f"Canonical environment ID to benchmark. One of: {', '.join(available_envs)}"
+        ),
     )
     env_selection.add_argument(
         "--all",
         action="store_true",
-        help="Benchmark every discovered environment.",
+        help="Benchmark every registered SuperDex environment.",
     )
 
     # Worker arguments
@@ -317,6 +332,11 @@ def main():
     )
 
     args = parser.parse_args()
+    if args.env is not None and args.env not in available_envs:
+        parser.error(
+            f"unknown SuperDex environment ID {args.env!r}; choose one of: "
+            + ", ".join(available_envs)
+        )
 
     # Parse worker and environment configuration arguments.
     try:
@@ -368,7 +388,9 @@ def main():
             max_time=args.max_time,
             write_to_file=args.write_to_file,
             output_filename=(
-                f"benchmark_{env_name}.json" if args.all else DEFAULT_OUTPUT_FILENAME
+                f"benchmark_{env_name.replace('/', '_')}.json"
+                if args.all
+                else DEFAULT_OUTPUT_FILENAME
             ),
         )
 

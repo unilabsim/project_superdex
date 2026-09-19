@@ -41,35 +41,32 @@ vectorization strategies, consider using Gymnasium's native wrappers directly:
 - SyncVectorEnv: https://gymnasium.farama.org/api/vector/sync_vector_env/
 """
 
-from typing import Any, Type
+from typing import Any
 
+import gymnasium as gym
 import numpy as np
-from superdex.lab.gym.envs import MochiEnv
-from superdex.lab.gym.envs.benchmarks.cartpole_env import CartPoleEnv
 from superdex.lab.gym.utils.vector import HybridVectorEnv
 
 ########################################################################################
 
 
 def run_with_gymnasium_vectorization(
-    cls: Type[MochiEnv],
+    env_id: str,
     cfg: dict[str, Any],
     num_environments: int,
     num_environments_per_worker: int,
     num_steps: int,
 ):
     """
-    Runs a number of instances of the given environment using our HybridVectorEnv
-    wrapper, which combines async and sync vectorization. Instances are run for the
-    given number of steps.
+    Runs registered environment instances using our HybridVectorEnv wrapper, which
+    combines async and sync vectorization. Instances are run for the given number of
+    steps. Registered variant defaults are merged with ``cfg`` before construction.
     """
-
-    assert issubclass(cls, MochiEnv), "The given class must inherit MochiEnv"
 
     # Generate hybrid (async + sync) vectorized environment. This creates multiple
     # async worker processes, where each worker runs a SyncVectorEnv with multiple
     # environments.
-    env_creators = [lambda: cls(cfg) for _ in range(num_environments)]
+    env_creators = [lambda: gym.make(env_id, **cfg) for _ in range(num_environments)]
     env = HybridVectorEnv(env_creators, num_envs_per_worker=num_environments_per_worker)
     print(f"Created HybridVectorEnv with {num_environments} environments.")
     print(
@@ -121,11 +118,16 @@ def run_with_gymnasium_vectorization(
 
 ########################################################################################
 
-if __name__ == "__main__":
+
+def main() -> None:
     run_with_gymnasium_vectorization(
-        cls=CartPoleEnv,
+        env_id="superdex_gym/CartPole-v0",
         cfg={"render_mode": None},
         num_environments=9,
         num_environments_per_worker=3,
         num_steps=200,
     )
+
+
+if __name__ == "__main__":
+    main()

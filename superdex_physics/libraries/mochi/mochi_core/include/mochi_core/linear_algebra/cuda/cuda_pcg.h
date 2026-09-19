@@ -65,7 +65,7 @@ std::pair<int, LinearSolverConvergenceStatus> CudaPCG_impl(
  * @param[in] b The right-hand side vector of \f$ A x = b\f$.
  * @param[in,out] x Vector containing the initial guess at input and the solution at output.
  * @param[in] P The preconditioner application functor.
- * @param[in] maxIter Maximum number of iterations.
+ * @param[in] maxIter Maximum number of iterations. Must be positive.
  * @param[in,out] statusCheck A functor called at each iteration to check the stop criteria.
  * @param[in] abortIfNotSpd Boolean to abort the solve if the matrix is detected not to be symmetric
  * positive definite. Default is false.
@@ -106,6 +106,9 @@ LinearSolverStatus CudaPCG(
     bool usePolakRibiere = true) {
   using Scalar = std::remove_pointer_t<decltype(b.Data())>;
   using NonConstScalar = std::remove_const_t<Scalar>;
+  MOCHI_ASSERT_VERBOSE(maxIter > 0, "Maximum number of iterations must be positive.");
+  MOCHI_ASSERT(((b.Cols() == x.Cols()) && (x.Cols() == 1)), "Incompatible number of columns");
+
   //--- Represent the operator A with a function to "hide the type" of A.
   auto Afunc = [&](mochi::CudaVectorView<NonConstScalar> const& v,
                    mochi::CudaVectorView<NonConstScalar>& Av) { Apply(A, v, Av); };
@@ -120,7 +123,6 @@ LinearSolverStatus CudaPCG(
     return statusCheck.CheckStatus(iter, r, z, p, Ap);
   };
   //--- Convert to CudaVectorView
-  MOCHI_ASSERT(((b.Cols() == x.Cols()) && (x.Cols() == 1)), "Incompatible number of columns");
   mochi::CudaVectorView<Scalar> bv(b.Data(), b.Rows());
   mochi::CudaVectorView<NonConstScalar> xv(x.Data(), x.Rows());
   //--- Set the "scaling" for the stopping criterion

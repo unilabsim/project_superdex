@@ -18,27 +18,27 @@
 
 // clang-format off
 
-#include <pybind11/pybind11.h>
+#include <limits>
+#include <nanobind/nanobind.h>
 #include "../pybind_include.h"
 
 using namespace mochi;
-namespace py = pybind11;
-using namespace pybind11::literals;
+namespace nb = nanobind;
 
 namespace mochi {
   // Forward declarations for the definitions below.
-  void DeclareMochiPhysics_MochiPhysicsDebugServer(py::module_& m, PybindRegistry& registry);
-  void DefineMochiPhysics_MochiPhysicsDebugServer(py::module_& m, PybindRegistry& registry);
+  void DeclareMochiPhysics_MochiPhysicsDebugServer(nb::module_& m, PybindRegistry& registry);
+  void DefineMochiPhysics_MochiPhysicsDebugServer(nb::module_& m, PybindRegistry& registry);
 } // namespace mochi
 
-void mochi::DeclareMochiPhysics_MochiPhysicsDebugServer([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
-  registry.StoreClass(py::class_<mochi::DebugServer, std::unique_ptr<mochi::DebugServer, py::nodelete>>(m, "DebugServer", "Server API to enable remote debugging and visualization.\n\nSee Also:\n    :func:`~superdex.physics.get_debug_server`"));
+void mochi::DeclareMochiPhysics_MochiPhysicsDebugServer([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+  registry.StoreClass(nb::class_<mochi::DebugServer>(m, "DebugServer", "Server API to enable remote debugging and visualization.\n\nSee Also:\n    :func:`~superdex.physics.get_debug_server`", nb::never_destruct()));
 }
 
-void mochi::DefineMochiPhysics_MochiPhysicsDebugServer([[maybe_unused]] py::module_& m, [[maybe_unused]] PybindRegistry& registry) {
-  registry.GetClass<mochi::DebugServer, std::unique_ptr<mochi::DebugServer, py::nodelete>>()
+void mochi::DefineMochiPhysics_MochiPhysicsDebugServer([[maybe_unused]] nb::module_& m, [[maybe_unused]] PybindRegistry& registry) {
+  registry.GetClass<mochi::DebugServer>()
     .def("start", &mochi::DebugServer::Start
-      , py::arg("preferred_port") = int(7333)
+      , nb::arg("preferred_port") = int(7333)
       , "Start accepting client connections on a TCP port.\n\nArgs:\n    preferred_port (int): Preferred TCP port to listen on. If the port is\n        already in use, the next available port is chosen automatically.\n\nNote:\n    No-op if the server has already been started.\n\nSee Also:\n    :meth:`~superdex.physics.DebugServer.stop`,\n    :meth:`~superdex.physics.DebugServer.has_started`,\n    :meth:`~superdex.physics.DebugServer.get_port`"
     )
     .def("stop", &mochi::DebugServer::Stop
@@ -54,7 +54,7 @@ void mochi::DefineMochiPhysics_MochiPhysicsDebugServer([[maybe_unused]] py::modu
       , "Get the actual TCP port the server is listening on.\n\nMay differ from the port requested in\n:meth:`~superdex.physics.DebugServer.start` if that port was already in use.\n\nReturns:\n    The TCP port currently in use, or 0 if the server is not listening on a TCP\n    socket.\n\nSee Also:\n    :meth:`~superdex.physics.DebugServer.start`"
     )
     .def("set_coordinate_space", &mochi::DebugServer::SetCoordinateSpace
-      , py::arg("space")
+      , nb::arg("space")
       , "Declare the coordinate space this application's scene data is expressed in.\n\nSent to the debugger client so it can render the scene in the correct\norientation. This is purely descriptive metadata: it does not affect simulation.\nThe default is X-right, Y-up, Z-backward.\n\nArgs:\n    space (CoordinateSpace): Coordinate space convention and unit scale of this\n        application's scenes.\n\nNote:\n    Must be called before :meth:`~superdex.physics.DebugServer.start`.\n\nSee Also:\n    :meth:`~superdex.physics.DebugServer.start`"
     )
   ;

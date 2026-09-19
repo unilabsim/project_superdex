@@ -1049,25 +1049,6 @@ static void EvaluateDisplacements(
   *gradientOut = x.DEval(dofValues);
 }
 
-void mochi::SetZeroDisplacements(entt::registry& reg, entt::entity e, Error& error) {
-  MOCHI_ERROR_RETURN(error);
-  MOCHI_PROFILE_SCOPE();
-
-  auto* currDispl = reg.try_get<CDisplacementSlice<real, TimeStep::Current>>(e);
-  MOCHI_ERROR_IF(
-      currDispl == nullptr, error, "CDisplacementSlice<real, TimeStep::Current> required.");
-  auto* prevDispl = reg.try_get<CDisplacementSlice<real, TimeStep::Previous>>(e);
-  MOCHI_ERROR_IF(
-      prevDispl == nullptr, error, "CDisplacementSlice<real, TimeStep::Previous> required.");
-  MOCHI_ERROR_RETURN(error);
-
-  currDispl->value.SetZero();
-  prevDispl->value.SetZero();
-
-  // External state changes invalidate step history.
-  InvalidateActorStepHistory(reg, e);
-}
-
 void mochi::SetNodePositionsLocal(
     entt::registry& reg,
     entt::entity e,
@@ -1102,32 +1083,6 @@ void mochi::SetNodePositionsLocal(
       MakeSpan(currDispl->value), inPositionsLocal, Flatten(cmesh->mesh->GetNodeCoordinates()));
 
   prevDispl->CopyFrom(*currDispl);
-
-  // External state changes invalidate step history.
-  InvalidateActorStepHistory(reg, e);
-}
-
-void mochi::SetZeroVelocities(entt::registry& reg, entt::entity e, Error& error) {
-  MOCHI_ERROR_RETURN(error);
-  MOCHI_PROFILE_SCOPE();
-  auto* prevVel = reg.try_get<CVelocitySlice<real, TimeStep::Previous>>(e);
-  MOCHI_ERROR_IF(prevVel == nullptr, error, "Requires CVelocitySlice<real, TimeStep::Previous>.");
-  MOCHI_ERROR_RETURN(error);
-  prevVel->value.SetZero();
-  auto* currVel = reg.try_get<CVelocitySlice<real, TimeStep::Current>>(e);
-  MOCHI_ERROR_IF(currVel == nullptr, error, "Requires CVelocitySlice<real, TimeStep::Current>.");
-  MOCHI_ERROR_RETURN(error);
-  currVel->value.SetZero();
-
-  // Zero skinned velocity layers if they exist (soft-skinned actors).
-  if (auto* prevVelSkinned =
-          reg.try_get<CVelocitySlice<real, TimeStep::Previous, DisplacementLayer::Skinned>>(e)) {
-    prevVelSkinned->value.SetZero();
-  }
-  if (auto* currVelSkinned =
-          reg.try_get<CVelocitySlice<real, TimeStep::Current, DisplacementLayer::Skinned>>(e)) {
-    currVelSkinned->value.SetZero();
-  }
 
   // External state changes invalidate step history.
   InvalidateActorStepHistory(reg, e);
